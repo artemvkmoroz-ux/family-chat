@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Семейный чат</title>
+<style>
+  body { font-family: Arial; margin: 0; display: flex; height: 100vh; }
+  #sidebar { width: 220px; background: #222; color: white; padding: 10px; overflow-y: auto; }
+  #sidebar h3 { margin-top: 0; }
+  .contact { padding: 8px; cursor: pointer; border-radius: 5px; margin-bottom: 4px; background: #333; }
+  .contact:hover { background: #444; }
+  .contact.active { background: #0a84ff; }
+  #main { flex: 1; display: flex; flex-direction: column; }
+  #chat-header { padding: 10px; background: #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+  #messages { flex: 1; overflow-y: auto; padding: 10px; background: #e5ddd5; }
+  .msg { padding: 6px 10px; margin: 4px 0; border-radius: 8px; max-width: 60%; clear: both; word-wrap: break-word; }
+  .msg.self { background: #dcf8c6; float: right; }
+  .msg.other { background: white; float: left; }
+  .msg .time { font-size: 10px; color: #888; }
+  #input-area { display: flex; padding: 10px; background: #f0f0f0; }
+  #input-area input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+  #input-area button { margin-left: 8px; padding: 8px 16px; }
+  #login { position: fixed; inset: 0; background: #0a84ff; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 200; }
+  #login input { padding: 10px; font-size: 16px; border-radius: 5px; border: none; margin-bottom: 10px; }
+  #login button { padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
+  #video-area { position: fixed; top: 10px; right: 10px; display: none; gap: 10px; z-index: 100; }
+  video { width: 160px; background: black; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<!-- Экран входа -->
+<div id="login">
+  <h2>Вход в семейный чат</h2>
+  <input id="nameInput" placeholder="Введи своё имя" onkeydown="if(event.key==='Enter')register()" />
+  <button onclick="register()">Войти</button>
+</div>
+
+<!-- Контакты -->
+<div id="sidebar">
+  <h3>Контакты</h3>
+  <div id="contacts"></div>
+</div>
+
+<!-- Основная часть -->
+<div id="main">
+  <div id="chat-header">
+    <span id="chatWith">Выбери контакт</span>
+    <div>
+      <button onclick="startCall(false)" id="callBtn" disabled>📞 Звонок</button>
+      <button onclick="startCall(true)" id="videoBtn" disabled>📹 Видео</button>
+    </div>
+  </div>
+  <div id="messages"></div>
+  <div id="input-area">
+    <input id="msgInput" placeholder="Сообщение..." onkeydown="if(event.key==='Enter')sendMsg()" />
+    <button onclick="sendMsg()">➤</button>
+  </div>
+</div>
+
+<!-- Видео -->
+<div id="video-area">
+  <video id="localVideo" autoplay muted></video>
+  <video id="remoteVideo" autoplay></video>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let myName = null;
+let currentChat = null;
+let contacts = [];
+
+// ============ ВХОД ============
+function register() {
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name) return alert('Введи имя');
+  myName = name;
+  socket.emit('register', name);
+  document.getElementById('login').style.display = 'none';
+}
+
+// ============ КОНТАКТЫ ============
+socket.on('contacts', (list) => {
+  contacts = list.filter(u => u.name !== myName);
+  const box = document.getElementById('contacts');
+  box.innerHTML = '';
+  contacts.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'contact' + (currentChat === u.name ? ' active' : '');
+    div.textContent = u.name;
+    div.onclick = () => selectContact(u.name);
+    box.appendChild(div);
+  });
+});
+
+function selectContact(name) {
+  currentChat = name;
+  document.getElementById('chatWith').textContent = name;
+  document.getElementById('callBtn').disabled = false;
+  document.getElementById('videoBtn').disabled = false;
+  document.getElementById('messages').innerHTML = '';
+  socket.emit('load history', { me: myName, withUser: name });
+
+  document.querySelectorAll('.contact').forEach(el => {
+    el.classList.toggle('active', el.textContent === name);
+  });
+}
+
+// ============ ИСТОРИЯ ============
+socket.on('history', ({ withUser, messages }) => {
+  if (withUser !== currentChat) return;
+  const box = document.getElementById('messages');
+  box.innerHTML = '';
+  messages.forEach(m => {
+    addMessage(m.from_user, m.text, m.from_user === myName, m.time);
+  });
+});
+
+// ============ ОТПРАВКА ============
+function sendMsg() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text || !currentChat) return;
+  socket.emit('private message', { to: currentChat, text, from: myName });
+  input.value = '';
+}
+
+socket.on('private message', ({ from, text, self, to, time }) => {
+  if (self && currentChat === to) {
+    addMessage(myName, text, true, time);
+  } else if (!self && from === currentChat) {
+    addMessage(from, text, false, time);
+  }
+});
+
+function addMessage(from, text, self, time) {
+  const box = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (self ? 'self' : 'other');
+  const t = time ? new Date(time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+  div.innerHTML = `<b>${self ? 'Я' : from}:</b> ${escapeHtml(text)} <span class="time">${t}</span>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ============ ЗВОНКИ (WebRTC) ============
+let peerConnection;
+let localStream;
+const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+async function startCall(video) {
+  if (!currentChat) return;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('video-area').style.display = 'flex';
+
+    peerConnection = new RTCPeerConnection(config);
+    localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+
+    peerConnection.onicecandidate = (e) => {
+      if (e.candidate) socket.emit('ice-candidate', { to: currentChat, candidate: e.candidate });
+    };
+    peerConnection.ontrack = (e) => {
+      document.getElementById('remoteVideo').srcObject = e.streams[0];
+    };
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    socket.emit('call-user', { to: currentChat, from: myName, offer, video });
+  } catch (err) {
+    alert('Нет доступа к камере/микрофону: ' + err.message);
+  }
+}
+
+socket.on('incoming-call', async ({ from, offer, video }) => {
+  if (!confirm(`Входящий ${video ? 'видео' : 'аудио'} звонок от ${from}. Принять?`)) {
+    return;
+  }
+  currentChat = from;
+  document.getElementById('chatWith').textContent = from;
+
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('video-area').style.display = 'flex';
+
+    peerConnection = new RTCPeerConnection(config);
+    localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+
+    peerConnection.onicecandidate = (e) => {
+      if (e.candidate) socket.emit('ice-candidate', { to: currentChat, candidate: e.candidate });
+    };
+    peerConnection.ontrack = (e) => {
+      document.getElementById('remoteVideo').srcObject = e.streams[0];
+    };
+
+    await peerConnection.setRemoteDescription(offer);
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.emit('answer-call', { to: currentChat, answer });
+  } catch (err) {
+    alert('Ошибка: ' + err.message);
+  }
+});
+
+socket.on('call-answered', async ({ answer }) => {
+  if (peerConnection) await peerConnection.setRemoteDescription(answer);
+});
+
+socket.on('ice-candidate', async ({ candidate }) => {
+  if (peerConnection) {
+    try { await peerConnection.addIceCandidate(candidate); } catch (e) {}
+  }
+});
+
+socket.on('call-ended', () => {
+  if (peerConnection) { peerConnection.close(); peerConnection = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  document.getElementById('video-area').style.display = 'none';
+  document.getElementById('localVideo').srcObject = null;
+  document.getElementById('remoteVideo').srcObject = null;
+});
+</script>
+</body>
+</html>
