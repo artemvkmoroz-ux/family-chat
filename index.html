@@ -9,29 +9,24 @@
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
   /* ВХОД */
-  #login { position: fixed; inset: 0; background: #0a0a0a; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; z-index: 1000; }
+  #login { position: fixed; inset: 0; background: #0a0a0a; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 30px; z-index: 1000; }
   #login h1 { font-size: 26px; margin-bottom: 8px; }
   #login p { color: #888; margin-bottom: 24px; font-size: 14px; text-align: center; }
-  #login-avatar {
-    width: 110px; height: 110px; border-radius: 50%;
-    background: #1c1c1e; display: flex; align-items: center; justify-content: center;
-    font-size: 36px; margin-bottom: 28px; cursor: pointer;
-    border: 3px dashed #444; overflow: hidden;
-    background-size: cover; background-position: center; background-repeat: no-repeat;
-    transition: border-color 0.2s;
-  }
-  #login-avatar:hover { border-color: #0a84ff; }
+  #login-avatar { width: 110px; height: 110px; border-radius: 50%; background: #1c1c1e; display: flex; align-items: center; justify-content: center; font-size: 36px; margin-bottom: 28px; cursor: pointer; border: 3px dashed #444; overflow: hidden; background-size: cover; background-position: center; background-repeat: no-repeat; transition: border-color 0.2s; }
   #login-avatar.has-photo { border-style: solid; border-color: #0a84ff; }
-  #nameInput {
-    width: 100%; max-width: 320px; padding: 14px 16px; font-size: 16px;
-    background: #1c1c1e; border: 1px solid #2c2c2e; border-radius: 12px;
-    color: #fff; margin-bottom: 12px; outline: none;
-  }
+  #nameInput { width: 100%; max-width: 320px; padding: 14px 16px; font-size: 16px; background: #1c1c1e; border: 1px solid #2c2c2e; border-radius: 12px; color: #fff; margin-bottom: 12px; outline: none; }
   #nameInput:focus { border-color: #0a84ff; }
-  #login-btn {
-    width: 100%; max-width: 320px; padding: 14px; font-size: 16px; font-weight: 600;
-    background: #0a84ff; border: none; border-radius: 12px; color: #fff; cursor: pointer;
+  #login-btn { width: 100%; max-width: 320px; padding: 14px; font-size: 16px; font-weight: 600; background: #0a84ff; border: none; border-radius: 12px; color: #fff; cursor: pointer; }
+
+  /* БАННЕР УВЕДОМЛЕНИЙ */
+  #notif-banner {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: #0a84ff; color: #fff; padding: 12px 16px;
+    display: none; align-items: center; justify-content: space-between;
+    z-index: 3000; font-size: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
   }
+  #notif-banner.active { display: flex; }
+  #notif-banner button { background: rgba(255,255,255,0.25); border: none; color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600; }
 
   /* ГЛАВНЫЙ */
   #app { display: none; flex-direction: column; height: 100vh; }
@@ -41,33 +36,27 @@
   .icon-btn { width: 36px; height: 36px; border-radius: 50%; background: #1c1c1e; border: none; color: #fff; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 0; }
   .icon-btn img { width: 100%; height: 100%; object-fit: cover; }
   #search-wrap { padding: 0 16px 10px; }
-  #search {
-    width: 100%; padding: 10px 14px 10px 38px;
-    background: #1c1c1e; border: none; border-radius: 10px; color: #fff; font-size: 15px; outline: none;
+  #search { width: 100%; padding: 10px 14px 10px 38px; background: #1c1c1e; border: none; border-radius: 10px; color: #fff; font-size: 15px; outline: none;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23888' viewBox='0 0 16 16'><path d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/></svg>");
     background-repeat: no-repeat; background-position: 14px center;
   }
   #chat-list { flex: 1; overflow-y: auto; padding: 0 8px; }
   .chat-item { display: flex; align-items: center; gap: 12px; padding: 12px 8px; border-radius: 12px; cursor: pointer; }
   .chat-item:hover, .chat-item.active { background: #1c1c1e; }
-  .avatar {
-    width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 600; font-size: 18px; color: #fff;
-    background-size: cover; background-position: center; background-repeat: no-repeat;
-    position: relative;
-  }
-  .avatar .online-dot {
-    position: absolute; bottom: 2px; right: 2px;
-    width: 12px; height: 12px; border-radius: 50%;
-    background: #4caf50; border: 2px solid #0a0a0a;
-  }
+  .chat-item.unread .chat-name { color: #fff; font-weight: 700; }
+  .chat-item.unread .chat-preview { color: #ccc; font-weight: 500; }
+
+  .avatar { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 18px; color: #fff; background-size: cover; background-position: center; background-repeat: no-repeat; position: relative; }
+  .avatar .online-dot { position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px; border-radius: 50%; background: #4caf50; border: 2px solid #0a0a0a; }
   .chat-info { flex: 1; min-width: 0; }
   .chat-name { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
   .chat-preview { font-size: 14px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-meta { text-align: right; flex-shrink: 0; }
+  .chat-time { font-size: 12px; color: #888; margin-bottom: 4px; }
+  .chat-badge { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; padding: 0 7px; background: #ff3b30; color: #fff; border-radius: 11px; font-size: 12px; font-weight: 700; text-align: center; }
 
   #tabbar { display: flex; justify-content: space-around; padding: 10px 0 20px; border-top: 1px solid #1c1c1e; }
-  .tab { flex: 1; text-align: center; color: #666; font-size: 11px; cursor: pointer; padding: 4px; }
+  .tab { flex: 1; text-align: center; color: #666; font-size: 11px; cursor: pointer; padding: 4px; position: relative; }
   .tab.active { color: #0a84ff; }
   .tab .tab-icon { font-size: 22px; display: block; margin-bottom: 2px; }
 
@@ -115,16 +104,20 @@
 </head>
 <body>
 
+<!-- БАННЕР РАЗРЕШЕНИЯ УВЕДОМЛЕНИЙ -->
+<div id="notif-banner">
+  <span>🔔 Включить уведомления о сообщениях?</span>
+  <button onclick="enableNotifications()">Включить</button>
+</div>
+
 <!-- ВХОД -->
 <div id="login">
   <h1>💬 Семейный чат</h1>
   <p>Выбери фото и введи имя</p>
-
   <div id="login-avatar" onclick="document.getElementById('avatarFile').click()">
     <span id="login-avatar-text">📷</span>
   </div>
   <input type="file" id="avatarFile" accept="image/*" style="display:none" onchange="previewAvatar(event)" />
-
   <input id="nameInput" placeholder="Например: Артём" onkeydown="if(event.key==='Enter')register()" />
   <button id="login-btn" onclick="register()">Войти</button>
 </div>
@@ -200,27 +193,129 @@ let myAvatar = null;
 let currentChat = null;
 let contacts = [];
 
-// ============ ПАМЯТЬ ТЕЛЕФОНА (localStorage) ============
+// Непрочитанные сообщения: { имя: количество }
+let unread = {};
+
+// ============ ПАМЯТЬ ТЕЛЕФОНА ============
 const STORAGE_KEY = 'family-chat-profile';
+const UNREAD_KEY = 'family-chat-unread';
 
 function saveProfile() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name: myName, avatar: myAvatar }));
-  } catch (e) { console.warn('Не удалось сохранить профиль', e); }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ name: myName, avatar: myAvatar })); } catch (e) {}
 }
-
 function loadProfile() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (data && data.name) return data;
-  } catch (e) { console.warn('Не удалось прочитать профиль', e); }
+    const d = JSON.parse(raw);
+    if (d && d.name) return d;
+  } catch (e) {}
   return null;
 }
-
 function clearProfile() {
-  try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(UNREAD_KEY); } catch (e) {}
+}
+function saveUnread() {
+  try { localStorage.setItem(UNREAD_KEY, JSON.stringify(unread)); } catch (e) {}
+}
+function loadUnread() {
+  try {
+    const raw = localStorage.getItem(UNREAD_KEY);
+    if (raw) unread = JSON.parse(raw) || {};
+  } catch (e) { unread = {}; }
+}
+
+// ============ УВЕДОМЛЕНИЯ ============
+let notificationsAllowed = false;
+
+function initNotifications() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    notificationsAllowed = true;
+  } else if (Notification.permission === 'default') {
+    // Покажем свой баннер с просьбой
+    const banner = document.getElementById('notif-banner');
+    if (banner) banner.classList.add('active');
+  }
+}
+
+async function enableNotifications() {
+  document.getElementById('notif-banner').classList.remove('active');
+  if (!('Notification' in window)) {
+    alert('Твой браузер не поддерживает уведомления');
+    return;
+  }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      notificationsAllowed = true;
+      new Notification('Семейный чат', { body: 'Уведомления включены! 🎉' });
+    }
+  } catch (e) {
+    alert('Не удалось включить уведомления: ' + e.message);
+  }
+}
+
+// Звук «пик» через Web Audio API (не нужен файл)
+function playPing() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (e) { /* браузер может блокировать звук без действия пользователя */ }
+}
+
+function vibrate() {
+  if ('vibrate' in navigator) {
+    try { navigator.vibrate([100, 50, 100]); } catch (e) {}
+  }
+}
+
+function showBrowserNotification(from, text) {
+  if (!notificationsAllowed) return;
+  if (document.visibilityState === 'visible' && currentChat === from) return;
+  try {
+    const n = new Notification('💬 ' + from, {
+      body: text,
+      tag: 'chat-' + from,
+      icon: myAvatar || undefined
+    });
+    n.onclick = () => {
+      window.focus();
+      if (currentChat !== from) openChat(from);
+      n.close();
+    };
+  } catch (e) {}
+}
+
+// Обновление заголовка вкладки
+let titleFlashInterval = null;
+function updateTitle() {
+  const total = Object.values(unread).reduce((a, b) => a + b, 0);
+  if (total > 0) {
+    if (!titleFlashInterval) {
+      let on = true;
+      titleFlashInterval = setInterval(() => {
+        document.title = on ? `(${total}) Новые сообщения` : '💬 Семейный чат';
+        on = !on;
+      }, 1000);
+    }
+  } else {
+    if (titleFlashInterval) {
+      clearInterval(titleFlashInterval);
+      titleFlashInterval = null;
+    }
+    document.title = 'Семейный чат';
+  }
 }
 
 // ============ ВХОД ============
@@ -232,7 +327,6 @@ function register() {
   enterChat();
 }
 
-// Входим в чат (используется и при первом входе, и при автовходе)
 function enterChat() {
   socket.emit('register', myName);
   if (myAvatar) socket.emit('set avatar', { name: myName, avatar: myAvatar });
@@ -241,17 +335,24 @@ function enterChat() {
   updateMyAvatarBtn();
 }
 
-// ============ АВТОВХОД ПРИ ОТКРЫТИИ ============
 window.addEventListener('load', () => {
+  loadUnread();
+  initNotifications();
+
   const saved = loadProfile();
   if (saved) {
     myName = saved.name;
     myAvatar = saved.avatar || null;
-    // Сразу входим, экран логина даже не мелькнёт
     enterChat();
   } else {
-    // Показываем экран входа
     document.getElementById('login').style.display = 'flex';
+  }
+});
+
+// При возврате во вкладку — обновляем заголовок
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentChat) {
+    clearUnread(currentChat);
   }
 });
 
@@ -273,7 +374,6 @@ function previewAvatar(event) {
       ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
       myAvatar = canvas.toDataURL('image/jpeg', 0.8);
 
-      // Обновим превью на экране входа
       const box = document.getElementById('login-avatar');
       if (box) {
         box.style.backgroundImage = `url(${myAvatar})`;
@@ -281,14 +381,11 @@ function previewAvatar(event) {
         const t = document.getElementById('login-avatar-text');
         if (t) t.style.display = 'none';
       }
-
-      // Если уже в чате — сразу отправим на сервер
       if (myName) {
         socket.emit('set avatar', { name: myName, avatar: myAvatar });
         updateMyAvatarBtn();
       }
-
-      saveProfile(); // сохраним в память телефона
+      saveProfile();
       closePhotoModal();
     };
     img.src = e.target.result;
@@ -314,15 +411,12 @@ function updateMyAvatarBtn() {
 // ============ СПИСОК ЧАТОВ ============
 socket.on('contacts', (list) => {
   contacts = list.filter(u => u.name !== myName);
-
-  // Синхронизируем аватарку, если сервер знает другую
   const me = list.find(u => u.name === myName);
   if (me && me.avatar && me.avatar !== myAvatar) {
     myAvatar = me.avatar;
     saveProfile();
     updateMyAvatarBtn();
   }
-
   renderChatList();
 });
 
@@ -339,15 +433,20 @@ function renderChatList() {
 
   filtered.forEach(u => {
     const div = document.createElement('div');
-    div.className = 'chat-item' + (currentChat === u.name ? ' active' : '');
+    const unreadCount = unread[u.name] || 0;
+    div.className = 'chat-item' + (currentChat === u.name ? ' active' : '') + (unreadCount > 0 ? ' unread' : '');
     const onlineDot = u.online ? '<span class="online-dot"></span>' : '';
     const style = u.avatar ? `background-image:url(${u.avatar})` : `background:#5f27cd`;
     const content = u.avatar ? '' : initials(u.name);
+    const badge = unreadCount > 0 ? `<div class="chat-badge">${unreadCount}</div>` : '';
     div.innerHTML = `
       <div class="avatar" style="${style}">${content}${onlineDot}</div>
       <div class="chat-info">
         <div class="chat-name">${escapeHtml(u.name)}</div>
-        <div class="chat-preview">Нажми, чтобы написать</div>
+        <div class="chat-preview">${unreadCount > 0 ? '🔴 Новое сообщение' : 'Нажми, чтобы написать'}</div>
+      </div>
+      <div class="chat-meta">
+        ${badge}
       </div>
     `;
     div.onclick = () => openChat(u.name);
@@ -359,12 +458,12 @@ function initials(name) {
   const p = name.trim().split(/\s+/);
   return p.length >= 2 ? (p[0][0] + p[1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
 }
-
 function filterContacts() { renderChatList(); }
 
 // ============ ОТКРЫТИЕ ЧАТА ============
 function openChat(name) {
   currentChat = name;
+  clearUnread(name);
   const contact = contacts.find(c => c.name === name);
   document.getElementById('chat-top-name').textContent = name;
   document.getElementById('chat-top-status').textContent = contact?.online ? 'в сети' : 'был(а) недавно';
@@ -391,6 +490,15 @@ function closeChat() {
   renderChatList();
 }
 
+function clearUnread(name) {
+  if (unread[name]) {
+    delete unread[name];
+    saveUnread();
+    updateTitle();
+    renderChatList();
+  }
+}
+
 // ============ ИСТОРИЯ ============
 socket.on('history', ({ withUser, messages }) => {
   if (withUser !== currentChat) return;
@@ -409,8 +517,24 @@ function sendMsg() {
 }
 
 socket.on('private message', ({ from, text, self, to, time }) => {
-  if (self && currentChat === to) addMessage(myName, text, true, time);
-  else if (!self && from === currentChat) addMessage(from, text, false, time);
+  if (self && currentChat === to) {
+    addMessage(myName, text, true, time);
+  } else if (!self) {
+    // Входящее сообщение от кого-то
+    if (from === currentChat) {
+      addMessage(from, text, false, time);
+      clearUnread(from);
+    } else {
+      // Сообщение не в открытом чате — уведомляем!
+      unread[from] = (unread[from] || 0) + 1;
+      saveUnread();
+      renderChatList();
+      updateTitle();
+      playPing();
+      vibrate();
+      showBrowserNotification(from, text);
+    }
+  }
 });
 
 function addMessage(from, text, self, time) {
