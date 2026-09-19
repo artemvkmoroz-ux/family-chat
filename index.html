@@ -6,76 +6,59 @@
 <title>Семейный чат</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0a0a0a;
-    color: #fff;
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-  /* ===== ЭКРАН ВХОДА ===== */
-  #login {
-    position: fixed; inset: 0; background: #0a0a0a;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 30px; z-index: 1000;
+  /* ВХОД */
+  #login { position: fixed; inset: 0; background: #0a0a0a; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; z-index: 1000; }
+  #login h1 { font-size: 26px; margin-bottom: 8px; }
+  #login p { color: #888; margin-bottom: 24px; font-size: 14px; text-align: center; }
+
+  #login-avatar {
+    width: 110px; height: 110px; border-radius: 50%;
+    background: #1c1c1e; display: flex; align-items: center; justify-content: center;
+    font-size: 36px; margin-bottom: 28px; cursor: pointer;
+    border: 3px dashed #444; overflow: hidden;
+    background-size: cover; background-position: center; background-repeat: no-repeat;
+    transition: border-color 0.2s;
   }
-  #login h1 { font-size: 28px; margin-bottom: 8px; color: #fff; }
-  #login p { color: #888; margin-bottom: 30px; font-size: 14px; }
-  #login input {
+  #login-avatar:hover { border-color: #0a84ff; }
+  #login-avatar.has-photo { border-style: solid; border-color: #0a84ff; }
+
+  #nameInput {
     width: 100%; max-width: 320px; padding: 14px 16px; font-size: 16px;
     background: #1c1c1e; border: 1px solid #2c2c2e; border-radius: 12px;
     color: #fff; margin-bottom: 12px; outline: none;
   }
-  #login input:focus { border-color: #0a84ff; }
-  #login button {
+  #nameInput:focus { border-color: #0a84ff; }
+  #login-btn {
     width: 100%; max-width: 320px; padding: 14px; font-size: 16px; font-weight: 600;
     background: #0a84ff; border: none; border-radius: 12px; color: #fff; cursor: pointer;
   }
+  #login-btn:disabled { opacity: 0.4; }
 
-  /* ===== ГЛАВНЫЙ ЭКРАН ===== */
+  /* ГЛАВНЫЙ */
   #app { display: none; flex-direction: column; height: 100vh; }
   #app.active { display: flex; }
-
-  /* Шапка */
-  #header {
-    padding: 14px 16px 10px;
-    display: flex; align-items: center; justify-content: space-between;
-    background: #0a0a0a;
-  }
+  #header { padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between; }
   #header h2 { font-size: 22px; font-weight: 700; }
-  .header-actions { display: flex; gap: 12px; align-items: center; }
-  .icon-btn {
-    width: 36px; height: 36px; border-radius: 50%; background: #1c1c1e;
-    border: none; color: #fff; font-size: 18px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .icon-btn.primary { background: #0a84ff; }
-
-  /* Поиск */
+  .icon-btn { width: 36px; height: 36px; border-radius: 50%; background: #1c1c1e; border: none; color: #fff; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 0; }
+  .icon-btn img { width: 100%; height: 100%; object-fit: cover; }
   #search-wrap { padding: 0 16px 10px; }
   #search {
     width: 100%; padding: 10px 14px 10px 38px;
-    background: #1c1c1e; border: none; border-radius: 10px;
-    color: #fff; font-size: 15px; outline: none;
+    background: #1c1c1e; border: none; border-radius: 10px; color: #fff; font-size: 15px; outline: none;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23888' viewBox='0 0 16 16'><path d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/></svg>");
     background-repeat: no-repeat; background-position: 14px center;
   }
-
-  /* Список чатов */
   #chat-list { flex: 1; overflow-y: auto; padding: 0 8px; }
-  .chat-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 8px; border-radius: 12px; cursor: pointer;
-    transition: background 0.15s;
-  }
+  .chat-item { display: flex; align-items: center; gap: 12px; padding: 12px 8px; border-radius: 12px; cursor: pointer; }
   .chat-item:hover, .chat-item.active { background: #1c1c1e; }
+
   .avatar {
-    width: 52px; height: 52px; border-radius: 50%;
+    width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 600; font-size: 18px; color: #fff; flex-shrink: 0;
+    font-weight: 600; font-size: 18px; color: #fff;
+    background-size: cover; background-position: center; background-repeat: no-repeat;
     position: relative;
   }
   .avatar .online-dot {
@@ -84,116 +67,86 @@
     background: #4caf50; border: 2px solid #0a0a0a;
   }
   .chat-info { flex: 1; min-width: 0; }
-  .chat-name {
-    font-size: 16px; font-weight: 600; margin-bottom: 3px;
-  }
-  .chat-preview {
-    font-size: 14px; color: #888; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis;
-  }
-  .chat-meta { text-align: right; flex-shrink: 0; }
-  .chat-time { font-size: 12px; color: #888; }
+  .chat-name { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+  .chat-preview { font-size: 14px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* Нижнее меню */
-  #tabbar {
-    display: flex; justify-content: space-around; align-items: center;
-    padding: 10px 0 20px; background: #0a0a0a; border-top: 1px solid #1c1c1e;
-  }
-  .tab {
-    flex: 1; text-align: center; color: #666; font-size: 11px;
-    cursor: pointer; padding: 4px;
-  }
+  /* НИЖНЕЕ МЕНЮ */
+  #tabbar { display: flex; justify-content: space-around; padding: 10px 0 20px; border-top: 1px solid #1c1c1e; }
+  .tab { flex: 1; text-align: center; color: #666; font-size: 11px; cursor: pointer; padding: 4px; }
   .tab.active { color: #0a84ff; }
   .tab .tab-icon { font-size: 22px; display: block; margin-bottom: 2px; }
 
-  /* ===== ЭКРАН ЧАТА ===== */
-  #chat-screen {
-    position: fixed; inset: 0; background: #0a0a0a;
-    display: none; flex-direction: column; z-index: 500;
-  }
+  /* ЧАТ */
+  #chat-screen { position: fixed; inset: 0; background: #0a0a0a; display: none; flex-direction: column; z-index: 500; }
   #chat-screen.active { display: flex; }
-  #chat-top {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 16px; background: #0a0a0a; border-bottom: 1px solid #1c1c1e;
-  }
-  .back-btn {
-    background: none; border: none; color: #0a84ff;
-    font-size: 22px; cursor: pointer; padding: 4px 8px;
-  }
+  #chat-top { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #1c1c1e; }
+  .back-btn { background: none; border: none; color: #0a84ff; font-size: 22px; cursor: pointer; padding: 4px 8px; }
   #chat-top .avatar { width: 38px; height: 38px; font-size: 14px; }
   #chat-top-name { font-weight: 600; font-size: 16px; }
   #chat-top-status { font-size: 12px; color: #888; margin-top: 2px; }
   #call-actions { display: flex; gap: 8px; margin-left: auto; }
-  #call-actions button {
-    background: none; border: none; color: #0a84ff;
-    font-size: 22px; cursor: pointer; padding: 4px;
-  }
+  #call-actions button { background: none; border: none; color: #0a84ff; font-size: 22px; cursor: pointer; padding: 4px; }
 
-  #messages {
-    flex: 1; overflow-y: auto; padding: 12px 14px;
-    background: #0a0a0a;
-  }
-  .msg {
-    max-width: 75%; padding: 9px 13px; margin: 3px 0;
-    border-radius: 18px; font-size: 15px; line-height: 1.35;
-    word-wrap: break-word; clear: both;
-  }
-  .msg.self { background: #0a84ff; color: #fff; float: right; border-bottom-right-radius: 5px; }
-  .msg.other { background: #1c1c1e; color: #fff; float: left; border-bottom-left-radius: 5px; }
+  #messages { flex: 1; overflow-y: auto; padding: 12px 14px; }
+  .msg { max-width: 75%; padding: 9px 13px; margin: 3px 0; border-radius: 18px; font-size: 15px; word-wrap: break-word; clear: both; }
+  .msg.self { background: #0a84ff; float: right; border-bottom-right-radius: 5px; }
+  .msg.other { background: #1c1c1e; float: left; border-bottom-left-radius: 5px; }
   .msg .time { font-size: 10px; opacity: 0.6; margin-left: 6px; }
 
-  #input-area {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 12px 24px; background: #0a0a0a; border-top: 1px solid #1c1c1e;
-  }
-  #input-area input {
-    flex: 1; padding: 11px 16px; background: #1c1c1e;
-    border: none; border-radius: 22px; color: #fff;
-    font-size: 15px; outline: none;
-  }
-  #input-area button {
-    width: 42px; height: 42px; border-radius: 50%;
-    background: #0a84ff; border: none; color: #fff;
-    font-size: 18px; cursor: pointer; flex-shrink: 0;
-  }
+  #input-area { display: flex; align-items: center; gap: 8px; padding: 10px 12px 24px; border-top: 1px solid #1c1c1e; }
+  #input-area input { flex: 1; padding: 11px 16px; background: #1c1c1e; border: none; border-radius: 22px; color: #fff; font-size: 15px; outline: none; }
+  #input-area button { width: 42px; height: 42px; border-radius: 50%; background: #0a84ff; border: none; color: #fff; font-size: 18px; cursor: pointer; }
 
-  /* ===== ВИДЕО ===== */
-  #video-area {
-    position: fixed; top: 10px; right: 10px; display: none;
-    flex-direction: column; gap: 10px; z-index: 1000;
-    background: rgba(0,0,0,0.85); padding: 10px; border-radius: 16px;
-  }
+  /* ВИДЕО */
+  #video-area { position: fixed; top: 10px; right: 10px; display: none; flex-direction: column; gap: 10px; z-index: 1000; background: rgba(0,0,0,0.85); padding: 10px; border-radius: 16px; }
   #video-area.active { display: flex; }
   video { width: 150px; background: #000; border-radius: 12px; }
   #call-controls { display: flex; gap: 6px; justify-content: center; }
-  #call-controls button {
-    padding: 8px 10px; border: none; border-radius: 8px;
-    cursor: pointer; font-size: 16px; background: #2c2c2e; color: #fff;
-  }
+  #call-controls button { padding: 8px 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; background: #2c2c2e; color: #fff; }
   #call-controls button.off { background: #ff3b30; }
 
-  @media (max-width: 600px) {
-    video { width: 90px; }
-  }
+  /* МОДАЛКА ВЫБОРА ФОТО */
+  #photo-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+  #photo-modal.active { display: flex; }
+  .modal-box { background: #1c1c1e; border-radius: 16px; padding: 20px; max-width: 340px; width: 100%; text-align: center; }
+  .modal-box h3 { margin-bottom: 16px; font-size: 18px; }
+  .modal-box button { width: 100%; padding: 12px; margin-bottom: 8px; border: none; border-radius: 10px; font-size: 15px; cursor: pointer; }
+  .modal-primary { background: #0a84ff; color: #fff; font-weight: 600; }
+  .modal-secondary { background: #2c2c2e; color: #fff; }
+
+  @media (max-width: 600px) { video { width: 90px; } }
 </style>
 </head>
 <body>
 
-<!-- ЭКРАН ВХОДА -->
+<!-- ВХОД -->
 <div id="login">
   <h1>💬 Семейный чат</h1>
-  <p>Введи своё имя, чтобы войти</p>
+  <p>Выбери фото и введи имя</p>
+
+  <div id="login-avatar" onclick="document.getElementById('avatarFile').click()">
+    <span id="login-avatar-text">📷</span>
+  </div>
+  <input type="file" id="avatarFile" accept="image/*" style="display:none" onchange="previewAvatar(event)" />
+
   <input id="nameInput" placeholder="Например: Артём" onkeydown="if(event.key==='Enter')register()" />
-  <button onclick="register()">Войти</button>
+  <button id="login-btn" onclick="register()">Войти</button>
+</div>
+
+<!-- МОДАЛКА ВЫБОРА -->
+<div id="photo-modal">
+  <div class="modal-box">
+    <h3>Аватарка</h3>
+    <button class="modal-primary" onclick="document.getElementById('avatarFile').click()">📷 Выбрать фото</button>
+    <button class="modal-secondary" onclick="closePhotoModal()">Отмена</button>
+  </div>
 </div>
 
 <!-- ГЛАВНЫЙ ЭКРАН -->
 <div id="app">
   <div id="header">
     <h2>Чаты</h2>
-    <div class="header-actions">
-      <button class="icon-btn" onclick="alert('Кнопка «Добавить контакт» пока в разработке')">＋</button>
-    </div>
+    <button class="icon-btn" id="my-avatar-btn" onclick="openPhotoModal()"></button>
   </div>
 
   <div id="search-wrap">
@@ -210,7 +163,7 @@
   </div>
 </div>
 
-<!-- ЭКРАН ЧАТА -->
+<!-- ЧАТ -->
 <div id="chat-screen">
   <div id="chat-top">
     <button class="back-btn" onclick="closeChat()">‹</button>
@@ -220,8 +173,8 @@
       <div id="chat-top-status">—</div>
     </div>
     <div id="call-actions">
-      <button onclick="startCall(false)" title="Аудиозвонок">📞</button>
-      <button onclick="startCall(true)" title="Видеозвонок">📹</button>
+      <button onclick="startCall(false)">📞</button>
+      <button onclick="startCall(true)">📹</button>
     </div>
   </div>
   <div id="messages"></div>
@@ -246,25 +199,9 @@
 <script>
 const socket = io();
 let myName = null;
+let myAvatar = null;   // base64 фото
 let currentChat = null;
 let contacts = [];
-
-// Цвета для аватарок
-const AVATAR_COLORS = ['#ff6b6b','#feca57','#48dbfb','#1dd1a1','#5f27cd','#ff9ff3','#54a0ff','#00d2d3','#f368e0','#ff7675'];
-function colorForName(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-function initialsForName(name) {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
-function makeAvatarHTML(name, id) {
-  const idAttr = id ? ` id="${id}"` : '';
-  return `<div class="avatar"${idAttr} style="background:${colorForName(name)}">${initialsForName(name)}</div>`;
-}
 
 // ============ ВХОД ============
 function register() {
@@ -272,13 +209,84 @@ function register() {
   if (!name) return alert('Введи имя');
   myName = name;
   socket.emit('register', name);
+  if (myAvatar) socket.emit('set avatar', { name, avatar: myAvatar });
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').classList.add('active');
+  updateMyAvatarBtn();
+}
+
+// ============ ВЫБОР ФОТО ============
+function previewAvatar(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    // Сжимаем фото до 200x200
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const size = 200;
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      // Квадратная обрезка по центру
+      const min = Math.min(img.width, img.height);
+      const sx = (img.width - min) / 2;
+      const sy = (img.height - min) / 2;
+      ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+      myAvatar = canvas.toDataURL('image/jpeg', 0.8);
+
+      // Обновляем превью на экране входа
+      const box = document.getElementById('login-avatar');
+      box.style.backgroundImage = `url(${myAvatar})`;
+      box.classList.add('has-photo');
+      document.getElementById('login-avatar-text').style.display = 'none';
+
+      // Если уже в приложении — сразу отправим на сервер
+      if (myName) {
+        socket.emit('set avatar', { name: myName, avatar: myAvatar });
+        updateMyAvatarBtn();
+      }
+      closePhotoModal();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function openPhotoModal() {
+  document.getElementById('photo-modal').classList.add('active');
+}
+function closePhotoModal() {
+  document.getElementById('photo-modal').classList.remove('active');
+}
+
+function updateMyAvatarBtn() {
+  const btn = document.getElementById('my-avatar-btn');
+  if (myAvatar) {
+    btn.innerHTML = `<img src="${myAvatar}" alt="">`;
+  } else {
+    btn.textContent = '📷';
+  }
 }
 
 // ============ СПИСОК ЧАТОВ ============
 socket.on('contacts', (list) => {
   contacts = list.filter(u => u.name !== myName);
+
+  // Обновим свою аватарку, если сервер вернул её
+  const me = list.find(u => u.name === myName);
+  if (me && me.avatar && !myAvatar) {
+    myAvatar = me.avatar;
+    updateMyAvatarBtn();
+    const box = document.getElementById('login-avatar');
+    if (box) {
+      box.style.backgroundImage = `url(${myAvatar})`;
+      box.classList.add('has-photo');
+      const txt = document.getElementById('login-avatar-text');
+      if (txt) txt.style.display = 'none';
+    }
+  }
+
   renderChatList();
 });
 
@@ -297,20 +305,23 @@ function renderChatList() {
     const div = document.createElement('div');
     div.className = 'chat-item' + (currentChat === u.name ? ' active' : '');
     const onlineDot = u.online ? '<span class="online-dot"></span>' : '';
-    const avatarHTML = `<div class="avatar" style="background:${colorForName(u.name)}">${initialsForName(u.name)}${onlineDot}</div>`;
+    const style = u.avatar ? `background-image:url(${u.avatar})` : `background:#5f27cd`;
+    const content = u.avatar ? '' : initials(u.name);
     div.innerHTML = `
-      ${avatarHTML}
+      <div class="avatar" style="${style}">${content}${onlineDot}</div>
       <div class="chat-info">
         <div class="chat-name">${escapeHtml(u.name)}</div>
         <div class="chat-preview">Нажми, чтобы написать</div>
-      </div>
-      <div class="chat-meta">
-        <div class="chat-time">${u.online ? 'в сети' : ''}</div>
       </div>
     `;
     div.onclick = () => openChat(u.name);
     box.appendChild(div);
   });
+}
+
+function initials(name) {
+  const p = name.trim().split(/\s+/);
+  return p.length >= 2 ? (p[0][0] + p[1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
 }
 
 function filterContacts() { renderChatList(); }
@@ -321,9 +332,17 @@ function openChat(name) {
   const contact = contacts.find(c => c.name === name);
   document.getElementById('chat-top-name').textContent = name;
   document.getElementById('chat-top-status').textContent = contact?.online ? 'в сети' : 'был(а) недавно';
+
   const av = document.getElementById('chat-avatar');
-  av.textContent = initialsForName(name);
-  av.style.background = colorForName(name);
+  if (contact?.avatar) {
+    av.style.backgroundImage = `url(${contact.avatar})`;
+    av.textContent = '';
+  } else {
+    av.style.backgroundImage = '';
+    av.textContent = initials(name);
+    av.style.background = '#5f27cd';
+  }
+
   document.getElementById('messages').innerHTML = '';
   document.getElementById('chat-screen').classList.add('active');
   socket.emit('load history', { me: myName, withUser: name });
@@ -341,9 +360,7 @@ socket.on('history', ({ withUser, messages }) => {
   if (withUser !== currentChat) return;
   const box = document.getElementById('messages');
   box.innerHTML = '';
-  messages.forEach(m => {
-    addMessage(m.from_user, m.text, m.from_user === myName, m.time);
-  });
+  messages.forEach(m => addMessage(m.from_user, m.text, m.from_user === myName, m.time));
 });
 
 // ============ СООБЩЕНИЯ ============
@@ -396,7 +413,7 @@ async function startCall(video) {
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     socket.emit('call-user', { to: currentChat, from: myName, offer, video });
-  } catch (err) { alert('Нет доступа к камере/микрофону: ' + err.message); }
+  } catch (err) { alert('Нет доступа: ' + err.message); }
 }
 
 socket.on('call-failed', ({ reason }) => alert('Не удалось позвонить: ' + reason));
