@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Aurora</title>
+
+<!-- PWA манифест -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a84ff">
+
+<!-- iOS: добавление на домашний экран -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Aurora">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icon-192.png">
+
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
@@ -93,38 +107,19 @@
   .msg img.photo { max-width: 100%; border-radius: 12px; display: block; margin-bottom: 4px; cursor: pointer; }
 
   /* РЕАКЦИИ */
-  .reactions {
-    display: flex; gap: 4px; margin-top: 4px;
-    flex-wrap: wrap;
-  }
-  .reaction-chip {
-    display: inline-flex; align-items: center; gap: 3px;
-    padding: 3px 8px; background: #1c1c1e;
-    border: 1px solid #2c2c2e; border-radius: 12px;
-    font-size: 12px; color: #fff; cursor: pointer;
-    user-select: none;
-  }
+  .reactions { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .reaction-chip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; background: #1c1c1e; border: 1px solid #2c2c2e; border-radius: 12px; font-size: 12px; color: #fff; cursor: pointer; user-select: none; }
   .reaction-chip.mine { background: rgba(10,132,255,0.25); border-color: #0a84ff; }
   .reaction-chip:active { transform: scale(0.95); }
 
   /* МЕНЮ РЕАКЦИЙ */
-  #reaction-menu {
-    position: fixed; z-index: 2500;
-    background: #1c1c1e; border-radius: 28px;
-    padding: 8px 12px; display: none;
-    gap: 6px; box-shadow: 0 8px 30px rgba(0,0,0,0.8);
-    animation: popIn 0.15s ease-out;
-  }
+  #reaction-menu { position: fixed; z-index: 2500; background: #1c1c1e; border-radius: 28px; padding: 8px 12px; display: none; gap: 6px; box-shadow: 0 8px 30px rgba(0,0,0,0.8); animation: popIn 0.15s ease-out; }
   #reaction-menu.active { display: flex; }
   @keyframes popIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  .reaction-option {
-    font-size: 26px; padding: 4px 6px; cursor: pointer;
-    border-radius: 50%; transition: transform 0.15s;
-    background: none; border: none;
-  }
+  .reaction-option { font-size: 26px; padding: 4px 6px; cursor: pointer; border-radius: 50%; transition: transform 0.15s; background: none; border: none; }
   .reaction-option:active { transform: scale(1.3); }
 
-  /* ГОЛОСОВОЕ СООБЩЕНИЕ */
+  /* ГОЛОСОВОЕ */
   .voice-msg { display: flex; align-items: center; gap: 10px; min-width: 180px; }
   .voice-play { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.25); border: none; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .msg.other .voice-play { background: rgba(10,132,255,0.3); color: #0a84ff; }
@@ -151,7 +146,7 @@
   #recording-time { font-variant-numeric: tabular-nums; font-weight: 600; }
   #recording-hint { margin-left: auto; font-size: 13px; opacity: 0.85; }
 
-  /* ПОЛНОЭКРАННЫЙ ЗВОНОК */
+  /* ЗВОНОК */
   #call-screen { position: fixed; inset: 0; z-index: 4000; background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%); display: none; flex-direction: column; }
   #call-screen.active { display: flex; }
   #remote-video-wrap { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; }
@@ -377,9 +372,9 @@ let currentChat = null;
 let contacts = [];
 let unread = {};
 let authMode = 'login';
-let typingUsersMap = {};    // { username: timestamp }
-let typingTimeouts = {};    // { username: timeoutId }
-let myTypingTimeout = null; // чтобы не спамить
+let typingUsersMap = {};
+let typingTimeouts = {};
+let myTypingTimeout = null;
 let activeReactionMsgId = null;
 
 const CREDS_KEY = 'aurora-creds';
@@ -679,7 +674,6 @@ function openChat(name) {
   updateTopStatusTyping();
 }
 function closeChat() {
-  // Прекращаем печатать
   if (currentChat) socket.emit('typing', { to: currentChat, isTyping: false });
   if (myTypingTimeout) { clearTimeout(myTypingTimeout); myTypingTimeout = null; }
 
@@ -717,14 +711,13 @@ socket.on('history', ({ withUser, messages }) => {
   box.scrollTop = box.scrollHeight;
 });
 
-// ============ ОТПРАВКА ТЕКСТА ============
+// ============ ОТПРАВКА ============
 function sendMsg() {
   const input = document.getElementById('msgInput');
   const text = input.value.trim();
   if (!text || !currentChat) return;
   socket.emit('private message', { to: currentChat, text });
   input.value = '';
-  // Прекращаем печатать
   socket.emit('typing', { to: currentChat, isTyping: false });
   if (myTypingTimeout) { clearTimeout(myTypingTimeout); myTypingTimeout = null; }
 }
@@ -805,7 +798,6 @@ const MAX_RECORDING_SEC = 60;
 
 async function toggleVoiceRecording() {
   if (!currentChat) return;
-
   if (isRecording) {
     stopVoiceRecording(false);
   } else {
@@ -813,53 +805,34 @@ async function toggleVoiceRecording() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks = [];
       mediaRecorder = new MediaRecorder(stream);
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.push(e.data);
-      };
-
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         clearInterval(recordingTimer);
         const duration = Math.round((Date.now() - recordingStartTime) / 1000);
         document.getElementById('recording-bar').classList.remove('active');
         document.getElementById('micBtnInput').classList.remove('recording');
-
-        if (audioChunks.length === 0 || duration < 1) {
-          isRecording = false;
-          return;
-        }
-
+        if (audioChunks.length === 0 || duration < 1) { isRecording = false; return; }
         const blob = new Blob(audioChunks, { type: 'audio/webm' });
         const reader = new FileReader();
         reader.onload = () => {
-          const dataUrl = reader.result;
-          socket.emit('private message', {
-            to: currentChat,
-            voice: dataUrl,
-            voiceDuration: duration
-          });
+          socket.emit('private message', { to: currentChat, voice: reader.result, voiceDuration: duration });
         };
         reader.readAsDataURL(blob);
         isRecording = false;
       };
-
       mediaRecorder.start();
       isRecording = true;
       recordingStartTime = Date.now();
       document.getElementById('recording-bar').classList.add('active');
       document.getElementById('micBtnInput').classList.add('recording');
       updateRecordingTimer();
-
       recordingTimer = setInterval(() => {
         const elapsed = Math.round((Date.now() - recordingStartTime) / 1000);
         updateRecordingTimer();
         if (elapsed >= MAX_RECORDING_SEC) stopVoiceRecording(false);
       }, 200);
-
-    } catch (err) {
-      alert('Нет доступа к микрофону: ' + err.message);
-    }
+    } catch (err) { alert('Нет доступа к микрофону: ' + err.message); }
   }
 }
 
@@ -909,7 +882,6 @@ function renderMessage(msg) {
   const div = document.createElement('div');
   div.className = 'msg ' + (msg.self ? 'self' : 'other');
 
-  // Фото
   if (msg.image) {
     const img = document.createElement('img');
     img.className = 'photo'; img.src = msg.image;
@@ -917,15 +889,12 @@ function renderMessage(msg) {
     div.appendChild(img);
   }
 
-  // Голосовое
   if (msg.voice) {
     const voiceWrap = document.createElement('div');
     voiceWrap.className = 'voice-msg';
-
     const playBtn = document.createElement('button');
     playBtn.className = 'voice-play';
     playBtn.textContent = '▶';
-
     const wave = document.createElement('div');
     wave.className = 'voice-wave';
     for (let i = 0; i < 30; i++) {
@@ -933,17 +902,14 @@ function renderMessage(msg) {
       bar.style.height = (4 + Math.random() * 16) + 'px';
       wave.appendChild(bar);
     }
-
     const dur = document.createElement('span');
     dur.className = 'voice-duration';
     const d = msg.voiceDuration || 0;
     dur.textContent = `${Math.floor(d / 60)}:${(d % 60).toString().padStart(2, '0')}`;
-
     voiceWrap.appendChild(playBtn);
     voiceWrap.appendChild(wave);
     voiceWrap.appendChild(dur);
     div.appendChild(voiceWrap);
-
     const audio = new Audio(msg.voice);
     let playing = false;
     playBtn.onclick = (e) => {
@@ -965,28 +931,23 @@ function renderMessage(msg) {
     };
   }
 
-  // Текст
   if (msg.text) {
     const span = document.createElement('span');
     span.textContent = msg.text;
     div.appendChild(span);
   }
 
-  // Время
   const t = msg.time ? new Date(msg.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
   const timeEl = document.createElement('span');
   timeEl.className = 'time'; timeEl.textContent = t;
   div.appendChild(timeEl);
 
-  // Долгое нажатие → меню реакций
+  // Долгое нажатие
   let pressTimer = null;
   const startPress = (e) => {
-    pressTimer = setTimeout(() => {
-      showReactionMenu(e, msg.id, wrap);
-    }, 500);
+    pressTimer = setTimeout(() => { showReactionMenu(e, msg.id, wrap); }, 500);
   };
   const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
-
   div.addEventListener('touchstart', startPress, { passive: true });
   div.addEventListener('touchend', cancelPress);
   div.addEventListener('touchmove', cancelPress);
@@ -996,8 +957,6 @@ function renderMessage(msg) {
   div.addEventListener('contextmenu', (e) => { e.preventDefault(); });
 
   wrap.appendChild(div);
-
-  // Реакции
   renderReactionsInto(wrap, msg.reactions);
 
   box.appendChild(wrap);
@@ -1005,15 +964,12 @@ function renderMessage(msg) {
 }
 
 function renderReactionsInto(wrap, reactions) {
-  // Удаляем старый блок реакций
   const existing = wrap.querySelector('.reactions');
   if (existing) existing.remove();
-
   if (!reactions || Object.keys(reactions).length === 0) return;
 
   const bar = document.createElement('div');
   bar.className = 'reactions';
-
   Object.entries(reactions).forEach(([emoji, users]) => {
     if (!users || users.length === 0) return;
     const chip = document.createElement('button');
@@ -1026,8 +982,6 @@ function renderReactionsInto(wrap, reactions) {
     };
     bar.appendChild(chip);
   });
-
-  // Добавляем к .msg, не к wrap — чтобы было внутри пузыря
   const msgEl = wrap.querySelector('.msg');
   if (msgEl) msgEl.appendChild(bar);
 }
@@ -1039,18 +993,12 @@ function showReactionMenu(e, messageId, wrap) {
   const touch = (e.touches && e.touches[0]) || e;
   let x = touch.clientX;
   let y = touch.clientY;
-
   menu.classList.add('active');
-
-  // Размеры меню
   const rect = menu.getBoundingClientRect();
   const w = rect.width || 250;
   const h = rect.height || 60;
-
-  // Не вылезаем за экран
   x = Math.min(Math.max(x - w / 2, 10), window.innerWidth - w - 10);
   y = Math.max(y - h - 15, 10);
-
   menu.style.left = x + 'px';
   menu.style.top = y + 'px';
 }
@@ -1066,7 +1014,6 @@ function applyReaction(emoji) {
   hideReactionMenu();
 }
 
-// Клик вне меню — закрыть
 document.addEventListener('click', (e) => {
   const menu = document.getElementById('reaction-menu');
   if (menu.classList.contains('active') && !menu.contains(e.target)) {
@@ -1074,13 +1021,9 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// ============ ОБНОВЛЕНИЕ РЕАКЦИЙ ============
-socket.on('reaction updated', ({ messageId, reactions, from, to }) => {
-  // Если это сообщение в текущем чате — обновляем
+socket.on('reaction updated', ({ messageId, reactions }) => {
   const wrap = document.querySelector(`.msg-wrap[data-id="${messageId}"]`);
-  if (wrap) {
-    renderReactionsInto(wrap, reactions);
-  }
+  if (wrap) renderReactionsInto(wrap, reactions);
 });
 
 // ============ МЕЛОЧИ ============
@@ -1104,18 +1047,12 @@ async function startCall(video) {
   if (!currentChat || callActive) return;
   const contact = contacts.find(c => c.name === currentChat);
   if (contact && !contact.online) { alert('@' + currentChat + ' сейчас не в сети.'); return; }
-
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
-  } catch (err) {
-    alert('Нет доступа к камере/микрофону: ' + err.message);
-    return;
-  }
-
+  } catch (err) { alert('Нет доступа к камере/микрофону: ' + err.message); return; }
   callActive = true;
   micOn = true; camOn = !!video;
   showCallScreen(currentChat, contact, video, 'Вызов...');
-
   peerConnection = new RTCPeerConnection(config);
   localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
   peerConnection.onicecandidate = (e) => {
@@ -1127,7 +1064,6 @@ async function startCall(video) {
     document.getElementById('call-avatar-big').style.display = 'none';
     document.getElementById('call-status').textContent = 'В разговоре';
   };
-
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
   socket.emit('call-user', { to: currentChat, offer, video });
@@ -1138,7 +1074,6 @@ function showCallScreen(peerName, contact, video, statusText) {
   document.getElementById('call-peer-name').innerHTML = '@' + escapeHtml(peerName) + tick;
   document.getElementById('call-status').textContent = statusText;
   document.getElementById('call-screen').classList.add('active');
-
   const localWrap = document.getElementById('local-video-wrap');
   if (video && localStream) {
     localWrap.classList.add('active');
@@ -1146,7 +1081,6 @@ function showCallScreen(peerName, contact, video, statusText) {
   } else {
     localWrap.classList.remove('active');
   }
-
   const bigAvatar = document.getElementById('call-avatar-big');
   const remoteWrap = document.getElementById('remote-video-wrap');
   if (video) {
@@ -1171,12 +1105,10 @@ socket.on('incoming-call', ({ from, offer, video }) => {
   incomingFrom = from;
   incomingVideo = video;
   pendingOffer = offer;
-
   const contact = contacts.find(c => c.name === from);
   document.getElementById('incoming-name').innerHTML = '@' + escapeHtml(from) +
     (contact?.verified ? '<span class="verified-badge big" style="margin-left:6px">✓</span>' : '');
   document.getElementById('incoming-type').textContent = video ? 'Видеозвонок' : 'Аудиозвонок';
-
   const av = document.getElementById('incoming-avatar');
   if (contact?.avatar) {
     av.style.backgroundImage = `url(${contact.avatar})`;
@@ -1186,10 +1118,8 @@ socket.on('incoming-call', ({ from, offer, video }) => {
     av.textContent = initials(from);
     av.style.background = '#5f27cd';
   }
-
   document.getElementById('incoming-screen').classList.add('active');
-  playPing();
-  vibrate();
+  playPing(); vibrate();
 });
 
 function declineIncoming() {
@@ -1202,14 +1132,12 @@ function declineIncoming() {
 async function acceptIncoming() {
   document.getElementById('incoming-screen').classList.remove('active');
   if (!pendingOffer || !incomingFrom) return;
-
   const from = incomingFrom;
   const video = incomingVideo;
   const offer = pendingOffer;
   pendingOffer = null;
   incomingFrom = null;
   currentChat = from;
-
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
   } catch (err) {
@@ -1217,12 +1145,10 @@ async function acceptIncoming() {
     socket.emit('end-call', { to: from });
     return;
   }
-
   callActive = true;
   micOn = true; camOn = !!video;
   const contact = contacts.find(c => c.name === from);
   showCallScreen(from, contact, video, 'Соединение...');
-
   peerConnection = new RTCPeerConnection(config);
   localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
   peerConnection.onicecandidate = (e) => {
@@ -1234,7 +1160,6 @@ async function acceptIncoming() {
     document.getElementById('call-avatar-big').style.display = 'none';
     document.getElementById('call-status').textContent = 'В разговоре';
   };
-
   await peerConnection.setRemoteDescription(offer);
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
