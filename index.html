@@ -28,11 +28,12 @@
   #auth .error { color: #ff3b30; font-size: 13px; margin-bottom: 10px; text-align: center; min-height: 18px; }
   #auth .hint { color: #666; font-size: 12px; margin-top: 6px; text-align: center; max-width: 320px; }
 
-  /* ШАПКА */
+  /* БАННЕР УВЕДОМЛЕНИЙ */
   #notif-banner { position: fixed; top: 0; left: 0; right: 0; background: #0a84ff; color: #fff; padding: 12px 16px; display: none; align-items: center; justify-content: space-between; z-index: 3000; font-size: 14px; }
   #notif-banner.active { display: flex; }
   #notif-banner button { background: rgba(255,255,255,0.25); border: none; color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600; }
 
+  /* ГЛАВНЫЙ ЭКРАН */
   #app { display: none; flex-direction: column; height: 100vh; }
   #app.active { display: flex; }
   #header { padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between; }
@@ -88,10 +89,65 @@
   .msg .time { font-size: 10px; opacity: 0.6; margin-left: 6px; }
   .msg img.photo { max-width: 100%; border-radius: 12px; display: block; margin-bottom: 4px; cursor: pointer; }
 
+  /* ГОЛОСОВОЕ СООБЩЕНИЕ */
+  .voice-msg {
+    display: flex; align-items: center; gap: 10px;
+    min-width: 180px;
+  }
+  .voice-play {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    border: none; color: #fff; font-size: 16px;
+    cursor: pointer; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+  }
+  .msg.self .voice-play { background: rgba(255,255,255,0.3); }
+  .msg.other .voice-play { background: rgba(10,132,255,0.3); color: #0a84ff; }
+  .voice-wave {
+    flex: 1; height: 24px;
+    display: flex; align-items: center; gap: 2px;
+    overflow: hidden;
+  }
+  .voice-wave span {
+    display: inline-block;
+    width: 2px; background: currentColor;
+    border-radius: 1px; opacity: 0.5;
+  }
+  .voice-duration {
+    font-size: 12px; opacity: 0.7;
+    flex-shrink: 0; font-variant-numeric: tabular-nums;
+  }
+  .voice-msg.playing .voice-wave span {
+    animation: waveAnim 0.6s infinite alternate;
+    opacity: 0.9;
+  }
+  @keyframes waveAnim { from { transform: scaleY(0.4); } to { transform: scaleY(1.3); } }
+
+  /* ПАНЕЛЬ ВВОДА */
   #input-area { display: flex; align-items: center; gap: 8px; padding: 10px 12px 24px; border-top: 1px solid #1c1c1e; }
   #input-area input:not([type="file"]) { flex: 1; padding: 11px 16px; background: #1c1c1e; border: none; border-radius: 22px; color: #fff; font-size: 15px; outline: none; }
   #input-area button { width: 42px; height: 42px; border-radius: 50%; background: #0a84ff; border: none; color: #fff; font-size: 18px; cursor: pointer; flex-shrink: 0; }
   #input-area button.attach-btn { background: #1c1c1e; color: #0a84ff; font-size: 20px; }
+  #input-area button.mic-btn { background: #1c1c1e; color: #0a84ff; font-size: 20px; }
+  #input-area button.mic-btn.recording { background: #ff3b30; color: #fff; animation: recPulse 1s infinite; }
+  @keyframes recPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+
+  /* ИНДИКАТОР ЗАПИСИ */
+  #recording-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #ff3b30; color: #fff;
+    padding: 16px 20px; padding-bottom: 30px;
+    display: none; align-items: center; gap: 12px;
+    z-index: 700;
+  }
+  #recording-bar.active { display: flex; }
+  #recording-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; animation: recDot 1s infinite;
+  }
+  @keyframes recDot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  #recording-time { font-variant-numeric: tabular-nums; font-weight: 600; }
+  #recording-hint { margin-left: auto; font-size: 13px; opacity: 0.85; }
 
   /* ПОЛНОЭКРАННЫЙ ЗВОНОК */
   #call-screen { position: fixed; inset: 0; z-index: 4000; background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%); display: none; flex-direction: column; }
@@ -166,16 +222,12 @@
   <div class="logo">🌌</div>
   <h1>Aurora</h1>
   <div class="subtitle">Твой семейный мессенджер</div>
-
   <input id="auth-username" placeholder="Ник (латиница)" autocapitalize="none" autocomplete="username" />
   <input id="auth-password" type="password" placeholder="Пароль" autocomplete="current-password" />
   <input id="auth-password2" type="password" placeholder="Повтори пароль" autocomplete="new-password" style="display:none" />
-
   <div class="error" id="auth-error"></div>
-
   <button id="auth-btn" onclick="doAuth()">Войти</button>
   <button class="switch" id="auth-switch" onclick="toggleAuthMode()">Нет аккаунта? Зарегистрироваться</button>
-
   <div class="hint" id="auth-hint">Ник — только латиница, цифры и _</div>
 </div>
 
@@ -250,8 +302,17 @@
     <button class="attach-btn" onclick="document.getElementById('photoFile').click()">📎</button>
     <input type="file" id="photoFile" accept="image/*" style="display:none" onchange="sendPhoto(event)" />
     <input id="msgInput" placeholder="Сообщение..." onkeydown="if(event.key==='Enter')sendMsg()" />
-    <button onclick="sendMsg()">➤</button>
+    <button class="mic-btn" id="micBtnInput" onclick="toggleVoiceRecording()">🎤</button>
+    <button onclick="sendMsg()" id="sendBtn">➤</button>
   </div>
+</div>
+
+<!-- ИНДИКАТОР ЗАПИСИ -->
+<div id="recording-bar">
+  <div id="recording-dot"></div>
+  <span id="recording-time">0:00</span>
+  <span>● Запись...</span>
+  <span id="recording-hint">Нажми 🎤 чтобы отправить</span>
 </div>
 
 <!-- ЗВОНОК -->
@@ -348,7 +409,7 @@ function doAuth() {
   }
 }
 
-function saveCreds(username, password) { try { localStorage.setItem(CREDS_KEY, JSON.stringify({ username, password })); } catch (e) {} }
+function saveCreds(u, p) { try { localStorage.setItem(CREDS_KEY, JSON.stringify({ username: u, password: p })); } catch (e) {} }
 function loadCreds() { try { const r = localStorage.getItem(CREDS_KEY); if (!r) return null; const d = JSON.parse(r); return d && d.username && d.password ? d : null; } catch (e) { return null; } }
 function clearCreds() { try { localStorage.removeItem(CREDS_KEY); localStorage.removeItem(UNREAD_KEY); } catch (e) {} }
 
@@ -488,7 +549,6 @@ function updateMyAvatarBtn() {
   if (myAvatar) btn.innerHTML = `<img src="${myAvatar}" alt="">`;
   else btn.textContent = '👤';
 }
-
 function updateVerifyButton() {
   const btn = document.getElementById('verify-btn');
   if (!btn) return;
@@ -504,7 +564,6 @@ function updateVerifyButton() {
     btn.onclick = () => openModal('verify-modal');
   }
 }
-
 function doVerify() {
   const password = document.getElementById('verify-password').value;
   const errEl = document.getElementById('verify-error');
@@ -518,8 +577,7 @@ function doVerify() {
     renderChatList();
   });
 }
-
-socket.on('me updated', ({ verified, avatar, username }) => {
+socket.on('me updated', ({ verified, avatar }) => {
   if (verified) myVerified = true;
   if (avatar) myAvatar = avatar;
   updateVerifyButton();
@@ -601,6 +659,7 @@ function openChat(name) {
 function closeChat() {
   document.getElementById('chat-screen').classList.remove('active');
   currentChat = null;
+  if (isRecording) stopVoiceRecording(true);
   renderChatList();
 }
 function clearUnread(name) {
@@ -613,10 +672,10 @@ socket.on('history', ({ withUser, messages }) => {
   if (withUser !== currentChat) return;
   const box = document.getElementById('messages');
   box.innerHTML = '';
-  messages.forEach(m => addMessage(m.from_user, m.text, m.from_user === myName, m.time, m.image));
+  messages.forEach(m => addMessage(m.from_user, m.text, m.from_user === myName, m.time, m.image, m.voice, m.voice_duration));
 });
 
-// ============ СООБЩЕНИЯ ============
+// ============ ОТПРАВКА ТЕКСТА ============
 function sendMsg() {
   const input = document.getElementById('msgInput');
   const text = input.value.trim();
@@ -625,6 +684,7 @@ function sendMsg() {
   input.value = '';
 }
 
+// ============ ОТПРАВКА ФОТО ============
 function sendPhoto(event) {
   const file = event.target.files[0];
   if (!file || !currentChat) return;
@@ -648,39 +708,202 @@ function sendPhoto(event) {
   reader.readAsDataURL(file);
 }
 
-socket.on('private message', ({ from, text, image, self, to, time }) => {
+// ============ ГОЛОСОВЫЕ ============
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let recordingStartTime = 0;
+let recordingTimer = null;
+const MAX_RECORDING_SEC = 60; // максимум 60 секунд
+
+async function toggleVoiceRecording() {
+  if (!currentChat) return;
+
+  if (isRecording) {
+    // Останавливаем и отправляем
+    stopVoiceRecording(false);
+  } else {
+    // Начинаем запись
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        clearInterval(recordingTimer);
+        const duration = Math.round((Date.now() - recordingStartTime) / 1000);
+        document.getElementById('recording-bar').classList.remove('active');
+        document.getElementById('micBtnInput').classList.remove('recording');
+
+        if (audioChunks.length === 0 || duration < 1) {
+          isRecording = false;
+          return;
+        }
+
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          socket.emit('private message', {
+            to: currentChat,
+            voice: dataUrl,
+            voiceDuration: duration
+          });
+        };
+        reader.readAsDataURL(blob);
+        isRecording = false;
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      recordingStartTime = Date.now();
+      document.getElementById('recording-bar').classList.add('active');
+      document.getElementById('micBtnInput').classList.add('recording');
+      updateRecordingTimer();
+
+      // Автостоп через 60 секунд
+      recordingTimer = setInterval(() => {
+        const elapsed = Math.round((Date.now() - recordingStartTime) / 1000);
+        updateRecordingTimer();
+        if (elapsed >= MAX_RECORDING_SEC) {
+          stopVoiceRecording(false);
+        }
+      }, 200);
+
+    } catch (err) {
+      alert('Нет доступа к микрофону: ' + err.message);
+    }
+  }
+}
+
+function stopVoiceRecording(cancel) {
+  if (!isRecording) return;
+  if (cancel) {
+    audioChunks = [];
+  }
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  isRecording = false;
+  clearInterval(recordingTimer);
+  document.getElementById('recording-bar').classList.remove('active');
+  document.getElementById('micBtnInput').classList.remove('recording');
+}
+
+function updateRecordingTimer() {
+  const elapsed = Math.round((Date.now() - recordingStartTime) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  document.getElementById('recording-time').textContent = `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// ============ ПРИЁМ СООБЩЕНИЙ ============
+socket.on('private message', ({ from, text, image, voice, voiceDuration, self, to, time }) => {
   if (self && currentChat === to) {
-    addMessage(myName, text, true, time, image);
+    addMessage(myName, text, true, time, image, voice, voiceDuration);
   } else if (!self) {
     if (from === currentChat) {
-      addMessage(from, text, false, time, image);
+      addMessage(from, text, false, time, image, voice, voiceDuration);
       clearUnread(from);
     } else {
       unread[from] = (unread[from] || 0) + 1;
       saveUnread(); renderChatList(); updateTitle(); playPing(); vibrate();
-      showBrowserNotification(from, image ? '📷 Фото' : (text || ''));
+      let preview = text || '';
+      if (image) preview = '📷 Фото';
+      if (voice) preview = '🎤 Голосовое';
+      showBrowserNotification(from, preview);
     }
   }
 });
 
-function addMessage(from, text, self, time, image) {
+function addMessage(from, text, self, time, image, voice, voiceDuration) {
   const box = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = 'msg ' + (self ? 'self' : 'other');
   const t = time ? new Date(time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
   div.innerHTML = '';
+
   if (image) {
     const img = document.createElement('img');
     img.className = 'photo'; img.src = image;
     img.onclick = (e) => { e.stopPropagation(); openLightbox(image); };
     div.appendChild(img);
   }
-  if (text) { const span = document.createElement('span'); span.textContent = text; div.appendChild(span); }
+
+  if (voice) {
+    const voiceWrap = document.createElement('div');
+    voiceWrap.className = 'voice-msg';
+
+    const playBtn = document.createElement('button');
+    playBtn.className = 'voice-play';
+    playBtn.textContent = '▶';
+
+    const wave = document.createElement('div');
+    wave.className = 'voice-wave';
+    for (let i = 0; i < 30; i++) {
+      const bar = document.createElement('span');
+      bar.style.height = (4 + Math.random() * 16) + 'px';
+      wave.appendChild(bar);
+    }
+
+    const dur = document.createElement('span');
+    dur.className = 'voice-duration';
+    const d = voiceDuration || 0;
+    dur.textContent = `${Math.floor(d / 60)}:${(d % 60).toString().padStart(2, '0')}`;
+
+    voiceWrap.appendChild(playBtn);
+    voiceWrap.appendChild(wave);
+    voiceWrap.appendChild(dur);
+    div.appendChild(voiceWrap);
+
+    const audio = new Audio(voice);
+    let playing = false;
+
+    playBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (playing) {
+        audio.pause();
+        audio.currentTime = 0;
+        playing = false;
+        playBtn.textContent = '▶';
+        voiceWrap.classList.remove('playing');
+      } else {
+        audio.play();
+        playing = true;
+        playBtn.textContent = '⏸';
+        voiceWrap.classList.add('playing');
+        // Остановить другие играющие
+        document.querySelectorAll('audio').forEach(a => { if (a !== audio) a.pause(); });
+      }
+    };
+
+    audio.onended = () => {
+      playing = false;
+      playBtn.textContent = '▶';
+      voiceWrap.classList.remove('playing');
+    };
+  }
+
+  if (text) {
+    const span = document.createElement('span');
+    span.textContent = text;
+    div.appendChild(span);
+  }
+
   const timeEl = document.createElement('span');
-  timeEl.className = 'time'; timeEl.textContent = t; div.appendChild(timeEl);
+  timeEl.className = 'time';
+  timeEl.textContent = t;
+  div.appendChild(timeEl);
+
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
+
 function openLightbox(src) {
   document.getElementById('lightbox-img').src = src;
   document.getElementById('lightbox').classList.add('active');
@@ -844,13 +1067,9 @@ socket.on('call-answered', async ({ answer }) => {
     document.getElementById('call-status').textContent = 'В разговоре';
   }
 });
-
 socket.on('ice-candidate', async ({ candidate }) => {
-  if (peerConnection) {
-    try { await peerConnection.addIceCandidate(candidate); } catch (e) {}
-  }
+  if (peerConnection) { try { await peerConnection.addIceCandidate(candidate); } catch (e) {} }
 });
-
 socket.on('call-ended', () => cleanupCall());
 socket.on('call-failed', ({ reason }) => { alert('Не удалось позвонить: ' + reason); cleanupCall(); });
 
