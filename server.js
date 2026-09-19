@@ -11,6 +11,9 @@ const io = new Server(server, { maxHttpBufferSize: 1e7 });
 
 app.use(express.static(path.join(__dirname)));
 
+// 🔑 СЕКРЕТНЫЙ ПАРОЛЬ ДЛЯ ГАЛОЧКИ — можешь поменять
+const VERIFY_PASSWORD = 'aurora2026';
+
 // ============ БАЗА ============
 const db = new Database('chat.db');
 
@@ -19,10 +22,12 @@ db.exec(`
     username TEXT PRIMARY KEY,
     password TEXT NOT NULL,
     avatar TEXT,
+    verified INTEGER DEFAULT 0,
     registered_at INTEGER NOT NULL
   )
 `);
 try { db.exec('ALTER TABLE users ADD COLUMN avatar TEXT'); } catch (e) {}
+try { db.exec('ALTER TABLE users ADD COLUMN verified INTEGER DEFAULT 0'); } catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS contacts (
@@ -46,13 +51,13 @@ db.exec(`
 try { db.exec('ALTER TABLE messages ADD COLUMN image TEXT'); } catch (e) {}
 
 const findUser = db.prepare('SELECT * FROM users WHERE username = ?');
-const createUser = db.prepare('INSERT INTO users (username, password, avatar, registered_at) VALUES (?, ?, ?, ?)');
+const createUser = db.prepare('INSERT INTO users (username, password, avatar, verified, registered_at) VALUES (?, ?, ?, 0, ?)');
 const updateAvatar = db.prepare('UPDATE users SET avatar = ? WHERE username = ?');
+const setVerified = db.prepare('UPDATE users SET verified = 1 WHERE username = ?');
 
 const addContact = db.prepare('INSERT OR IGNORE INTO contacts (owner, contact, added_at) VALUES (?, ?, ?)');
-const removeContact = db.prepare('DELETE FROM contacts WHERE owner = ? AND contact = ?');
 const getContacts = db.prepare('SELECT contact FROM contacts WHERE owner = ? ORDER BY added_at ASC');
-const getContactInfo = db.prepare('SELECT username, avatar FROM users WHERE username = ?');
+const getContactInfo = db.prepare('SELECT username, avatar, verified FROM users WHERE username = ?');
 
 const insertMessage = db.prepare(
   'INSERT INTO messages (from_user, to_user, text, image, time) VALUES (?, ?, ?, ?, ?)'
@@ -63,43 +68,38 @@ const getHistory = db.prepare(`
   ORDER BY time ASC LIMIT 200
 `);
 
-// ============ ПОЛЬЗОВАТЕЛИ ОНЛАЙН ============
-const onlineUsers = {}; // { socketId: username }
+// ============ ONLINE ============
+const onlineUsers = {};
 
 function findSocketsByUsername(username) {
-  return Object.entries(onlineUsers)
-    .filter(([, u]) => u === username)
-    .map(([sid]) => sid);
+  return Object.entries(onlineUsers).filter(([, u]) => u === username).map(([sid]) => sid);
 }
 function isOnline(username) {
   return Object.values(onlineUsers).includes(username);
 }
 
-// Отправить список контактов конкретному пользователю
 function sendContactsTo(username) {
   const sockets = findSocketsByUsername(username);
   if (sockets.length === 0) return;
-
   const contactNames = getContacts.all(username).map(r => r.contact);
   const list = contactNames.map(name => {
     const info = getContactInfo.get(name);
     return {
       name,
       avatar: info ? info.avatar : null,
+      verified: info ? !!info.verified : false,
       online: isOnline(name)
     };
   });
   sockets.forEach(sid => io.to(sid).emit('contacts', list));
 }
 
-// Обновить контакты у всех, кто имеет этого пользователя в друзьях
 function refreshForFriends(username) {
-  // Все, у кого username в контактах
   const owners = db.prepare('SELECT owner FROM contacts WHERE contact = ?').all(username);
   owners.forEach(({ owner }) => sendContactsTo(owner));
 }
 
-// ============ SOCKET.IO ============
+// ============ SOCKET ============
 io.on('connection', (socket) => {
   console.log('Подключился:', socket.id);
 
@@ -128,13 +128,11 @@ io.on('connection', (socket) => {
 
     const user = findUser.get(username);
     if (!user) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-    if (!bcrypt.compareSync(password, user.password)) {
-      return cb && cb({ ok: false, error: 'Неверный пароль' });
-    }
+    if (!bcrypt.compareSync(password, user.password)) return cb && cb({ ok: false, error: 'Неверный пароль' });
 
     onlineUsers[socket.id] = username;
     socket.username = username;
-    cb && cb({ ok: true, avatar: user.avatar, username });
+    cb && cb({ ok: true, avatar: user.avatar, username, verified: !!user.verified });
 
     sendContactsTo(username);
     refreshForFriends(username);
@@ -147,14 +145,19 @@ io.on('connection', (socket) => {
     refreshForFriends(socket.username);
   });
 
-  // ---- Получить мои данные ----
-  socket.on('get me', (cb) => {
-    if (!socket.username) return cb && cb(null);
+  // ---- Получить галочку ----
+  socket.on('verify', ({ password }, cb) => {
+    if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+    if (password !== VERIFY_PASSWORD) return cb && cb({ ok: false, error: 'Неверный пароль' });
+
+    setVerified.run(socket.username);
+    refreshForFriends(socket.username);
     const u = findUser.get(socket.username);
-    cb && cb({ username: u.username, avatar: u.avatar });
+    socket.emit('me updated', { verified: !!u.verified, avatar: u.avatar, username: u.username });
+    cb && cb({ ok: true });
   });
 
-  // ---- Добавить контакт по нику ----
+  // ---- Добавить контакт ----
   socket.on('add contact', ({ username }, cb) => {
     if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
     username = String(username || '').trim().toLowerCase();
@@ -170,14 +173,6 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
-  // ---- Удалить контакт ----
-  socket.on('remove contact', ({ username }, cb) => {
-    if (!socket.username) return;
-    removeContact.run(socket.username, username);
-    sendContactsTo(socket.username);
-    cb && cb({ ok: true });
-  });
-
   // ---- История ----
   socket.on('load history', ({ withUser }) => {
     if (!socket.username) return;
@@ -185,15 +180,14 @@ io.on('connection', (socket) => {
     socket.emit('history', { withUser, messages: rows });
   });
 
-  // ---- Личное сообщение ----
+  // ---- Сообщение ----
   socket.on('private message', ({ to, text, image }) => {
     if (!socket.username) return;
     const from = socket.username;
     const time = Date.now();
     insertMessage.run(from, to, text || null, image || null, time);
 
-    const toSockets = findSocketsByUsername(to);
-    toSockets.forEach(sid => io.to(sid).emit('private message', { from, text, image, time }));
+    findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', { from, text, image, time }));
     socket.emit('private message', { from, text, image, time, self: true, to });
   });
 
@@ -224,11 +218,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const u = socket.username;
     delete onlineUsers[socket.id];
-    if (u) {
-      sendContactsTo(u);
-      refreshForFriends(u);
-    }
-    console.log('Отключился:', socket.id);
+    if (u) { sendContactsTo(u); refreshForFriends(u); }
   });
 });
 
