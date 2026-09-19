@@ -49,7 +49,7 @@
   .avatar { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 18px; color: #fff; background-size: cover; background-position: center; position: relative; }
   .avatar .online-dot { position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px; border-radius: 50%; background: #4caf50; border: 2px solid #0a0a0a; }
   .chat-info { flex: 1; min-width: 0; }
-  .chat-name { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+  .chat-name { font-size: 16px; font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
   .chat-preview { font-size: 14px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chat-meta { text-align: right; flex-shrink: 0; }
   .chat-badge { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; padding: 0 7px; background: #ff3b30; color: #fff; border-radius: 11px; font-size: 12px; font-weight: 700; text-align: center; }
@@ -60,13 +60,23 @@
   .tab.active { color: #0a84ff; }
   .tab .tab-icon { font-size: 22px; display: block; margin-bottom: 2px; }
 
+  /* ГАЛОЧКА */
+  .verified-badge {
+    display: inline-flex; width: 16px; height: 16px;
+    background: #0a84ff; border-radius: 50%;
+    align-items: center; justify-content: center;
+    font-size: 11px; color: #fff; font-weight: 700;
+    flex-shrink: 0; line-height: 1;
+  }
+  .verified-badge.big { width: 20px; height: 20px; font-size: 13px; }
+
   /* ЧАТ */
   #chat-screen { position: fixed; inset: 0; background: #0a0a0a; display: none; flex-direction: column; z-index: 500; }
   #chat-screen.active { display: flex; }
   #chat-top { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #1c1c1e; }
   .back-btn { background: none; border: none; color: #0a84ff; font-size: 22px; cursor: pointer; padding: 4px 8px; }
   #chat-top .avatar { width: 38px; height: 38px; font-size: 14px; }
-  #chat-top-name { font-weight: 600; font-size: 16px; }
+  #chat-top-name { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 6px; }
   #chat-top-status { font-size: 12px; color: #888; margin-top: 2px; }
   #call-actions { display: flex; gap: 8px; margin-left: auto; }
   #call-actions button { background: none; border: none; color: #0a84ff; font-size: 22px; cursor: pointer; padding: 4px; }
@@ -83,111 +93,37 @@
   #input-area button { width: 42px; height: 42px; border-radius: 50%; background: #0a84ff; border: none; color: #fff; font-size: 18px; cursor: pointer; flex-shrink: 0; }
   #input-area button.attach-btn { background: #1c1c1e; color: #0a84ff; font-size: 20px; }
 
-  /* ===== ПОЛНОЭКРАННЫЙ ЗВОНОК ===== */
-  #call-screen {
-    position: fixed; inset: 0; z-index: 4000;
-    background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%);
-    display: none; flex-direction: column;
-  }
+  /* ПОЛНОЭКРАННЫЙ ЗВОНОК */
+  #call-screen { position: fixed; inset: 0; z-index: 4000; background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%); display: none; flex-direction: column; }
   #call-screen.active { display: flex; }
-
-  /* Большое видео собеседника */
-  #remote-video-wrap {
-    flex: 1; position: relative;
-    display: flex; align-items: center; justify-content: center;
-    overflow: hidden; background: #000;
-  }
-  #remote-video-wrap video {
-    width: 100%; height: 100%; object-fit: cover;
-  }
-  #remote-video-wrap.audio-only {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  }
-  #call-avatar-big {
-    width: 160px; height: 160px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 56px; font-weight: 700; color: #fff;
-    background: #5f27cd; background-size: cover; background-position: center;
-    box-shadow: 0 0 60px rgba(10,132,255,0.4);
-    animation: callPulse 2s infinite;
-  }
-  @keyframes callPulse {
-    0%,100% { box-shadow: 0 0 40px rgba(10,132,255,0.3); }
-    50% { box-shadow: 0 0 80px rgba(10,132,255,0.6); }
-  }
-
-  /* Информация о звонке — сверху */
-  #call-info {
-    position: absolute; top: 0; left: 0; right: 0;
-    padding: 50px 20px 20px;
-    background: linear-gradient(180deg, rgba(0,0,0,0.7), transparent);
-    text-align: center;
-    z-index: 10;
-  }
-  #call-peer-name { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+  #remote-video-wrap { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; }
+  #remote-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+  #remote-video-wrap.audio-only { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); }
+  #call-avatar-big { width: 160px; height: 160px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 56px; font-weight: 700; color: #fff; background: #5f27cd; background-size: cover; background-position: center; animation: callPulse 2s infinite; }
+  @keyframes callPulse { 0%,100% { box-shadow: 0 0 40px rgba(10,132,255,0.3); } 50% { box-shadow: 0 0 80px rgba(10,132,255,0.6); } }
+  #call-info { position: absolute; top: 0; left: 0; right: 0; padding: 50px 20px 20px; background: linear-gradient(180deg, rgba(0,0,0,0.7), transparent); text-align: center; z-index: 10; }
+  #call-peer-name { font-size: 24px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 8px; }
   #call-status { font-size: 14px; color: #ccc; }
-
-  /* Своё видео — маленькое окошко */
-  #local-video-wrap {
-    position: absolute; top: 100px; right: 16px;
-    width: 110px; height: 160px;
-    border-radius: 16px; overflow: hidden;
-    background: #000; box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-    z-index: 20; display: none;
-  }
+  #local-video-wrap { position: absolute; top: 100px; right: 16px; width: 110px; height: 160px; border-radius: 16px; overflow: hidden; background: #000; box-shadow: 0 4px 20px rgba(0,0,0,0.6); z-index: 20; display: none; }
   #local-video-wrap.active { display: block; }
-  #local-video-wrap video {
-    width: 100%; height: 100%; object-fit: cover;
-  }
-
-  /* Кнопки управления снизу */
-  #call-controls-bar {
-    padding: 20px 20px 40px;
-    background: linear-gradient(0deg, rgba(0,0,0,0.9), transparent);
-    display: flex; justify-content: center; gap: 16px;
-    z-index: 10;
-  }
-  .call-btn {
-    width: 64px; height: 64px; border-radius: 50%;
-    border: none; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px; color: #fff;
-    background: rgba(255,255,255,0.15);
-    backdrop-filter: blur(10px);
-    transition: transform 0.15s, background 0.15s;
-  }
+  #local-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+  #call-controls-bar { padding: 20px 20px 40px; background: linear-gradient(0deg, rgba(0,0,0,0.9), transparent); display: flex; justify-content: center; gap: 16px; z-index: 10; }
+  .call-btn { width: 64px; height: 64px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 26px; color: #fff; background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); transition: transform 0.15s, background 0.15s; }
   .call-btn:active { transform: scale(0.92); }
   .call-btn.off { background: #fff; color: #000; }
   .call-btn.hangup { background: #ff3b30; }
   .call-btn.hangup:active { background: #d62d24; }
 
-  /* Входящий звонок — на весь экран */
-  #incoming-screen {
-    position: fixed; inset: 0; z-index: 4500;
-    background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%);
-    display: none; flex-direction: column;
-    align-items: center; justify-content: space-between;
-    padding: 80px 20px 60px;
-  }
+  /* ВХОДЯЩИЙ */
+  #incoming-screen { position: fixed; inset: 0; z-index: 4500; background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%); display: none; flex-direction: column; align-items: center; justify-content: space-between; padding: 80px 20px 60px; }
   #incoming-screen.active { display: flex; }
   #incoming-screen .info { text-align: center; }
   #incoming-screen .from-label { color: #888; font-size: 14px; margin-bottom: 8px; }
   #incoming-screen .from-name { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
   #incoming-screen .type { color: #ccc; font-size: 15px; }
-  #incoming-screen .avatar-big {
-    width: 160px; height: 160px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 56px; font-weight: 700; color: #fff;
-    background: #5f27cd; background-size: cover; background-position: center;
-    animation: callPulse 1.5s infinite;
-  }
+  #incoming-screen .avatar-big { width: 160px; height: 160px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 56px; font-weight: 700; color: #fff; background: #5f27cd; background-size: cover; background-position: center; animation: callPulse 1.5s infinite; }
   #incoming-screen .buttons { display: flex; gap: 60px; }
-  .incoming-btn {
-    width: 72px; height: 72px; border-radius: 50%;
-    border: none; cursor: pointer; font-size: 30px; color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    transition: transform 0.15s;
-  }
+  .incoming-btn { width: 72px; height: 72px; border-radius: 50%; border: none; cursor: pointer; font-size: 30px; color: #fff; display: flex; align-items: center; justify-content: center; transition: transform 0.15s; }
   .incoming-btn:active { transform: scale(0.92); }
   .incoming-btn.accept { background: #4caf50; }
   .incoming-btn.decline { background: #ff3b30; }
@@ -204,6 +140,7 @@
   .modal-secondary { background: #2c2c2e; color: #fff; }
   .modal-danger { background: #ff3b30; color: #fff; }
   .modal-error { color: #ff3b30; font-size: 13px; margin-bottom: 10px; text-align: center; min-height: 16px; }
+  .modal-desc { color: #888; font-size: 13px; text-align: center; margin-bottom: 14px; line-height: 1.5; }
 
   #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: none; align-items: center; justify-content: center; z-index: 3000; padding: 20px; }
   #lightbox.active { display: flex; }
@@ -248,8 +185,21 @@
     <h3>Мой профиль</h3>
     <div id="profile-username" style="text-align:center; color:#888; margin-bottom:16px; font-size:14px"></div>
     <button class="modal-primary" onclick="document.getElementById('avatarFile').click()">📷 Сменить фото</button>
+    <button class="modal-primary" id="verify-btn" onclick="openModal('verify-modal')">✓ Получить галочку</button>
     <button class="modal-secondary" onclick="closeModal('profile-modal')">Закрыть</button>
     <button class="modal-danger" onclick="logout()">🚪 Выйти из аккаунта</button>
+  </div>
+</div>
+
+<!-- ВЕРИФИКАЦИЯ -->
+<div class="modal" id="verify-modal">
+  <div class="modal-box">
+    <h3>✓ Получить галочку</h3>
+    <div class="modal-desc">Введи секретный пароль, чтобы получить синюю галочку</div>
+    <input id="verify-password" type="password" placeholder="Секретный пароль" onkeydown="if(event.key==='Enter')doVerify()" />
+    <div class="modal-error" id="verify-error"></div>
+    <button class="modal-primary" onclick="doVerify()">Получить</button>
+    <button class="modal-secondary" onclick="closeModal('verify-modal')">Отмена</button>
   </div>
 </div>
 
@@ -304,22 +254,19 @@
   </div>
 </div>
 
-<!-- ===== ПОЛНОЭКРАННЫЙ ЗВОНОК ===== -->
+<!-- ЗВОНОК -->
 <div id="call-screen">
   <div id="remote-video-wrap">
     <video id="remoteVideo" autoplay playsinline></video>
     <div id="call-avatar-big"></div>
   </div>
-
   <div id="call-info">
     <div id="call-peer-name">@user</div>
     <div id="call-status">Соединение...</div>
   </div>
-
   <div id="local-video-wrap">
     <video id="localVideo" autoplay muted playsinline></video>
   </div>
-
   <div id="call-controls-bar">
     <button class="call-btn" id="micBtn" onclick="toggleMic()">🎤</button>
     <button class="call-btn" id="camBtn" onclick="toggleCam()">📷</button>
@@ -327,16 +274,14 @@
   </div>
 </div>
 
-<!-- ===== ВХОДЯЩИЙ ЗВОНОК ===== -->
+<!-- ВХОДЯЩИЙ -->
 <div id="incoming-screen">
   <div class="info">
     <div class="from-label">Входящий звонок</div>
     <div class="from-name" id="incoming-name">@user</div>
     <div class="type" id="incoming-type">Видеозвонок</div>
   </div>
-
   <div class="avatar-big" id="incoming-avatar"></div>
-
   <div class="buttons">
     <button class="incoming-btn decline" onclick="declineIncoming()">📵</button>
     <button class="incoming-btn accept" onclick="acceptIncoming()">📞</button>
@@ -354,6 +299,7 @@
 const socket = io();
 let myName = null;
 let myAvatar = null;
+let myVerified = false;
 let currentChat = null;
 let contacts = [];
 let unread = {};
@@ -389,7 +335,7 @@ function doAuth() {
     socket.emit('register', { username, password }, (res) => {
       if (!res.ok) return errEl.textContent = res.error;
       socket.emit('login', { username, password }, (r2) => {
-        if (r2.ok) { saveCreds(username, password); onLoggedIn(r2.username, r2.avatar); }
+        if (r2.ok) { saveCreds(username, password); onLoggedIn(r2.username, r2.avatar, r2.verified); }
         else errEl.textContent = r2.error || 'Ошибка входа';
       });
     });
@@ -397,7 +343,7 @@ function doAuth() {
     socket.emit('login', { username, password }, (res) => {
       if (!res.ok) return errEl.textContent = res.error;
       saveCreds(username, password);
-      onLoggedIn(res.username, res.avatar);
+      onLoggedIn(res.username, res.avatar, res.verified);
     });
   }
 }
@@ -406,12 +352,14 @@ function saveCreds(username, password) { try { localStorage.setItem(CREDS_KEY, J
 function loadCreds() { try { const r = localStorage.getItem(CREDS_KEY); if (!r) return null; const d = JSON.parse(r); return d && d.username && d.password ? d : null; } catch (e) { return null; } }
 function clearCreds() { try { localStorage.removeItem(CREDS_KEY); localStorage.removeItem(UNREAD_KEY); } catch (e) {} }
 
-function onLoggedIn(username, avatar) {
+function onLoggedIn(username, avatar, verified) {
   myName = username;
   myAvatar = avatar || null;
+  myVerified = !!verified;
   document.getElementById('auth').classList.remove('active');
   document.getElementById('app').classList.add('active');
   updateMyAvatarBtn();
+  updateVerifyButton();
 }
 
 function logout() {
@@ -431,7 +379,7 @@ window.addEventListener('load', () => {
       status.textContent = 'Вхожу как @' + creds.username + '...';
       socket.emit('login', { username: creds.username, password: creds.password }, (res) => {
         if (res.ok) {
-          onLoggedIn(res.username, res.avatar);
+          onLoggedIn(res.username, res.avatar, res.verified);
           document.getElementById('loading').style.display = 'none';
         } else {
           status.textContent = 'Не удалось войти. Введи данные заново.';
@@ -512,6 +460,7 @@ function updateTitle() {
 // ============ ПРОФИЛЬ ============
 function openProfile() {
   document.getElementById('profile-username').textContent = '@' + (myName || '');
+  updateVerifyButton();
   openModal('profile-modal');
 }
 function uploadAvatar(event) {
@@ -539,6 +488,43 @@ function updateMyAvatarBtn() {
   if (myAvatar) btn.innerHTML = `<img src="${myAvatar}" alt="">`;
   else btn.textContent = '👤';
 }
+
+function updateVerifyButton() {
+  const btn = document.getElementById('verify-btn');
+  if (!btn) return;
+  if (myVerified) {
+    btn.textContent = '✓ Галочка получена';
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.onclick = null;
+  } else {
+    btn.textContent = '✓ Получить галочку';
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.onclick = () => openModal('verify-modal');
+  }
+}
+
+function doVerify() {
+  const password = document.getElementById('verify-password').value;
+  const errEl = document.getElementById('verify-error');
+  errEl.textContent = '';
+  socket.emit('verify', { password }, (res) => {
+    if (!res.ok) return errEl.textContent = res.error;
+    myVerified = true;
+    document.getElementById('verify-password').value = '';
+    closeModal('verify-modal');
+    updateVerifyButton();
+    renderChatList();
+  });
+}
+
+socket.on('me updated', ({ verified, avatar, username }) => {
+  if (verified) myVerified = true;
+  if (avatar) myAvatar = avatar;
+  updateVerifyButton();
+  renderChatList();
+});
 
 // ============ МОДАЛКИ ============
 function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -582,10 +568,11 @@ function renderChatList() {
     const style = u.avatar ? `background-image:url(${u.avatar})` : `background:#5f27cd`;
     const content = u.avatar ? '' : initials(u.name);
     const badge = unreadCount > 0 ? `<div class="chat-badge">${unreadCount}</div>` : '';
+    const tick = u.verified ? '<span class="verified-badge">✓</span>' : '';
     div.innerHTML = `
       <div class="avatar" style="${style}">${content}${onlineDot}</div>
       <div class="chat-info">
-        <div class="chat-name">@${escapeHtml(u.name)}</div>
+        <div class="chat-name">@${escapeHtml(u.name)}${tick}</div>
         <div class="chat-preview">${unreadCount > 0 ? '🔴 Новое сообщение' : (u.online ? 'в сети' : 'не в сети')}</div>
       </div>
       <div class="chat-meta">${badge}</div>
@@ -600,7 +587,8 @@ function openChat(name) {
   currentChat = name;
   clearUnread(name);
   const contact = contacts.find(c => c.name === name);
-  document.getElementById('chat-top-name').textContent = '@' + name;
+  const tick = contact?.verified ? '<span class="verified-badge big">✓</span>' : '';
+  document.getElementById('chat-top-name').innerHTML = '@' + escapeHtml(name) + tick;
   document.getElementById('chat-top-status').textContent = contact?.online ? 'в сети' : 'не в сети';
   const av = document.getElementById('chat-avatar');
   if (contact?.avatar) { av.style.backgroundImage = `url(${contact.avatar})`; av.textContent = ''; }
@@ -701,9 +689,7 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// ============================================================
-// ============ ЗВОНКИ (ПОЛНОЭКРАННЫЕ) ============
-// ============================================================
+// ============ ЗВОНКИ ============
 let peerConnection, localStream, micOn = true, camOn = true;
 let callActive = false;
 let pendingOffer = null;
@@ -711,7 +697,6 @@ let incomingFrom = null;
 let incomingVideo = false;
 const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-// ---- Начать звонок ----
 async function startCall(video) {
   if (!currentChat || callActive) return;
   const contact = contacts.find(c => c.name === currentChat);
@@ -726,8 +711,6 @@ async function startCall(video) {
 
   callActive = true;
   micOn = true; camOn = !!video;
-
-  // Показать экран звонка
   showCallScreen(currentChat, contact, video, 'Вызов...');
 
   peerConnection = new RTCPeerConnection(config);
@@ -739,6 +722,7 @@ async function startCall(video) {
     document.getElementById('remoteVideo').srcObject = e.streams[0];
     document.getElementById('remote-video-wrap').classList.remove('audio-only');
     document.getElementById('call-avatar-big').style.display = 'none';
+    document.getElementById('call-status').textContent = 'В разговоре';
   };
 
   const offer = await peerConnection.createOffer();
@@ -746,13 +730,12 @@ async function startCall(video) {
   socket.emit('call-user', { to: currentChat, offer, video });
 }
 
-// ---- Показать экран звонка ----
 function showCallScreen(peerName, contact, video, statusText) {
-  document.getElementById('call-peer-name').textContent = '@' + peerName;
+  const tick = contact?.verified ? '<span class="verified-badge big" style="filter:brightness(1.5)">✓</span>' : '';
+  document.getElementById('call-peer-name').innerHTML = '@' + escapeHtml(peerName) + tick;
   document.getElementById('call-status').textContent = statusText;
   document.getElementById('call-screen').classList.add('active');
 
-  // Локальное видео — показываем если видео-звонок
   const localWrap = document.getElementById('local-video-wrap');
   if (video && localStream) {
     localWrap.classList.add('active');
@@ -761,7 +744,6 @@ function showCallScreen(peerName, contact, video, statusText) {
     localWrap.classList.remove('active');
   }
 
-  // Аватарка собеседника — большая, если нет видео
   const bigAvatar = document.getElementById('call-avatar-big');
   const remoteWrap = document.getElementById('remote-video-wrap');
   if (video) {
@@ -779,18 +761,17 @@ function showCallScreen(peerName, contact, video, statusText) {
       bigAvatar.style.background = '#5f27cd';
     }
   }
-
   updateButtons();
 }
 
-// ---- Входящий звонок ----
 socket.on('incoming-call', ({ from, offer, video }) => {
   incomingFrom = from;
   incomingVideo = video;
   pendingOffer = offer;
 
   const contact = contacts.find(c => c.name === from);
-  document.getElementById('incoming-name').textContent = '@' + from;
+  document.getElementById('incoming-name').innerHTML = '@' + escapeHtml(from) +
+    (contact?.verified ? '<span class="verified-badge big" style="margin-left:6px">✓</span>' : '');
   document.getElementById('incoming-type').textContent = video ? 'Видеозвонок' : 'Аудиозвонок';
 
   const av = document.getElementById('incoming-avatar');
@@ -808,7 +789,6 @@ socket.on('incoming-call', ({ from, offer, video }) => {
   vibrate();
 });
 
-// ---- Отклонить входящий ----
 function declineIncoming() {
   document.getElementById('incoming-screen').classList.remove('active');
   if (incomingFrom) socket.emit('end-call', { to: incomingFrom });
@@ -816,7 +796,6 @@ function declineIncoming() {
   incomingFrom = null;
 }
 
-// ---- Принять входящий ----
 async function acceptIncoming() {
   document.getElementById('incoming-screen').classList.remove('active');
   if (!pendingOffer || !incomingFrom) return;
@@ -859,7 +838,6 @@ async function acceptIncoming() {
   socket.emit('answer-call', { to: from, answer });
 }
 
-// ---- Собеседник ответил ----
 socket.on('call-answered', async ({ answer }) => {
   if (peerConnection) {
     await peerConnection.setRemoteDescription(answer);
@@ -867,24 +845,15 @@ socket.on('call-answered', async ({ answer }) => {
   }
 });
 
-// ---- ICE candidate ----
 socket.on('ice-candidate', async ({ candidate }) => {
   if (peerConnection) {
     try { await peerConnection.addIceCandidate(candidate); } catch (e) {}
   }
 });
 
-// ---- Собеседник завершил ----
-socket.on('call-ended', () => {
-  cleanupCall();
-});
+socket.on('call-ended', () => cleanupCall());
+socket.on('call-failed', ({ reason }) => { alert('Не удалось позвонить: ' + reason); cleanupCall(); });
 
-socket.on('call-failed', ({ reason }) => {
-  alert('Не удалось позвонить: ' + reason);
-  cleanupCall();
-});
-
-// ---- Очистка ----
 function cleanupCall() {
   callActive = false;
   if (peerConnection) { peerConnection.close(); peerConnection = null; }
@@ -896,7 +865,6 @@ function cleanupCall() {
   document.getElementById('local-video-wrap').classList.remove('active');
 }
 
-// ---- Кнопки ----
 function toggleMic() {
   if (!localStream) return;
   const t = localStream.getAudioTracks()[0]; if (!t) return;
