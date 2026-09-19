@@ -329,4 +329,297 @@ function showBrowserNotification(from, text) {
   if (!notificationsAllowed) return;
   if (document.visibilityState === 'visible' && currentChat === from) return;
   try {
-    const n
+    const n = new Notification('💬 ' + from, { body: text, tag: 'aurora-' + from });
+    n.onclick = () => { window.focus(); if (currentChat !== from) openChat(from); n.close(); };
+  } catch (e) {}
+}
+let titleFlashInterval = null;
+function updateTitle() {
+  const total = Object.values(unread).reduce((a, b) => a + b, 0);
+  if (total > 0) {
+    if (!titleFlashInterval) {
+      let on = true;
+      titleFlashInterval = setInterval(() => {
+        document.title = on ? `(${total}) Aurora` : 'Aurora';
+        on = !on;
+      }, 1000);
+    }
+  } else {
+    if (titleFlashInterval) { clearInterval(titleFlashInterval); titleFlashInterval = null; }
+    document.title = 'Aurora';
+  }
+}
+
+// ============ ПРОФИЛЬ ============
+function openProfile() {
+  document.getElementById('profile-username').textContent = '@' + (myName || '');
+  openModal('profile-modal');
+}
+function uploadAvatar(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const size = 200; canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const min = Math.min(img.width, img.height);
+      ctx.drawImage(img, (img.width-min)/2, (img.height-min)/2, min, min, 0, 0, size, size);
+      myAvatar = canvas.toDataURL('image/jpeg', 0.8);
+      socket.emit('set avatar', { avatar: myAvatar });
+      updateMyAvatarBtn();
+      closeModal('profile-modal');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function updateMyAvatarBtn() {
+  const btn = document.getElementById('my-avatar-btn');
+  if (myAvatar) btn.innerHTML = `<img src="${myAvatar}" alt="">`;
+  else btn.textContent = '👤';
+}
+
+// ============ МОДАЛКИ ============
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// ============ ДОБАВЛЕНИЕ КОНТАКТА ============
+function doAddContact() {
+  const username = document.getElementById('add-username').value.trim().toLowerCase();
+  const errEl = document.getElementById('add-error');
+  errEl.textContent = '';
+
+  socket.emit('add contact', { username }, (res) => {
+    if (!res.ok) return errEl.textContent = res.error;
+    document.getElementById('add-username').value = '';
+    closeModal('add-modal');
+  });
+}
+
+// ============ СПИСОК КОНТАКТОВ ============
+socket.on('contacts', (list) => {
+  contacts = list;
+  renderChatList();
+});
+
+function renderChatList() {
+  const box = document.getElementById('chat-list');
+  box.innerHTML = '';
+  if (contacts.length === 0) {
+    box.innerHTML = `
+      <div class="empty-state">
+        <div class="big">👋</div>
+        Пока никого нет.<br>
+        Нажми <b>＋</b> вверху и добавь друга по нику.
+      </div>
+    `;
+    return;
+  }
+  contacts.forEach(u => {
+    const div = document.createElement('div');
+    const unreadCount = unread[u.name] || 0;
+    div.className = 'chat-item' + (currentChat === u.name ? ' active' : '') + (unreadCount > 0 ? ' unread' : '');
+    const onlineDot = u.online ? '<span class="online-dot"></span>' : '';
+    const style = u.avatar ? `background-image:url(${u.avatar})` : `background:#5f27cd`;
+    const content = u.avatar ? '' : initials(u.name);
+    const badge = unreadCount > 0 ? `<div class="chat-badge">${unreadCount}</div>` : '';
+    div.innerHTML = `
+      <div class="avatar" style="${style}">${content}${onlineDot}</div>
+      <div class="chat-info">
+        <div class="chat-name">@${escapeHtml(u.name)}</div>
+        <div class="chat-preview">${unreadCount > 0 ? '🔴 Новое сообщение' : (u.online ? 'в сети' : 'не в сети')}</div>
+      </div>
+      <div class="chat-meta">${badge}</div>
+    `;
+    div.onclick = () => openChat(u.name);
+    box.appendChild(div);
+  });
+}
+function initials(name) {
+  return name.slice(0, 2).toUpperCase();
+}
+
+// ============ ЧАТ ============
+function openChat(name) {
+  currentChat = name;
+  clearUnread(name);
+  const contact = contacts.find(c => c.name === name);
+  document.getElementById('chat-top-name').textContent = '@' + name;
+  document.getElementById('chat-top-status').textContent = contact?.online ? 'в сети' : 'не в сети';
+  const av = document.getElementById('chat-avatar');
+  if (contact?.avatar) { av.style.backgroundImage = `url(${contact.avatar})`; av.textContent = ''; }
+  else { av.style.backgroundImage = ''; av.textContent = initials(name); av.style.background = '#5f27cd'; }
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('chat-screen').classList.add('active');
+  socket.emit('load history', { withUser: name });
+  renderChatList();
+}
+function closeChat() {
+  document.getElementById('chat-screen').classList.remove('active');
+  currentChat = null;
+  renderChatList();
+}
+function clearUnread(name) {
+  if (unread[name]) { delete unread[name]; saveUnread(); updateTitle(); renderChatList(); }
+}
+function saveUnread() { try { localStorage.setItem(UNREAD_KEY, JSON.stringify(unread)); } catch (e) {} }
+function loadUnread() { try { const r = localStorage.getItem(UNREAD_KEY); if (r) unread = JSON.parse(r) || {}; } catch (e) {} }
+
+socket.on('history', ({ withUser, messages }) => {
+  if (withUser !== currentChat) return;
+  const box = document.getElementById('messages');
+  box.innerHTML = '';
+  messages.forEach(m => addMessage(m.from_user, m.text, m.from_user === myName, m.time, m.image));
+});
+
+// ============ СООБЩЕНИЯ ============
+function sendMsg() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text || !currentChat) return;
+  socket.emit('private message', { to: currentChat, text });
+  input.value = '';
+}
+
+function sendPhoto(event) {
+  const file = event.target.files[0];
+  if (!file || !currentChat) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxSize = 800;
+      let w = img.width, h = img.height;
+      if (w > h && w > maxSize) { h = h * maxSize / w; w = maxSize; }
+      else if (h > maxSize) { w = w * maxSize / h; h = maxSize; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      socket.emit('private message', { to: currentChat, image: dataUrl });
+      event.target.value = '';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+socket.on('private message', ({ from, text, image, self, to, time }) => {
+  if (self && currentChat === to) {
+    addMessage(myName, text, true, time, image);
+  } else if (!self) {
+    if (from === currentChat) {
+      addMessage(from, text, false, time, image);
+      clearUnread(from);
+    } else {
+      unread[from] = (unread[from] || 0) + 1;
+      saveUnread(); renderChatList(); updateTitle(); playPing(); vibrate();
+      showBrowserNotification(from, image ? '📷 Фото' : (text || ''));
+    }
+  }
+});
+
+function addMessage(from, text, self, time, image) {
+  const box = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (self ? 'self' : 'other');
+  const t = time ? new Date(time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+  div.innerHTML = '';
+  if (image) {
+    const img = document.createElement('img');
+    img.className = 'photo';
+    img.src = image;
+    img.onclick = (e) => { e.stopPropagation(); openLightbox(image); };
+    div.appendChild(img);
+  }
+  if (text) {
+    const span = document.createElement('span');
+    span.textContent = text;
+    div.appendChild(span);
+  }
+  const timeEl = document.createElement('span');
+  timeEl.className = 'time'; timeEl.textContent = t;
+  div.appendChild(timeEl);
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('active');
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ============ ЗВОНКИ ============
+let peerConnection, localStream, micOn = true, camOn = true;
+const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+async function startCall(video) {
+  if (!currentChat) return;
+  const contact = contacts.find(c => c.name === currentChat);
+  if (contact && !contact.online) { alert('@' + currentChat + ' сейчас не в сети.'); return; }
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('video-area').classList.add('active');
+    micOn = true; camOn = !!video; updateButtons();
+    peerConnection = new RTCPeerConnection(config);
+    localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+    peerConnection.onicecandidate = (e) => { if (e.candidate) socket.emit('ice-candidate', { to: currentChat, candidate: e.candidate }); };
+    peerConnection.ontrack = (e) => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    socket.emit('call-user', { to: currentChat, offer, video });
+  } catch (err) { alert('Нет доступа: ' + err.message); }
+}
+socket.on('call-failed', ({ reason }) => alert('Не удалось: ' + reason));
+socket.on('incoming-call', async ({ from, offer, video }) => {
+  if (!confirm(`Входящий ${video ? 'видео' : 'аудио'} звонок от @${from}. Принять?`)) return;
+  currentChat = from;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('video-area').classList.add('active');
+    micOn = true; camOn = !!video; updateButtons();
+    peerConnection = new RTCPeerConnection(config);
+    localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+    peerConnection.onicecandidate = (e) => { if (e.candidate) socket.emit('ice-candidate', { to: currentChat, candidate: e.candidate }); };
+    peerConnection.ontrack = (e) => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
+    await peerConnection.setRemoteDescription(offer);
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.emit('answer-call', { to: currentChat, answer });
+  } catch (err) { alert('Ошибка: ' + err.message); }
+});
+socket.on('call-answered', async ({ answer }) => { if (peerConnection) await peerConnection.setRemoteDescription(answer); });
+socket.on('ice-candidate', async ({ candidate }) => { if (peerConnection) { try { await peerConnection.addIceCandidate(candidate); } catch(e){} } });
+socket.on('call-ended', () => cleanupCall());
+
+function cleanupCall() {
+  if (peerConnection) { peerConnection.close(); peerConnection = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  document.getElementById('video-area').classList.remove('active');
+  document.getElementById('localVideo').srcObject = null;
+  document.getElementById('remoteVideo').srcObject = null;
+}
+function toggleMic() { if (!localStream) return; const t = localStream.getAudioTracks()[0]; if (!t) return; micOn = !micOn; t.enabled = micOn; updateButtons(); }
+function toggleCam() { if (!localStream) return; const t = localStream.getVideoTracks()[0]; if (!t) return; camOn = !camOn; t.enabled = camOn; updateButtons(); }
+function updateButtons() {
+  document.getElementById('micBtn').textContent = micOn ? '🎤' : '🔇';
+  document.getElementById('micBtn').classList.toggle('off', !micOn);
+  document.getElementById('camBtn').textContent = camOn ? '📷' : '🚫';
+  document.getElementById('camBtn').classList.toggle('off', !camOn);
+}
+function hangUp() { if (currentChat) socket.emit('end-call', { to: currentChat }); cleanupCall(); }
+
+// Инициализация
+window.addEventListener('load', () => {
+  loadUnread();
+  initNotifications();
+});
+</script>
+</body>
+</html>
