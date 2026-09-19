@@ -7,7 +7,6 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 const server = http.createServer(app);
-// 1e7 = 10 МБ, хватит и на фото, и на короткие голосовые
 const io = new Server(server, { maxHttpBufferSize: 1e7 });
 
 app.use(express.static(path.join(__dirname)));
@@ -48,12 +47,14 @@ db.exec(`
     image TEXT,
     voice TEXT,
     voice_duration INTEGER,
+    reactions TEXT DEFAULT '{}',
     time INTEGER NOT NULL
   )
 `);
 try { db.exec('ALTER TABLE messages ADD COLUMN image TEXT'); } catch (e) {}
 try { db.exec('ALTER TABLE messages ADD COLUMN voice TEXT'); } catch (e) {}
 try { db.exec('ALTER TABLE messages ADD COLUMN voice_duration INTEGER'); } catch (e) {}
+try { db.exec("ALTER TABLE messages ADD COLUMN reactions TEXT DEFAULT '{}'"); } catch (e) {}
 
 const findUser = db.prepare('SELECT * FROM users WHERE username = ?');
 const createUser = db.prepare('INSERT INTO users (username, password, avatar, verified, registered_at) VALUES (?, ?, ?, 0, ?)');
@@ -65,7 +66,7 @@ const getContacts = db.prepare('SELECT contact FROM contacts WHERE owner = ? ORD
 const getContactInfo = db.prepare('SELECT username, avatar, verified FROM users WHERE username = ?');
 
 const insertMessage = db.prepare(
-  'INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, time) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  'INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, reactions, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
 );
 const getHistory = db.prepare(`
   SELECT * FROM messages
@@ -73,8 +74,12 @@ const getHistory = db.prepare(`
   ORDER BY time ASC LIMIT 200
 `);
 
+const getMessageById = db.prepare('SELECT * FROM messages WHERE id = ?');
+const updateReactions = db.prepare('UPDATE messages SET reactions = ? WHERE id = ?');
+
 // ============ ONLINE ============
 const onlineUsers = {};
+const typingUsers = {}; // { "from|to": timeout }
 
 function findSocketsByUsername(username) {
   return Object.entries(onlineUsers).filter(([, u]) => u === username).map(([sid]) => sid);
@@ -173,7 +178,6 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
-  // ---- Удалить контакт ----
   socket.on('remove contact', ({ username }, cb) => {
     if (!socket.username) return;
     db.prepare('DELETE FROM contacts WHERE owner = ? AND contact = ?').run(socket.username, username);
@@ -185,27 +189,85 @@ io.on('connection', (socket) => {
   socket.on('load history', ({ withUser }) => {
     if (!socket.username) return;
     const rows = getHistory.all(socket.username, withUser, withUser, socket.username);
-    socket.emit('history', { withUser, messages: rows });
+    // Парсим reactions из JSON
+    const messages = rows.map(m => ({
+      ...m,
+      reactions: safeParseReactions(m.reactions)
+    }));
+    socket.emit('history', { withUser, messages });
   });
 
-  // ---- Сообщение (текст / фото / голос) ----
+  // ---- Сообщение ----
   socket.on('private message', ({ to, text, image, voice, voiceDuration }) => {
     if (!socket.username) return;
     const from = socket.username;
     const time = Date.now();
-    insertMessage.run(
+    const info = insertMessage.run(
       from, to,
       text || null,
       image || null,
       voice || null,
       voiceDuration || null,
+      '{}',
       time
     );
 
+    const msgId = info.lastInsertRowid;
+    const payload = { id: msgId, from, text, image, voice, voiceDuration, reactions: {}, time };
+
+    findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
+    socket.emit('private message', { ...payload, self: true, to });
+  });
+
+  // ---- ПЕЧАТАЕТ ----
+  socket.on('typing', ({ to, isTyping }) => {
+    if (!socket.username) return;
     findSocketsByUsername(to).forEach(sid =>
-      io.to(sid).emit('private message', { from, text, image, voice, voiceDuration, time })
+      io.to(sid).emit('typing', { from: socket.username, isTyping })
     );
-    socket.emit('private message', { from, text, image, voice, voiceDuration, time, self: true, to });
+  });
+
+  // ---- РЕАКЦИИ ----
+  socket.on('react', ({ messageId, emoji }, cb) => {
+    if (!socket.username) return cb && cb({ ok: false });
+    const msg = getMessageById.get(messageId);
+    if (!msg) return cb && cb({ ok: false, error: 'Сообщение не найдено' });
+
+    // Проверим, что реакция на сообщение между нами
+    const me = socket.username;
+    const inDialog = (msg.from_user === me || msg.to_user === me);
+    if (!inDialog) return cb && cb({ ok: false, error: 'Нет доступа' });
+
+    let reactions = safeParseReactions(msg.reactions);
+    // reactions = { "❤️": ["user1","user2"], "👍": ["user3"] }
+    if (!reactions[emoji]) reactions[emoji] = [];
+    const idx = reactions[emoji].indexOf(me);
+
+    if (idx === -1) {
+      // Добавляем реакцию
+      reactions[emoji].push(me);
+    } else {
+      // Убираем (toggle)
+      reactions[emoji].splice(idx, 1);
+      if (reactions[emoji].length === 0) delete reactions[emoji];
+    }
+
+    const serialized = JSON.stringify(reactions);
+    updateReactions.run(serialized, messageId);
+
+    const payload = {
+      messageId,
+      reactions,
+      from: msg.from_user,
+      to: msg.to_user
+    };
+
+    // Отправим обоим участникам диалога
+    const targets = new Set([msg.from_user, msg.to_user]);
+    targets.forEach(u => {
+      findSocketsByUsername(u).forEach(sid => io.to(sid).emit('reaction updated', payload));
+    });
+    cb && cb({ ok: true, reactions });
   });
 
   // ---- Звонки ----
@@ -235,8 +297,25 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const u = socket.username;
     delete onlineUsers[socket.id];
-    if (u) { sendContactsTo(u); refreshForFriends(u); }
+    if (u) {
+      sendContactsTo(u);
+      refreshForFriends(u);
+      // Сообщим всем, что он больше не печатает
+      Object.values(onlineUsers).forEach(other => {
+        findSocketsByUsername(other).forEach(sid =>
+          io.to(sid).emit('typing', { from: u, isTyping: false })
+        );
+      });
+    }
   });
 });
+
+function safeParseReactions(raw) {
+  if (!raw) return {};
+  try {
+    const obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object') ? obj : {};
+  } catch (e) { return {}; }
+}
 
 server.listen(3000, () => console.log('Aurora запущена: http://localhost:3000'));
