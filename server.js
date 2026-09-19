@@ -23,6 +23,13 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    name TEXT PRIMARY KEY,
+    registered_at INTEGER NOT NULL
+  )
+`);
+
 const insertMessage = db.prepare(
   'INSERT INTO messages (from_user, to_user, text, time) VALUES (?, ?, ?, ?)'
 );
@@ -34,12 +41,38 @@ const getHistory = db.prepare(`
   LIMIT 200
 `);
 
+const saveUser = db.prepare(
+  'INSERT OR IGNORE INTO users (name, registered_at) VALUES (?, ?)'
+);
+
+const getAllUsers = db.prepare('SELECT name FROM users ORDER BY registered_at ASC');
+
+const getLastMessage = db.prepare(`
+  SELECT text, time FROM messages
+  WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
+  ORDER BY time DESC
+  LIMIT 1
+`);
+
 // ============ ПОЛЬЗОВАТЕЛИ ОНЛАЙН ============
-const users = {}; // { socketId: { name } }
+const onlineUsers = {}; // { socketId: { name } }
 
 function findSocketByName(name) {
-  const entry = Object.entries(users).find(([, u]) => u.name === name);
+  const entry = Object.entries(onlineUsers).find(([, u]) => u.name === name);
   return entry ? entry[0] : null;
+}
+
+function isOnline(name) {
+  return Object.values(onlineUsers).some(u => u.name === name);
+}
+
+function broadcastContacts() {
+  const allUsers = getAllUsers.all();
+  const list = allUsers.map(u => ({
+    name: u.name,
+    online: isOnline(u.name)
+  }));
+  io.emit('contacts', list);
 }
 
 io.on('connection', (socket) => {
@@ -47,8 +80,9 @@ io.on('connection', (socket) => {
 
   // ---- Вход ----
   socket.on('register', (name) => {
-    users[socket.id] = { name };
-    io.emit('contacts', Object.values(users));
+    onlineUsers[socket.id] = { name };
+    saveUser.run(name, Date.now());
+    broadcastContacts();
     console.log(`${name} вошёл`);
   });
 
@@ -73,7 +107,11 @@ io.on('connection', (socket) => {
   // ---- Звонки ----
   socket.on('call-user', ({ to, from, offer, video }) => {
     const toSocket = findSocketByName(to);
-    if (toSocket) io.to(toSocket).emit('incoming-call', { from, offer, video });
+    if (toSocket) {
+      io.to(toSocket).emit('incoming-call', { from, offer, video });
+    } else {
+      socket.emit('call-failed', { reason: 'Пользователь не в сети' });
+    }
   });
 
   socket.on('answer-call', ({ to, answer }) => {
@@ -93,8 +131,8 @@ io.on('connection', (socket) => {
 
   // ---- Отключение ----
   socket.on('disconnect', () => {
-    delete users[socket.id];
-    io.emit('contacts', Object.values(users));
+    delete onlineUsers[socket.id];
+    broadcastContacts();
     console.log('Отключился:', socket.id);
   });
 });
