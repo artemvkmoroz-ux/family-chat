@@ -7,11 +7,12 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 const server = http.createServer(app);
+// 1e7 = 10 МБ, хватит и на фото, и на короткие голосовые
 const io = new Server(server, { maxHttpBufferSize: 1e7 });
 
 app.use(express.static(path.join(__dirname)));
 
-// 🔑 СЕКРЕТНЫЙ ПАРОЛЬ ДЛЯ ГАЛОЧКИ — можешь поменять
+// 🔑 СЕКРЕТНЫЙ ПАРОЛЬ ДЛЯ ГАЛОЧКИ
 const VERIFY_PASSWORD = 'aurora2026';
 
 // ============ БАЗА ============
@@ -45,10 +46,14 @@ db.exec(`
     to_user TEXT NOT NULL,
     text TEXT,
     image TEXT,
+    voice TEXT,
+    voice_duration INTEGER,
     time INTEGER NOT NULL
   )
 `);
 try { db.exec('ALTER TABLE messages ADD COLUMN image TEXT'); } catch (e) {}
+try { db.exec('ALTER TABLE messages ADD COLUMN voice TEXT'); } catch (e) {}
+try { db.exec('ALTER TABLE messages ADD COLUMN voice_duration INTEGER'); } catch (e) {}
 
 const findUser = db.prepare('SELECT * FROM users WHERE username = ?');
 const createUser = db.prepare('INSERT INTO users (username, password, avatar, verified, registered_at) VALUES (?, ?, ?, 0, ?)');
@@ -60,7 +65,7 @@ const getContacts = db.prepare('SELECT contact FROM contacts WHERE owner = ? ORD
 const getContactInfo = db.prepare('SELECT username, avatar, verified FROM users WHERE username = ?');
 
 const insertMessage = db.prepare(
-  'INSERT INTO messages (from_user, to_user, text, image, time) VALUES (?, ?, ?, ?, ?)'
+  'INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, time) VALUES (?, ?, ?, ?, ?, ?, ?)'
 );
 const getHistory = db.prepare(`
   SELECT * FROM messages
@@ -112,9 +117,7 @@ io.on('connection', (socket) => {
     if (username.length < 3) return cb && cb({ ok: false, error: 'Ник минимум 3 символа' });
     if (!/^[a-z0-9_]+$/.test(username)) return cb && cb({ ok: false, error: 'Только латиница, цифры и _' });
     if (password.length < 4) return cb && cb({ ok: false, error: 'Пароль минимум 4 символа' });
-
-    const existing = findUser.get(username);
-    if (existing) return cb && cb({ ok: false, error: 'Такой ник уже занят' });
+    if (findUser.get(username)) return cb && cb({ ok: false, error: 'Такой ник уже занят' });
 
     const hash = bcrypt.hashSync(password, 10);
     createUser.run(username, hash, null, Date.now());
@@ -138,14 +141,14 @@ io.on('connection', (socket) => {
     refreshForFriends(username);
   });
 
-  // ---- Установить аватарку ----
+  // ---- Аватарка ----
   socket.on('set avatar', ({ avatar }) => {
     if (!socket.username || !avatar) return;
     updateAvatar.run(avatar, socket.username);
     refreshForFriends(socket.username);
   });
 
-  // ---- Получить галочку ----
+  // ---- Галочка ----
   socket.on('verify', ({ password }, cb) => {
     if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
     if (password !== VERIFY_PASSWORD) return cb && cb({ ok: false, error: 'Неверный пароль' });
@@ -161,14 +164,19 @@ io.on('connection', (socket) => {
   socket.on('add contact', ({ username }, cb) => {
     if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
     username = String(username || '').trim().toLowerCase();
-
     if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
     if (username === socket.username) return cb && cb({ ok: false, error: 'Это твой ник' });
-
-    const target = findUser.get(username);
-    if (!target) return cb && cb({ ok: false, error: 'Такого пользователя нет' });
+    if (!findUser.get(username)) return cb && cb({ ok: false, error: 'Такого пользователя нет' });
 
     addContact.run(socket.username, username, Date.now());
+    sendContactsTo(socket.username);
+    cb && cb({ ok: true });
+  });
+
+  // ---- Удалить контакт ----
+  socket.on('remove contact', ({ username }, cb) => {
+    if (!socket.username) return;
+    db.prepare('DELETE FROM contacts WHERE owner = ? AND contact = ?').run(socket.username, username);
     sendContactsTo(socket.username);
     cb && cb({ ok: true });
   });
@@ -180,15 +188,24 @@ io.on('connection', (socket) => {
     socket.emit('history', { withUser, messages: rows });
   });
 
-  // ---- Сообщение ----
-  socket.on('private message', ({ to, text, image }) => {
+  // ---- Сообщение (текст / фото / голос) ----
+  socket.on('private message', ({ to, text, image, voice, voiceDuration }) => {
     if (!socket.username) return;
     const from = socket.username;
     const time = Date.now();
-    insertMessage.run(from, to, text || null, image || null, time);
+    insertMessage.run(
+      from, to,
+      text || null,
+      image || null,
+      voice || null,
+      voiceDuration || null,
+      time
+    );
 
-    findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', { from, text, image, time }));
-    socket.emit('private message', { from, text, image, time, self: true, to });
+    findSocketsByUsername(to).forEach(sid =>
+      io.to(sid).emit('private message', { from, text, image, voice, voiceDuration, time })
+    );
+    socket.emit('private message', { from, text, image, voice, voiceDuration, time, self: true, to });
   });
 
   // ---- Звонки ----
