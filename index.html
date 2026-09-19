@@ -2,53 +2,226 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Семейный чат</title>
 <style>
-  body { font-family: Arial; margin: 0; display: flex; height: 100vh; }
-  #sidebar { width: 220px; background: #222; color: white; padding: 10px; overflow-y: auto; }
-  #sidebar h3 { margin-top: 0; }
-  .contact { padding: 8px; cursor: pointer; border-radius: 5px; margin-bottom: 4px; background: #333; }
-  .contact:hover { background: #444; }
-  .contact.active { background: #0a84ff; }
-  #main { flex: 1; display: flex; flex-direction: column; }
-  #chat-header { padding: 10px; background: #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
-  #messages { flex: 1; overflow-y: auto; padding: 10px; background: #e5ddd5; }
-  .msg { padding: 6px 10px; margin: 4px 0; border-radius: 8px; max-width: 60%; clear: both; word-wrap: break-word; }
-  .msg.self { background: #dcf8c6; float: right; }
-  .msg.other { background: white; float: left; }
-  .msg .time { font-size: 10px; color: #888; }
-  #input-area { display: flex; padding: 10px; background: #f0f0f0; }
-  #input-area input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
-  #input-area button { margin-left: 8px; padding: 8px 16px; }
-  #login { position: fixed; inset: 0; background: #0a84ff; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 200; }
-  #login input { padding: 10px; font-size: 16px; border-radius: 5px; border: none; margin-bottom: 10px; }
-  #login button { padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
-  #video-area { position: fixed; top: 10px; right: 10px; display: none; gap: 10px; z-index: 100; }
-  video { width: 160px; background: black; border-radius: 8px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0a0a0a;
+    color: #fff;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ===== ЭКРАН ВХОДА ===== */
+  #login {
+    position: fixed; inset: 0; background: #0a0a0a;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 30px; z-index: 1000;
+  }
+  #login h1 { font-size: 28px; margin-bottom: 8px; color: #fff; }
+  #login p { color: #888; margin-bottom: 30px; font-size: 14px; }
+  #login input {
+    width: 100%; max-width: 320px; padding: 14px 16px; font-size: 16px;
+    background: #1c1c1e; border: 1px solid #2c2c2e; border-radius: 12px;
+    color: #fff; margin-bottom: 12px; outline: none;
+  }
+  #login input:focus { border-color: #0a84ff; }
+  #login button {
+    width: 100%; max-width: 320px; padding: 14px; font-size: 16px; font-weight: 600;
+    background: #0a84ff; border: none; border-radius: 12px; color: #fff; cursor: pointer;
+  }
+
+  /* ===== ГЛАВНЫЙ ЭКРАН ===== */
+  #app { display: none; flex-direction: column; height: 100vh; }
+  #app.active { display: flex; }
+
+  /* Шапка */
+  #header {
+    padding: 14px 16px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: #0a0a0a;
+  }
+  #header h2 { font-size: 22px; font-weight: 700; }
+  .header-actions { display: flex; gap: 12px; align-items: center; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%; background: #1c1c1e;
+    border: none; color: #fff; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .icon-btn.primary { background: #0a84ff; }
+
+  /* Поиск */
+  #search-wrap { padding: 0 16px 10px; }
+  #search {
+    width: 100%; padding: 10px 14px 10px 38px;
+    background: #1c1c1e; border: none; border-radius: 10px;
+    color: #fff; font-size: 15px; outline: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23888' viewBox='0 0 16 16'><path d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/></svg>");
+    background-repeat: no-repeat; background-position: 14px center;
+  }
+
+  /* Список чатов */
+  #chat-list { flex: 1; overflow-y: auto; padding: 0 8px; }
+  .chat-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 8px; border-radius: 12px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .chat-item:hover, .chat-item.active { background: #1c1c1e; }
+  .avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 18px; color: #fff; flex-shrink: 0;
+    position: relative;
+  }
+  .avatar .online-dot {
+    position: absolute; bottom: 2px; right: 2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #4caf50; border: 2px solid #0a0a0a;
+  }
+  .chat-info { flex: 1; min-width: 0; }
+  .chat-name {
+    font-size: 16px; font-weight: 600; margin-bottom: 3px;
+  }
+  .chat-preview {
+    font-size: 14px; color: #888; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .chat-meta { text-align: right; flex-shrink: 0; }
+  .chat-time { font-size: 12px; color: #888; }
+
+  /* Нижнее меню */
+  #tabbar {
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 10px 0 20px; background: #0a0a0a; border-top: 1px solid #1c1c1e;
+  }
+  .tab {
+    flex: 1; text-align: center; color: #666; font-size: 11px;
+    cursor: pointer; padding: 4px;
+  }
+  .tab.active { color: #0a84ff; }
+  .tab .tab-icon { font-size: 22px; display: block; margin-bottom: 2px; }
+
+  /* ===== ЭКРАН ЧАТА ===== */
+  #chat-screen {
+    position: fixed; inset: 0; background: #0a0a0a;
+    display: none; flex-direction: column; z-index: 500;
+  }
+  #chat-screen.active { display: flex; }
+  #chat-top {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px; background: #0a0a0a; border-bottom: 1px solid #1c1c1e;
+  }
+  .back-btn {
+    background: none; border: none; color: #0a84ff;
+    font-size: 22px; cursor: pointer; padding: 4px 8px;
+  }
+  #chat-top .avatar { width: 38px; height: 38px; font-size: 14px; }
+  #chat-top-name { font-weight: 600; font-size: 16px; }
+  #chat-top-status { font-size: 12px; color: #888; margin-top: 2px; }
+  #call-actions { display: flex; gap: 8px; margin-left: auto; }
+  #call-actions button {
+    background: none; border: none; color: #0a84ff;
+    font-size: 22px; cursor: pointer; padding: 4px;
+  }
+
+  #messages {
+    flex: 1; overflow-y: auto; padding: 12px 14px;
+    background: #0a0a0a;
+  }
+  .msg {
+    max-width: 75%; padding: 9px 13px; margin: 3px 0;
+    border-radius: 18px; font-size: 15px; line-height: 1.35;
+    word-wrap: break-word; clear: both;
+  }
+  .msg.self { background: #0a84ff; color: #fff; float: right; border-bottom-right-radius: 5px; }
+  .msg.other { background: #1c1c1e; color: #fff; float: left; border-bottom-left-radius: 5px; }
+  .msg .time { font-size: 10px; opacity: 0.6; margin-left: 6px; }
+
+  #input-area {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px 24px; background: #0a0a0a; border-top: 1px solid #1c1c1e;
+  }
+  #input-area input {
+    flex: 1; padding: 11px 16px; background: #1c1c1e;
+    border: none; border-radius: 22px; color: #fff;
+    font-size: 15px; outline: none;
+  }
+  #input-area button {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: #0a84ff; border: none; color: #fff;
+    font-size: 18px; cursor: pointer; flex-shrink: 0;
+  }
+
+  /* ===== ВИДЕО ===== */
+  #video-area {
+    position: fixed; top: 10px; right: 10px; display: none;
+    flex-direction: column; gap: 10px; z-index: 1000;
+    background: rgba(0,0,0,0.85); padding: 10px; border-radius: 16px;
+  }
+  #video-area.active { display: flex; }
+  video { width: 150px; background: #000; border-radius: 12px; }
+  #call-controls { display: flex; gap: 6px; justify-content: center; }
+  #call-controls button {
+    padding: 8px 10px; border: none; border-radius: 8px;
+    cursor: pointer; font-size: 16px; background: #2c2c2e; color: #fff;
+  }
+  #call-controls button.off { background: #ff3b30; }
+
+  @media (max-width: 600px) {
+    video { width: 90px; }
+  }
 </style>
 </head>
 <body>
 
-<!-- Экран входа -->
+<!-- ЭКРАН ВХОДА -->
 <div id="login">
-  <h2>Вход в семейный чат</h2>
-  <input id="nameInput" placeholder="Введи своё имя" onkeydown="if(event.key==='Enter')register()" />
+  <h1>💬 Семейный чат</h1>
+  <p>Введи своё имя, чтобы войти</p>
+  <input id="nameInput" placeholder="Например: Артём" onkeydown="if(event.key==='Enter')register()" />
   <button onclick="register()">Войти</button>
 </div>
 
-<!-- Контакты -->
-<div id="sidebar">
-  <h3>Контакты</h3>
-  <div id="contacts"></div>
+<!-- ГЛАВНЫЙ ЭКРАН -->
+<div id="app">
+  <div id="header">
+    <h2>Чаты</h2>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="alert('Кнопка «Добавить контакт» пока в разработке')">＋</button>
+    </div>
+  </div>
+
+  <div id="search-wrap">
+    <input id="search" placeholder="Поиск" oninput="filterContacts()" />
+  </div>
+
+  <div id="chat-list"></div>
+
+  <div id="tabbar">
+    <div class="tab active"><span class="tab-icon">💬</span>Чаты</div>
+    <div class="tab" onclick="alert('В разработке')"><span class="tab-icon">📞</span>Звонки</div>
+    <div class="tab" onclick="alert('В разработке')"><span class="tab-icon">👥</span>Контакты</div>
+    <div class="tab" onclick="alert('В разработке')"><span class="tab-icon">⚙️</span>Настройки</div>
+  </div>
 </div>
 
-<!-- Основная часть -->
-<div id="main">
-  <div id="chat-header">
-    <span id="chatWith">Выбери контакт</span>
+<!-- ЭКРАН ЧАТА -->
+<div id="chat-screen">
+  <div id="chat-top">
+    <button class="back-btn" onclick="closeChat()">‹</button>
+    <div class="avatar" id="chat-avatar"></div>
     <div>
-      <button onclick="startCall(false)" id="callBtn" disabled>📞 Звонок</button>
-      <button onclick="startCall(true)" id="videoBtn" disabled>📹 Видео</button>
+      <div id="chat-top-name">—</div>
+      <div id="chat-top-status">—</div>
+    </div>
+    <div id="call-actions">
+      <button onclick="startCall(false)" title="Аудиозвонок">📞</button>
+      <button onclick="startCall(true)" title="Видеозвонок">📹</button>
     </div>
   </div>
   <div id="messages"></div>
@@ -58,10 +231,15 @@
   </div>
 </div>
 
-<!-- Видео -->
+<!-- ВИДЕО -->
 <div id="video-area">
-  <video id="localVideo" autoplay muted></video>
-  <video id="remoteVideo" autoplay></video>
+  <video id="localVideo" autoplay muted playsinline></video>
+  <video id="remoteVideo" autoplay playsinline></video>
+  <div id="call-controls">
+    <button id="micBtn" onclick="toggleMic()">🎤</button>
+    <button id="camBtn" onclick="toggleCam()">📷</button>
+    <button onclick="hangUp()" style="background:#ff3b30;">📵</button>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -71,6 +249,23 @@ let myName = null;
 let currentChat = null;
 let contacts = [];
 
+// Цвета для аватарок
+const AVATAR_COLORS = ['#ff6b6b','#feca57','#48dbfb','#1dd1a1','#5f27cd','#ff9ff3','#54a0ff','#00d2d3','#f368e0','#ff7675'];
+function colorForName(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+function initialsForName(name) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+function makeAvatarHTML(name, id) {
+  const idAttr = id ? ` id="${id}"` : '';
+  return `<div class="avatar"${idAttr} style="background:${colorForName(name)}">${initialsForName(name)}</div>`;
+}
+
 // ============ ВХОД ============
 function register() {
   const name = document.getElementById('nameInput').value.trim();
@@ -78,33 +273,67 @@ function register() {
   myName = name;
   socket.emit('register', name);
   document.getElementById('login').style.display = 'none';
+  document.getElementById('app').classList.add('active');
 }
 
-// ============ КОНТАКТЫ ============
+// ============ СПИСОК ЧАТОВ ============
 socket.on('contacts', (list) => {
   contacts = list.filter(u => u.name !== myName);
-  const box = document.getElementById('contacts');
-  box.innerHTML = '';
-  contacts.forEach(u => {
-    const div = document.createElement('div');
-    div.className = 'contact' + (currentChat === u.name ? ' active' : '');
-    div.textContent = u.name;
-    div.onclick = () => selectContact(u.name);
-    box.appendChild(div);
-  });
+  renderChatList();
 });
 
-function selectContact(name) {
-  currentChat = name;
-  document.getElementById('chatWith').textContent = name;
-  document.getElementById('callBtn').disabled = false;
-  document.getElementById('videoBtn').disabled = false;
-  document.getElementById('messages').innerHTML = '';
-  socket.emit('load history', { me: myName, withUser: name });
+function renderChatList() {
+  const search = (document.getElementById('search')?.value || '').toLowerCase();
+  const box = document.getElementById('chat-list');
+  box.innerHTML = '';
 
-  document.querySelectorAll('.contact').forEach(el => {
-    el.classList.toggle('active', el.textContent === name);
+  const filtered = contacts.filter(c => c.name.toLowerCase().includes(search));
+  if (filtered.length === 0) {
+    box.innerHTML = '<div style="text-align:center;color:#666;padding:40px 20px;font-size:14px">Пока никого нет.<br>Позови родных — пусть зайдут по ссылке!</div>';
+    return;
+  }
+
+  filtered.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'chat-item' + (currentChat === u.name ? ' active' : '');
+    const onlineDot = u.online ? '<span class="online-dot"></span>' : '';
+    const avatarHTML = `<div class="avatar" style="background:${colorForName(u.name)}">${initialsForName(u.name)}${onlineDot}</div>`;
+    div.innerHTML = `
+      ${avatarHTML}
+      <div class="chat-info">
+        <div class="chat-name">${escapeHtml(u.name)}</div>
+        <div class="chat-preview">Нажми, чтобы написать</div>
+      </div>
+      <div class="chat-meta">
+        <div class="chat-time">${u.online ? 'в сети' : ''}</div>
+      </div>
+    `;
+    div.onclick = () => openChat(u.name);
+    box.appendChild(div);
   });
+}
+
+function filterContacts() { renderChatList(); }
+
+// ============ ОТКРЫТИЕ ЧАТА ============
+function openChat(name) {
+  currentChat = name;
+  const contact = contacts.find(c => c.name === name);
+  document.getElementById('chat-top-name').textContent = name;
+  document.getElementById('chat-top-status').textContent = contact?.online ? 'в сети' : 'был(а) недавно';
+  const av = document.getElementById('chat-avatar');
+  av.textContent = initialsForName(name);
+  av.style.background = colorForName(name);
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('chat-screen').classList.add('active');
+  socket.emit('load history', { me: myName, withUser: name });
+  renderChatList();
+}
+
+function closeChat() {
+  document.getElementById('chat-screen').classList.remove('active');
+  currentChat = null;
+  renderChatList();
 }
 
 // ============ ИСТОРИЯ ============
@@ -117,7 +346,7 @@ socket.on('history', ({ withUser, messages }) => {
   });
 });
 
-// ============ ОТПРАВКА ============
+// ============ СООБЩЕНИЯ ============
 function sendMsg() {
   const input = document.getElementById('msgInput');
   const text = input.value.trim();
@@ -127,11 +356,8 @@ function sendMsg() {
 }
 
 socket.on('private message', ({ from, text, self, to, time }) => {
-  if (self && currentChat === to) {
-    addMessage(myName, text, true, time);
-  } else if (!self && from === currentChat) {
-    addMessage(from, text, false, time);
-  }
+  if (self && currentChat === to) addMessage(myName, text, true, time);
+  else if (!self && from === currentChat) addMessage(from, text, false, time);
 });
 
 function addMessage(from, text, self, time) {
@@ -139,93 +365,95 @@ function addMessage(from, text, self, time) {
   const div = document.createElement('div');
   div.className = 'msg ' + (self ? 'self' : 'other');
   const t = time ? new Date(time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
-  div.innerHTML = `<b>${self ? 'Я' : from}:</b> ${escapeHtml(text)} <span class="time">${t}</span>`;
+  div.innerHTML = `${escapeHtml(text)} <span class="time">${t}</span>`;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
 
 function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// ============ ЗВОНКИ (WebRTC) ============
-let peerConnection;
-let localStream;
+// ============ ЗВОНКИ ============
+let peerConnection, localStream, micOn = true, camOn = true;
 const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 async function startCall(video) {
   if (!currentChat) return;
+  const contact = contacts.find(c => c.name === currentChat);
+  if (contact && !contact.online) { alert(currentChat + ' сейчас не в сети.'); return; }
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
     document.getElementById('localVideo').srcObject = localStream;
-    document.getElementById('video-area').style.display = 'flex';
+    document.getElementById('video-area').classList.add('active');
+    micOn = true; camOn = !!video; updateButtons();
 
     peerConnection = new RTCPeerConnection(config);
     localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
-
-    peerConnection.onicecandidate = (e) => {
-      if (e.candidate) socket.emit('ice-candidate', { to: currentChat, candidate: e.candidate });
-    };
-    peerConnection.ontrack = (e) => {
-      document.getElementById('remoteVideo').srcObject = e.streams[0];
-    };
+    peerConnection.onicecandidate = (e) => { if (e.candidate) socket.emit('ice-candidate', { to: currentChat, candidate: e.candidate }); };
+    peerConnection.ontrack = (e) => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
 
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     socket.emit('call-user', { to: currentChat, from: myName, offer, video });
-  } catch (err) {
-    alert('Нет доступа к камере/микрофону: ' + err.message);
-  }
+  } catch (err) { alert('Нет доступа к камере/микрофону: ' + err.message); }
 }
 
-socket.on('incoming-call', async ({ from, offer, video }) => {
-  if (!confirm(`Входящий ${video ? 'видео' : 'аудио'} звонок от ${from}. Принять?`)) {
-    return;
-  }
-  currentChat = from;
-  document.getElementById('chatWith').textContent = from;
+socket.on('call-failed', ({ reason }) => alert('Не удалось позвонить: ' + reason));
 
+socket.on('incoming-call', async ({ from, offer, video }) => {
+  if (!confirm(`Входящий ${video ? 'видео' : 'аудио'} звонок от ${from}. Принять?`)) return;
+  currentChat = from;
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
     document.getElementById('localVideo').srcObject = localStream;
-    document.getElementById('video-area').style.display = 'flex';
+    document.getElementById('video-area').classList.add('active');
+    micOn = true; camOn = !!video; updateButtons();
 
     peerConnection = new RTCPeerConnection(config);
     localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
-
-    peerConnection.onicecandidate = (e) => {
-      if (e.candidate) socket.emit('ice-candidate', { to: currentChat, candidate: e.candidate });
-    };
-    peerConnection.ontrack = (e) => {
-      document.getElementById('remoteVideo').srcObject = e.streams[0];
-    };
+    peerConnection.onicecandidate = (e) => { if (e.candidate) socket.emit('ice-candidate', { to: currentChat, candidate: e.candidate }); };
+    peerConnection.ontrack = (e) => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
 
     await peerConnection.setRemoteDescription(offer);
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
     socket.emit('answer-call', { to: currentChat, answer });
-  } catch (err) {
-    alert('Ошибка: ' + err.message);
-  }
+  } catch (err) { alert('Ошибка: ' + err.message); }
 });
 
-socket.on('call-answered', async ({ answer }) => {
-  if (peerConnection) await peerConnection.setRemoteDescription(answer);
-});
+socket.on('call-answered', async ({ answer }) => { if (peerConnection) await peerConnection.setRemoteDescription(answer); });
+socket.on('ice-candidate', async ({ candidate }) => { if (peerConnection) { try { await peerConnection.addIceCandidate(candidate); } catch(e){} } });
+socket.on('call-ended', () => cleanupCall());
 
-socket.on('ice-candidate', async ({ candidate }) => {
-  if (peerConnection) {
-    try { await peerConnection.addIceCandidate(candidate); } catch (e) {}
-  }
-});
-
-socket.on('call-ended', () => {
+function cleanupCall() {
   if (peerConnection) { peerConnection.close(); peerConnection = null; }
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-  document.getElementById('video-area').style.display = 'none';
+  document.getElementById('video-area').classList.remove('active');
   document.getElementById('localVideo').srcObject = null;
   document.getElementById('remoteVideo').srcObject = null;
-});
+}
+
+function toggleMic() {
+  if (!localStream) return;
+  const t = localStream.getAudioTracks()[0]; if (!t) return;
+  micOn = !micOn; t.enabled = micOn; updateButtons();
+}
+function toggleCam() {
+  if (!localStream) return;
+  const t = localStream.getVideoTracks()[0]; if (!t) return;
+  camOn = !camOn; t.enabled = camOn; updateButtons();
+}
+function updateButtons() {
+  document.getElementById('micBtn').textContent = micOn ? '🎤' : '🔇';
+  document.getElementById('micBtn').classList.toggle('off', !micOn);
+  document.getElementById('camBtn').textContent = camOn ? '📷' : '🚫';
+  document.getElementById('camBtn').classList.toggle('off', !camOn);
+}
+function hangUp() {
+  if (currentChat) socket.emit('end-call', { to: currentChat });
+  cleanupCall();
+}
 </script>
 </body>
 </html>
