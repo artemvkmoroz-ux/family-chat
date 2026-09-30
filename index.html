@@ -45,13 +45,13 @@
   #auth .subtitle { color: var(--text-muted); margin-bottom: 30px; font-size: 14px; }
   #auth input { width: 100%; max-width: 320px; padding: 14px 16px; font-size: 16px; background: #242f3d; border: 1px solid transparent; border-radius: 10px; color: #fff; margin-bottom: 12px; outline: none; transition: border-color 0.2s; }
   #auth input:focus { border-color: var(--accent); }
-  #auth button { width: 100%; max-width: 320px; padding: 14px; font-size: 16px; font-weight: 600; background: var(--accent); border: none; border-radius: 10px; color: #fff; cursor: pointer; margin-bottom: 10px; transition: transform 0.15s, background 0.15s; }
+  #auth button { width: 100%; max-width: 320px; padding: 14px; font-size: 16px; font-weight: 600; background: var(--accent); border: none; border-radius: 10px; color: #fff; cursor: pointer; margin-bottom: 10px; }
   #auth button:active { transform: scale(0.97); background: #4a7cb0; }
   #auth .switch { color: var(--accent-light); background: none; border: none; font-size: 14px; cursor: pointer; padding: 8px; }
   #auth .error { color: #ff5c5c; font-size: 13px; margin-bottom: 10px; text-align: center; min-height: 18px; }
   #auth .hint { color: #6c7883; font-size: 12px; margin-top: 6px; text-align: center; max-width: 320px; }
 
-  #notif-banner { position: fixed; top: 0; left: 0; right: 0; background: var(--accent); color: #fff; padding: 12px 16px; display: none; align-items: center; justify-content: space-between; z-index: 3000; font-size: 14px; transform: translateY(-100%); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  #notif-banner { position: fixed; top: 0; left: 0; right: 0; background: var(--accent); color: #fff; padding: 12px 16px; display: none; align-items: center; justify-content: space-between; z-index: 3000; font-size: 14px; transform: translateY(-100%); transition: transform 0.35s; }
   #notif-banner.active { display: flex; transform: translateY(0); }
   #notif-banner button { background: rgba(255,255,255,0.25); border: none; color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600; }
 
@@ -62,7 +62,6 @@
   #burger { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; padding: 4px; }
   #main-header h2 { font-size: 20px; font-weight: 600; flex: 1; }
   #main-header .icon-btn { width: 36px; height: 36px; border-radius: 50%; background: transparent; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 0; }
-  #main-header .icon-btn:active { background: var(--bg-hover); }
   #main-header .icon-btn img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
 
   #search-wrap { padding: 0 12px 10px; }
@@ -72,9 +71,8 @@
   }
 
   #chat-list { flex: 1; overflow-y: auto; padding: 0 8px; }
-  .chat-item { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 10px; cursor: pointer; transition: background 0.15s; }
+  .chat-item { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 10px; cursor: pointer; }
   .chat-item:hover, .chat-item.active { background: var(--bg-hover); }
-  .chat-item:active { background: #2a3745; }
   .avatar { width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 20px; color: #fff; background-size: cover; background-position: center; position: relative; }
   .avatar .online-dot { position: absolute; bottom: 2px; right: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--online); border: 2px solid var(--bg-panel); }
   .chat-info { flex: 1; min-width: 0; }
@@ -98,7 +96,7 @@
   #chat-top .avatar { width: 40px; height: 40px; font-size: 15px; }
   #chat-top-info { flex: 1; min-width: 0; }
   #chat-top-name { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 5px; }
-  #chat-top-status { font-size: 13px; color: var(--text-muted); margin-top: 1px; transition: color 0.2s; }
+  #chat-top-status { font-size: 13px; color: var(--text-muted); margin-top: 1px; }
   #chat-top-status.typing { color: var(--accent-light); font-style: italic; }
   #chat-actions { display: flex; gap: 4px; }
   #chat-actions button { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; padding: 6px; border-radius: 50%; }
@@ -135,16 +133,37 @@
 
   #input-area { display: flex; align-items: flex-end; gap: 6px; padding: 8px 10px 12px; background: var(--bg-header); }
   #input-area .attach, #input-area .mic { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; padding: 8px; flex-shrink: 0; }
-  #input-area .mic.recording { color: #ff5c5c; animation: recPulse 1s infinite; }
-  @keyframes recPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+  #input-area .mic.recording { color: #ff5c5c; }
   #msgInput { flex: 1; padding: 10px 16px; background: var(--bg-input-inner); border: none; border-radius: 20px; color: #fff; font-size: 15px; outline: none; }
   #send-btn { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); border: none; color: #fff; font-size: 18px; cursor: pointer; flex-shrink: 0; }
-  #send-btn:active { transform: scale(0.9); }
 
-  #recording-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #ff3b30; color: #fff; padding: 14px 20px 28px; display: none; align-items: center; gap: 12px; z-index: 700; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  /* ===== КРАСНАЯ ПАНЕЛЬ ЗАПИСИ ===== */
+  #recording-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #ff3b30; color: #fff;
+    padding: 14px 20px 28px;
+    display: none; align-items: center; gap: 12px;
+    z-index: 700;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
   #recording-bar.active { display: flex; transform: translateY(0); }
-  #recording-dot { width: 12px; height: 12px; border-radius: 50%; background: #fff; animation: recDot 1s infinite; }
+  #recording-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; animation: recDot 1s infinite; flex-shrink: 0;
+  }
   @keyframes recDot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .rec-cancel, .rec-send {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: none; cursor: pointer; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: transform 0.15s, background 0.15s;
+    color: #fff;
+  }
+  .rec-cancel { background: rgba(255,255,255,0.2); }
+  .rec-cancel:active { transform: scale(0.9); background: rgba(255,255,255,0.35); }
+  .rec-send { background: #fff; color: #ff3b30; font-weight: 700; }
+  .rec-send:active { transform: scale(0.9); background: #eee; }
 
   #reaction-menu { position: fixed; z-index: 2500; background: #1c2733; border-radius: 24px; padding: 6px 10px; display: none; gap: 4px; box-shadow: 0 8px 30px rgba(0,0,0,0.8); }
   #reaction-menu.active { display: flex; animation: popIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
@@ -184,7 +203,6 @@
   #local-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
   #call-controls-bar { padding: 20px 20px 40px; background: linear-gradient(0deg, rgba(0,0,0,0.9), transparent); display: flex; justify-content: center; gap: 16px; z-index: 10; }
   .call-btn { width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #fff; background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); }
-  .call-btn:active { transform: scale(0.85); }
   .call-btn.off { background: #fff; color: #000; }
   .call-btn.hangup { background: #e53935; }
 
@@ -196,7 +214,6 @@
   #incoming-screen .avatar-big { width: 150px; height: 150px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 52px; font-weight: 500; color: #fff; background: #2b5278; background-size: cover; background-position: center; animation: callPulse 1.5s infinite; }
   #incoming-screen .buttons { display: flex; gap: 60px; }
   .incoming-btn { width: 70px; height: 70px; border-radius: 50%; border: none; cursor: pointer; font-size: 28px; color: #fff; display: flex; align-items: center; justify-content: center; }
-  .incoming-btn:active { transform: scale(0.85); }
   .incoming-btn.accept { background: var(--online); }
   .incoming-btn.decline { background: #e53935; }
 </style>
@@ -306,10 +323,11 @@
 </div>
 
 <div id="recording-bar">
+  <button class="rec-cancel" onclick="stopVoiceRecording(true)" title="Отменить">✕</button>
   <div id="recording-dot"></div>
   <span id="recording-time">0:00</span>
-  <span>● Запись...</span>
-  <span style="margin-left:auto; font-size:13px; opacity:0.85;">Нажми 🎤 чтобы отправить</span>
+  <span style="flex:1; text-align:center; font-size:13px; opacity:0.9;">● Запись</span>
+  <button class="rec-send" onclick="stopVoiceRecording(false)" title="Отправить">➤</button>
 </div>
 
 <div id="call-screen">
@@ -384,7 +402,6 @@ function doAuth() {
   const errEl = document.getElementById('auth-error');
   errEl.textContent = '';
   if (!username || !password) return errEl.textContent = 'Заполни все поля';
-
   if (authMode === 'register') {
     const password2 = document.getElementById('auth-password2').value;
     if (password !== password2) return errEl.textContent = 'Пароли не совпадают';
@@ -429,16 +446,13 @@ window.addEventListener('load', () => {
   initNotifications();
   const creds = loadCreds();
   const status = document.getElementById('loading-status');
-
   socket.on('connect', () => {
     if (creds) {
       status.textContent = 'Вхожу как @' + creds.username + '...';
       socket.emit('login', { username: creds.username, password: creds.password }, (res) => {
-        if (res.ok) {
-          onLoggedIn(res.username, res.avatar, res.verified);
-          hideLoading();
-        } else {
-          status.textContent = 'Не удалось войти. Введи данные заново.';
+        if (res.ok) { onLoggedIn(res.username, res.avatar, res.verified); hideLoading(); }
+        else {
+          status.textContent = 'Не удалось войти.';
           clearCreds();
           setTimeout(() => { hideLoading(); document.getElementById('auth').classList.add('active'); }, 1200);
         }
@@ -550,13 +564,10 @@ function updateVerifyButton() {
   if (!btn) return;
   if (myVerified) {
     btn.textContent = '✓ Галочка получена';
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-    btn.onclick = null;
+    btn.disabled = true; btn.style.opacity = '0.5'; btn.onclick = null;
   } else {
     btn.textContent = '✓ Получить галочку';
-    btn.disabled = false;
-    btn.style.opacity = '1';
+    btn.disabled = false; btn.style.opacity = '1';
     btn.onclick = () => openModal('verify-modal');
   }
 }
@@ -596,10 +607,7 @@ function doAddContact() {
   });
 }
 
-socket.on('contacts', (list) => {
-  contacts = list;
-  renderChatList();
-});
+socket.on('contacts', (list) => { contacts = list; renderChatList(); });
 
 function renderChatList() {
   const box = document.getElementById('chat-list');
@@ -760,16 +768,22 @@ function sendPhoto(event) {
   reader.readAsDataURL(file);
 }
 
+// ============ ГОЛОСОВЫЕ ============
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
+let cancelledRecording = false;
 let recordingStartTime = 0;
 let recordingTimer = null;
 const MAX_RECORDING_SEC = 60;
 
 async function toggleVoiceRecording() {
   if (!currentChat) return;
-  if (isRecording) { stopVoiceRecording(false); return; }
+  if (isRecording) {
+    // Нажал на 🎤 во время записи → ОТМЕНИТЬ
+    stopVoiceRecording(true);
+    return;
+  }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioChunks = [];
@@ -781,7 +795,17 @@ async function toggleVoiceRecording() {
       const duration = Math.round((Date.now() - recordingStartTime) / 1000);
       document.getElementById('recording-bar').classList.remove('active');
       document.getElementById('micBtnInput').classList.remove('recording');
+
+      // Если отменили — просто выходим
+      if (cancelledRecording) {
+        cancelledRecording = false;
+        audioChunks = [];
+        isRecording = false;
+        return;
+      }
+
       if (audioChunks.length === 0 || duration < 1) { isRecording = false; return; }
+
       const blob = new Blob(audioChunks, { type: 'audio/webm' });
       const reader = new FileReader();
       reader.onload = () => {
@@ -792,6 +816,7 @@ async function toggleVoiceRecording() {
     };
     mediaRecorder.start();
     isRecording = true;
+    cancelledRecording = false;
     recordingStartTime = Date.now();
     document.getElementById('recording-bar').classList.add('active');
     document.getElementById('micBtnInput').classList.add('recording');
@@ -806,7 +831,7 @@ async function toggleVoiceRecording() {
 
 function stopVoiceRecording(cancel) {
   if (!isRecording) return;
-  if (cancel) audioChunks = [];
+  cancelledRecording = !!cancel;
   if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
   isRecording = false;
   clearInterval(recordingTimer);
