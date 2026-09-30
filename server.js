@@ -13,6 +13,10 @@ app.use(express.static(path.join(__dirname)));
 
 const VERIFY_PASSWORD = 'aurora2026';
 
+console.log('🚀 Aurora: старт...');
+console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? 'задан' : '❌ НЕ ЗАДАН');
+console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? 'задан' : '❌ НЕ ЗАДАН');
+
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
@@ -20,6 +24,9 @@ const db = createClient({
 
 // ============ ИНИЦИАЛИЗАЦИЯ БАЗЫ ============
 async function initDB() {
+  console.log('📦 Инициализация базы...');
+  const start = Date.now();
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS users (
       username TEXT PRIMARY KEY,
@@ -172,7 +179,7 @@ async function initDB() {
     )
   `);
 
-  console.log('✅ База данных готова (Turso)');
+  console.log(`✅ База данных готова (Turso) за ${Date.now() - start}мс`);
 }
 
 // ============ ХЕЛПЕРЫ ============
@@ -230,7 +237,6 @@ async function getGroupHistory(groupId) {
   return r.rows;
 }
 
-// ============ БЛОКИРОВКИ ============
 async function isBlocked(blocker, blocked) {
   const r = await db.execute({
     sql: 'SELECT 1 FROM blocks WHERE blocker = ? AND blocked = ?',
@@ -242,7 +248,6 @@ async function isBlockedEither(a, b) {
   return (await isBlocked(a, b)) || (await isBlocked(b, a));
 }
 
-// ============ АВТОУДАЛЕНИЕ ============
 async function cleanupOldMessages() {
   try {
     const r = await db.execute("SELECT username, auto_delete FROM user_settings WHERE auto_delete != 'off'");
@@ -264,7 +269,6 @@ async function cleanupOldMessages() {
   } catch (e) { console.error('cleanup error:', e); }
 }
 
-// ============ СЕССИИ ============
 async function createSession(username, device, ip) {
   const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
   await db.execute({
@@ -288,7 +292,6 @@ async function getUserSessions(username) {
   return r.rows;
 }
 
-// ============ НАСТРОЙКИ ЧАТА ============
 async function getChatSettings(owner, chatKey) {
   const r = await db.execute({
     sql: 'SELECT * FROM chat_settings WHERE owner = ? AND chat_key = ?',
@@ -307,7 +310,6 @@ async function setChatSetting(owner, chatKey, field, value) {
   });
 }
 
-// ============ ГРУППЫ ============
 async function getGroupById(id) {
   const r = await db.execute({ sql: 'SELECT * FROM groups_table WHERE id = ?', args: [id] });
   return r.rows[0] || null;
@@ -336,8 +338,6 @@ async function isGroupMember(groupId, username) {
   });
   return r.rows.length > 0;
 }
-
-// 🔒 Сколько групп создал пользователь
 async function countUserCreatedGroups(username) {
   const r = await db.execute({
     sql: 'SELECT COUNT(*) as cnt FROM groups_table WHERE creator = ?',
@@ -406,11 +406,8 @@ async function sendGroupsTo(username) {
       muted: !!settings.muted
     });
   }
-
-  // 🔒 Может ли этот пользователь создать группу
   const createdCount = await countUserCreatedGroups(username);
   const canCreate = createdCount < 1;
-
   sockets.forEach(sid => io.to(sid).emit('groups', list, { canCreate, createdCount }));
 }
 
@@ -433,7 +430,7 @@ async function notifyGroupMembers(groupId, event, payload) {
 
 // ============ СОКЕТЫ ============
 io.on('connection', (socket) => {
-  console.log('Подключился:', socket.id);
+  console.log('🔗 Подключился:', socket.id);
 
   socket.on('register', async ({ username, password }, cb) => {
     try {
@@ -848,17 +845,13 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
-  // ============ СОЗДАНИЕ ГРУППЫ (С ЛИМИТОМ) ============
   socket.on('create group', async ({ name, members }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
-
-      // 🔒 ЛИМИТ: одна группа на пользователя
       const createdCount = await countUserCreatedGroups(socket.username);
       if (createdCount >= 1) {
         return cb && cb({ ok: false, error: 'Ты уже создал группу. Максимум — одна.' });
       }
-
       name = String(name || '').trim();
       if (!name) return cb && cb({ ok: false, error: 'Введи название' });
       members = Array.isArray(members) ? members : [];
@@ -1089,13 +1082,18 @@ io.on('connection', (socket) => {
   });
 });
 
-// ============ АВТООЧИСТКА ============
 setInterval(cleanupOldMessages, 10 * 60 * 1000);
 
 // ============ СТАРТ ============
+console.log('⚙️ Запускаю initDB...');
 initDB()
   .then(() => {
+    console.log('✅ initDB завершён успешно');
     cleanupOldMessages().catch(() => {});
     server.listen(3000, () => console.log('🌌 Aurora запущена на порту 3000 (Turso)'));
   })
-  .catch(err => { console.error('❌ Ошибка инициализации базы:', err); process.exit(1); });
+  .catch(err => {
+    console.error('❌ ОШИБКА ИНИЦИАЛИЗАЦИИ БАЗЫ:', err);
+    console.error('❌ Проверь TURSO_DATABASE_URL и TURSO_AUTH_TOKEN');
+    process.exit(1);
+  });
