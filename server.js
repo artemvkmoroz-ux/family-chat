@@ -2,8 +2,8 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
+const { createClient } = require('@libsql/client');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,72 +14,100 @@ app.use(express.static(path.join(__dirname)));
 // 🔑 СЕКРЕТНЫЙ ПАРОЛЬ ДЛЯ ГАЛОЧКИ
 const VERIFY_PASSWORD = 'aurora2026';
 
-// ============ БАЗА ============
-const db = new Database('chat.db');
+// ============ БАЗА (TURSO) ============
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    username TEXT PRIMARY KEY,
-    password TEXT NOT NULL,
-    avatar TEXT,
-    verified INTEGER DEFAULT 0,
-    registered_at INTEGER NOT NULL
-  )
-`);
-try { db.exec('ALTER TABLE users ADD COLUMN avatar TEXT'); } catch (e) {}
-try { db.exec('ALTER TABLE users ADD COLUMN verified INTEGER DEFAULT 0'); } catch (e) {}
+// Создаём таблицы при запуске
+async function initDB() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS users (
+      username TEXT PRIMARY KEY,
+      password TEXT NOT NULL,
+      avatar TEXT,
+      verified INTEGER DEFAULT 0,
+      registered_at INTEGER NOT NULL
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS contacts (
+      owner TEXT NOT NULL,
+      contact TEXT NOT NULL,
+      added_at INTEGER NOT NULL,
+      PRIMARY KEY (owner, contact)
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_user TEXT NOT NULL,
+      to_user TEXT NOT NULL,
+      text TEXT,
+      image TEXT,
+      voice TEXT,
+      voice_duration INTEGER,
+      reactions TEXT DEFAULT '{}',
+      time INTEGER NOT NULL
+    )
+  `);
+  console.log('✅ База данных готова (Turso)');
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS contacts (
-    owner TEXT NOT NULL,
-    contact TEXT NOT NULL,
-    added_at INTEGER NOT NULL,
-    PRIMARY KEY (owner, contact)
-  )
-`);
+// ============ ХЕЛПЕРЫ ============
+async function getUser(username) {
+  const r = await db.execute({
+    sql: 'SELECT * FROM users WHERE username = ?',
+    args: [username]
+  });
+  return r.rows[0] || null;
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    from_user TEXT NOT NULL,
-    to_user TEXT NOT NULL,
-    text TEXT,
-    image TEXT,
-    voice TEXT,
-    voice_duration INTEGER,
-    reactions TEXT DEFAULT '{}',
-    time INTEGER NOT NULL
-  )
-`);
-try { db.exec('ALTER TABLE messages ADD COLUMN image TEXT'); } catch (e) {}
-try { db.exec('ALTER TABLE messages ADD COLUMN voice TEXT'); } catch (e) {}
-try { db.exec('ALTER TABLE messages ADD COLUMN voice_duration INTEGER'); } catch (e) {}
-try { db.exec("ALTER TABLE messages ADD COLUMN reactions TEXT DEFAULT '{}'"); } catch (e) {}
+async function getContactsOf(username) {
+  const r = await db.execute({
+    sql: 'SELECT contact FROM contacts WHERE owner = ? ORDER BY added_at ASC',
+    args: [username]
+  });
+  return r.rows.map(row => row.contact);
+}
 
-const findUser = db.prepare('SELECT * FROM users WHERE username = ?');
-const createUser = db.prepare('INSERT INTO users (username, password, avatar, verified, registered_at) VALUES (?, ?, ?, 0, ?)');
-const updateAvatar = db.prepare('UPDATE users SET avatar = ? WHERE username = ?');
-const setVerified = db.prepare('UPDATE users SET verified = 1 WHERE username = ?');
+async function getContactInfo(username) {
+  const r = await db.execute({
+    sql: 'SELECT username, avatar, verified FROM users WHERE username = ?',
+    args: [username]
+  });
+  return r.rows[0] || null;
+}
 
-const addContact = db.prepare('INSERT OR IGNORE INTO contacts (owner, contact, added_at) VALUES (?, ?, ?)');
-const getContacts = db.prepare('SELECT contact FROM contacts WHERE owner = ? ORDER BY added_at ASC');
-const getContactInfo = db.prepare('SELECT username, avatar, verified FROM users WHERE username = ?');
+async function getHistory(me, withUser) {
+  const r = await db.execute({
+    sql: `SELECT * FROM messages
+          WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
+          ORDER BY time ASC LIMIT 200`,
+    args: [me, withUser, withUser, me]
+  });
+  return r.rows;
+}
 
-const insertMessage = db.prepare(
-  'INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, reactions, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-);
-const getHistory = db.prepare(`
-  SELECT * FROM messages
-  WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
-  ORDER BY time ASC LIMIT 200
-`);
+async function getMessageById(id) {
+  const r = await db.execute({
+    sql: 'SELECT * FROM messages WHERE id = ?',
+    args: [id]
+  });
+  return r.rows[0] || null;
+}
 
-const getMessageById = db.prepare('SELECT * FROM messages WHERE id = ?');
-const updateReactions = db.prepare('UPDATE messages SET reactions = ? WHERE id = ?');
+function safeParseReactions(raw) {
+  if (!raw) return {};
+  try {
+    const obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object') ? obj : {};
+  } catch (e) { return {}; }
+}
 
 // ============ ONLINE ============
 const onlineUsers = {};
-const typingUsers = {}; // { "from|to": timeout }
 
 function findSocketsByUsername(username) {
   return Object.entries(onlineUsers).filter(([, u]) => u === username).map(([sid]) => sid);
@@ -88,25 +116,32 @@ function isOnline(username) {
   return Object.values(onlineUsers).includes(username);
 }
 
-function sendContactsTo(username) {
+async function sendContactsTo(username) {
   const sockets = findSocketsByUsername(username);
   if (sockets.length === 0) return;
-  const contactNames = getContacts.all(username).map(r => r.contact);
-  const list = contactNames.map(name => {
-    const info = getContactInfo.get(name);
-    return {
+
+  const contactNames = await getContactsOf(username);
+  const list = [];
+  for (const name of contactNames) {
+    const info = await getContactInfo(name);
+    list.push({
       name,
       avatar: info ? info.avatar : null,
       verified: info ? !!info.verified : false,
       online: isOnline(name)
-    };
-  });
+    });
+  }
   sockets.forEach(sid => io.to(sid).emit('contacts', list));
 }
 
-function refreshForFriends(username) {
-  const owners = db.prepare('SELECT owner FROM contacts WHERE contact = ?').all(username);
-  owners.forEach(({ owner }) => sendContactsTo(owner));
+async function refreshForFriends(username) {
+  const r = await db.execute({
+    sql: 'SELECT owner FROM contacts WHERE contact = ?',
+    args: [username]
+  });
+  for (const row of r.rows) {
+    await sendContactsTo(row.owner);
+  }
 }
 
 // ============ SOCKET ============
@@ -114,109 +149,150 @@ io.on('connection', (socket) => {
   console.log('Подключился:', socket.id);
 
   // ---- Регистрация ----
-  socket.on('register', ({ username, password }, cb) => {
-    username = String(username || '').trim().toLowerCase();
-    password = String(password || '');
+  socket.on('register', async ({ username, password }, cb) => {
+    try {
+      username = String(username || '').trim().toLowerCase();
+      password = String(password || '');
 
-    if (!username || !password) return cb && cb({ ok: false, error: 'Заполни все поля' });
-    if (username.length < 3) return cb && cb({ ok: false, error: 'Ник минимум 3 символа' });
-    if (!/^[a-z0-9_]+$/.test(username)) return cb && cb({ ok: false, error: 'Только латиница, цифры и _' });
-    if (password.length < 4) return cb && cb({ ok: false, error: 'Пароль минимум 4 символа' });
-    if (findUser.get(username)) return cb && cb({ ok: false, error: 'Такой ник уже занят' });
+      if (!username || !password) return cb && cb({ ok: false, error: 'Заполни все поля' });
+      if (username.length < 3) return cb && cb({ ok: false, error: 'Ник минимум 3 символа' });
+      if (!/^[a-z0-9_]+$/.test(username)) return cb && cb({ ok: false, error: 'Только латиница, цифры и _' });
+      if (password.length < 4) return cb && cb({ ok: false, error: 'Пароль минимум 4 символа' });
 
-    const hash = bcrypt.hashSync(password, 10);
-    createUser.run(username, hash, null, Date.now());
-    cb && cb({ ok: true });
+      const existing = await getUser(username);
+      if (existing) return cb && cb({ ok: false, error: 'Такой ник уже занят' });
+
+      const hash = bcrypt.hashSync(password, 10);
+      await db.execute({
+        sql: 'INSERT INTO users (username, password, avatar, verified, registered_at) VALUES (?, ?, ?, 0, ?)',
+        args: [username, hash, null, Date.now()]
+      });
+      cb && cb({ ok: true });
+    } catch (e) {
+      console.error(e);
+      cb && cb({ ok: false, error: 'Ошибка сервера' });
+    }
   });
 
   // ---- Вход ----
-  socket.on('login', ({ username, password }, cb) => {
-    username = String(username || '').trim().toLowerCase();
-    password = String(password || '');
+  socket.on('login', async ({ username, password }, cb) => {
+    try {
+      username = String(username || '').trim().toLowerCase();
+      password = String(password || '');
 
-    const user = findUser.get(username);
-    if (!user) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-    if (!bcrypt.compareSync(password, user.password)) return cb && cb({ ok: false, error: 'Неверный пароль' });
+      const user = await getUser(username);
+      if (!user) return cb && cb({ ok: false, error: 'Пользователь не найден' });
+      if (!bcrypt.compareSync(password, user.password)) return cb && cb({ ok: false, error: 'Неверный пароль' });
 
-    onlineUsers[socket.id] = username;
-    socket.username = username;
-    cb && cb({ ok: true, avatar: user.avatar, username, verified: !!user.verified });
+      onlineUsers[socket.id] = username;
+      socket.username = username;
+      cb && cb({ ok: true, avatar: user.avatar, username, verified: !!user.verified });
 
-    sendContactsTo(username);
-    refreshForFriends(username);
+      await sendContactsTo(username);
+      await refreshForFriends(username);
+    } catch (e) {
+      console.error(e);
+      cb && cb({ ok: false, error: 'Ошибка сервера' });
+    }
   });
 
   // ---- Аватарка ----
-  socket.on('set avatar', ({ avatar }) => {
+  socket.on('set avatar', async ({ avatar }) => {
     if (!socket.username || !avatar) return;
-    updateAvatar.run(avatar, socket.username);
-    refreshForFriends(socket.username);
+    await db.execute({
+      sql: 'UPDATE users SET avatar = ? WHERE username = ?',
+      args: [avatar, socket.username]
+    });
+    await refreshForFriends(socket.username);
   });
 
   // ---- Галочка ----
-  socket.on('verify', ({ password }, cb) => {
-    if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
-    if (password !== VERIFY_PASSWORD) return cb && cb({ ok: false, error: 'Неверный пароль' });
+  socket.on('verify', async ({ password }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      if (password !== VERIFY_PASSWORD) return cb && cb({ ok: false, error: 'Неверный пароль' });
 
-    setVerified.run(socket.username);
-    refreshForFriends(socket.username);
-    const u = findUser.get(socket.username);
-    socket.emit('me updated', { verified: !!u.verified, avatar: u.avatar, username: u.username });
-    cb && cb({ ok: true });
+      await db.execute({
+        sql: 'UPDATE users SET verified = 1 WHERE username = ?',
+        args: [socket.username]
+      });
+      await refreshForFriends(socket.username);
+      const u = await getUser(socket.username);
+      socket.emit('me updated', { verified: !!u.verified, avatar: u.avatar, username: u.username });
+      cb && cb({ ok: true });
+    } catch (e) {
+      console.error(e);
+      cb && cb({ ok: false, error: 'Ошибка сервера' });
+    }
   });
 
   // ---- Добавить контакт ----
-  socket.on('add contact', ({ username }, cb) => {
-    if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
-    username = String(username || '').trim().toLowerCase();
-    if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
-    if (username === socket.username) return cb && cb({ ok: false, error: 'Это твой ник' });
-    if (!findUser.get(username)) return cb && cb({ ok: false, error: 'Такого пользователя нет' });
+  socket.on('add contact', async ({ username }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      username = String(username || '').trim().toLowerCase();
+      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
+      if (username === socket.username) return cb && cb({ ok: false, error: 'Это твой ник' });
+      if (!(await getUser(username))) return cb && cb({ ok: false, error: 'Такого пользователя нет' });
 
-    addContact.run(socket.username, username, Date.now());
-    sendContactsTo(socket.username);
-    cb && cb({ ok: true });
+      await db.execute({
+        sql: 'INSERT OR IGNORE INTO contacts (owner, contact, added_at) VALUES (?, ?, ?)',
+        args: [socket.username, username, Date.now()]
+      });
+      await sendContactsTo(socket.username);
+      cb && cb({ ok: true });
+    } catch (e) {
+      console.error(e);
+      cb && cb({ ok: false, error: 'Ошибка сервера' });
+    }
   });
 
-  socket.on('remove contact', ({ username }, cb) => {
+  // ---- Удалить контакт ----
+  socket.on('remove contact', async ({ username }, cb) => {
     if (!socket.username) return;
-    db.prepare('DELETE FROM contacts WHERE owner = ? AND contact = ?').run(socket.username, username);
-    sendContactsTo(socket.username);
+    await db.execute({
+      sql: 'DELETE FROM contacts WHERE owner = ? AND contact = ?',
+      args: [socket.username, username]
+    });
+    await sendContactsTo(socket.username);
     cb && cb({ ok: true });
   });
 
   // ---- История ----
-  socket.on('load history', ({ withUser }) => {
+  socket.on('load history', async ({ withUser }) => {
     if (!socket.username) return;
-    const rows = getHistory.all(socket.username, withUser, withUser, socket.username);
-    // Парсим reactions из JSON
-    const messages = rows.map(m => ({
-      ...m,
-      reactions: safeParseReactions(m.reactions)
-    }));
-    socket.emit('history', { withUser, messages });
+    try {
+      const rows = await getHistory(socket.username, withUser);
+      const messages = rows.map(m => ({
+        ...m,
+        reactions: safeParseReactions(m.reactions)
+      }));
+      socket.emit('history', { withUser, messages });
+    } catch (e) {
+      console.error(e);
+    }
   });
 
   // ---- Сообщение ----
-  socket.on('private message', ({ to, text, image, voice, voiceDuration }) => {
+  socket.on('private message', async ({ to, text, image, voice, voiceDuration }) => {
     if (!socket.username) return;
-    const from = socket.username;
-    const time = Date.now();
-    const info = insertMessage.run(
-      from, to,
-      text || null,
-      image || null,
-      voice || null,
-      voiceDuration || null,
-      '{}',
-      time
-    );
+    try {
+      const from = socket.username;
+      const time = Date.now();
+      const result = await db.execute({
+        sql: `INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, reactions, time)
+              VALUES (?, ?, ?, ?, ?, ?, '{}', ?)`,
+        args: [from, to, text || null, image || null, voice || null, voiceDuration || null, time]
+      });
 
-    const msgId = info.lastInsertRowid;
-    const payload = { id: msgId, from, text, image, voice, voiceDuration, reactions: {}, time };
+      const msgId = Number(result.lastInsertRowid);
+      const payload = { id: msgId, from, text, image, voice, voiceDuration, reactions: {}, time };
 
-    findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
-    socket.emit('private message', { ...payload, self: true, to });
+      findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
+      socket.emit('private message', { ...payload, self: true, to });
+    } catch (e) {
+      console.error(e);
+    }
   });
 
   // ---- ПЕЧАТАЕТ ----
@@ -228,46 +304,42 @@ io.on('connection', (socket) => {
   });
 
   // ---- РЕАКЦИИ ----
-  socket.on('react', ({ messageId, emoji }, cb) => {
-    if (!socket.username) return cb && cb({ ok: false });
-    const msg = getMessageById.get(messageId);
-    if (!msg) return cb && cb({ ok: false, error: 'Сообщение не найдено' });
+  socket.on('react', async ({ messageId, emoji }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const msg = await getMessageById(messageId);
+      if (!msg) return cb && cb({ ok: false, error: 'Сообщение не найдено' });
 
-    // Проверим, что реакция на сообщение между нами
-    const me = socket.username;
-    const inDialog = (msg.from_user === me || msg.to_user === me);
-    if (!inDialog) return cb && cb({ ok: false, error: 'Нет доступа' });
+      const me = socket.username;
+      const inDialog = (msg.from_user === me || msg.to_user === me);
+      if (!inDialog) return cb && cb({ ok: false, error: 'Нет доступа' });
 
-    let reactions = safeParseReactions(msg.reactions);
-    // reactions = { "❤️": ["user1","user2"], "👍": ["user3"] }
-    if (!reactions[emoji]) reactions[emoji] = [];
-    const idx = reactions[emoji].indexOf(me);
+      let reactions = safeParseReactions(msg.reactions);
+      if (!reactions[emoji]) reactions[emoji] = [];
+      const idx = reactions[emoji].indexOf(me);
 
-    if (idx === -1) {
-      // Добавляем реакцию
-      reactions[emoji].push(me);
-    } else {
-      // Убираем (toggle)
-      reactions[emoji].splice(idx, 1);
-      if (reactions[emoji].length === 0) delete reactions[emoji];
+      if (idx === -1) {
+        reactions[emoji].push(me);
+      } else {
+        reactions[emoji].splice(idx, 1);
+        if (reactions[emoji].length === 0) delete reactions[emoji];
+      }
+
+      await db.execute({
+        sql: 'UPDATE messages SET reactions = ? WHERE id = ?',
+        args: [JSON.stringify(reactions), messageId]
+      });
+
+      const payload = { messageId, reactions, from: msg.from_user, to: msg.to_user };
+      const targets = new Set([msg.from_user, msg.to_user]);
+      targets.forEach(u => {
+        findSocketsByUsername(u).forEach(sid => io.to(sid).emit('reaction updated', payload));
+      });
+      cb && cb({ ok: true, reactions });
+    } catch (e) {
+      console.error(e);
+      cb && cb({ ok: false });
     }
-
-    const serialized = JSON.stringify(reactions);
-    updateReactions.run(serialized, messageId);
-
-    const payload = {
-      messageId,
-      reactions,
-      from: msg.from_user,
-      to: msg.to_user
-    };
-
-    // Отправим обоим участникам диалога
-    const targets = new Set([msg.from_user, msg.to_user]);
-    targets.forEach(u => {
-      findSocketsByUsername(u).forEach(sid => io.to(sid).emit('reaction updated', payload));
-    });
-    cb && cb({ ok: true, reactions });
   });
 
   // ---- Звонки ----
@@ -294,13 +366,12 @@ io.on('connection', (socket) => {
   });
 
   // ---- Отключение ----
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     const u = socket.username;
     delete onlineUsers[socket.id];
     if (u) {
-      sendContactsTo(u);
-      refreshForFriends(u);
-      // Сообщим всем, что он больше не печатает
+      await sendContactsTo(u);
+      await refreshForFriends(u);
       Object.values(onlineUsers).forEach(other => {
         findSocketsByUsername(other).forEach(sid =>
           io.to(sid).emit('typing', { from: u, isTyping: false })
@@ -310,12 +381,12 @@ io.on('connection', (socket) => {
   });
 });
 
-function safeParseReactions(raw) {
-  if (!raw) return {};
-  try {
-    const obj = JSON.parse(raw);
-    return (obj && typeof obj === 'object') ? obj : {};
-  } catch (e) { return {}; }
-}
-
-server.listen(3000, () => console.log('Aurora запущена: http://localhost:3000'));
+// ============ СТАРТ ============
+initDB()
+  .then(() => {
+    server.listen(3000, () => console.log('🌌 Aurora запущена на порту 3000 (Turso)'));
+  })
+  .catch(err => {
+    console.error('❌ Ошибка инициализации базы:', err);
+    process.exit(1);
+  });
