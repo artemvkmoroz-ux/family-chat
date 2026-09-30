@@ -28,10 +28,22 @@ async function initDB() {
       avatar TEXT,
       verified INTEGER DEFAULT 0,
       bio TEXT,
+      first_name TEXT,
+      last_name TEXT,
+      birthday TEXT,
+      emoji_status TEXT,
+      last_seen_visibility TEXT DEFAULT 'everyone',
+      phone TEXT,
       registered_at INTEGER NOT NULL
     )
   `);
   await db.execute(`ALTER TABLE users ADD COLUMN bio TEXT`).catch(() => {});
+  await db.execute(`ALTER TABLE users ADD COLUMN first_name TEXT`).catch(() => {});
+  await db.execute(`ALTER TABLE users ADD COLUMN last_name TEXT`).catch(() => {});
+  await db.execute(`ALTER TABLE users ADD COLUMN birthday TEXT`).catch(() => {});
+  await db.execute(`ALTER TABLE users ADD COLUMN emoji_status TEXT`).catch(() => {});
+  await db.execute(`ALTER TABLE users ADD COLUMN last_seen_visibility TEXT DEFAULT 'everyone'`).catch(() => {});
+  await db.execute(`ALTER TABLE users ADD COLUMN phone TEXT`).catch(() => {});
 
   // Контакты
   await db.execute(`
@@ -125,6 +137,51 @@ async function initDB() {
     )
   `);
 
+  // Настройки пользователя (тема, язык, анимации и т.д.)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS user_settings (
+      username TEXT PRIMARY KEY,
+      theme TEXT DEFAULT 'dark',
+      language TEXT DEFAULT 'ru',
+      font_size TEXT DEFAULT 'medium',
+      accent_color TEXT DEFAULT '#5288c1',
+      animations INTEGER DEFAULT 1,
+      sound INTEGER DEFAULT 1,
+      vibration INTEGER DEFAULT 1,
+      notif_private INTEGER DEFAULT 1,
+      notif_groups INTEGER DEFAULT 1,
+      auto_delete TEXT DEFAULT 'off',
+      passcode TEXT,
+      profile_color TEXT DEFAULT '#5288c1',
+      chat_wallpaper TEXT DEFAULT '',
+      FOREIGN KEY (username) REFERENCES users(username)
+    )
+  `);
+  await db.execute(`ALTER TABLE user_settings ADD COLUMN profile_color TEXT DEFAULT '#5288c1'`).catch(() => {});
+  await db.execute(`ALTER TABLE user_settings ADD COLUMN chat_wallpaper TEXT DEFAULT ''`).catch(() => {});
+
+  // Блокировки
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS blocks (
+      blocker TEXT NOT NULL,
+      blocked TEXT NOT NULL,
+      time INTEGER NOT NULL,
+      PRIMARY KEY (blocker, blocked)
+    )
+  `);
+
+  // Активные сеансы
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL,
+      device TEXT,
+      ip TEXT,
+      last_active INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
   console.log('✅ База данных готова (Turso)');
 }
 
@@ -132,6 +189,11 @@ async function initDB() {
 async function getUser(username) {
   const r = await db.execute({ sql: 'SELECT * FROM users WHERE username = ?', args: [username] });
   return r.rows[0] || null;
+}
+async function getSettings(username) {
+  await db.execute({ sql: 'INSERT OR IGNORE INTO user_settings (username) VALUES (?)', args: [username] });
+  const r = await db.execute({ sql: 'SELECT * FROM user_settings WHERE username = ?', args: [username] });
+  return r.rows[0] || {};
 }
 async function getContactsOf(username) {
   const r = await db.execute({
@@ -142,7 +204,7 @@ async function getContactsOf(username) {
 }
 async function getContactInfo(username) {
   const r = await db.execute({
-    sql: 'SELECT username, avatar, verified, bio FROM users WHERE username = ?',
+    sql: 'SELECT username, avatar, verified, bio, first_name, last_name, emoji_status, last_seen_visibility FROM users WHERE username = ?',
     args: [username]
   });
   return r.rows[0] || null;
@@ -178,6 +240,65 @@ async function getGroupHistory(groupId) {
   return r.rows;
 }
 
+// ============ БЛОКИРОВКИ ============
+async function isBlocked(blocker, blocked) {
+  const r = await db.execute({
+    sql: 'SELECT 1 FROM blocks WHERE blocker = ? AND blocked = ?',
+    args: [blocker, blocked]
+  });
+  return r.rows.length > 0;
+}
+async function isBlockedEither(a, b) {
+  return (await isBlocked(a, b)) || (await isBlocked(b, a));
+}
+
+// ============ АВТОУДАЛЕНИЕ ============
+async function cleanupOldMessages() {
+  try {
+    // Получаем всех пользователей с включённым автоудалением
+    const r = await db.execute("SELECT username, auto_delete FROM user_settings WHERE auto_delete != 'off'");
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+    for (const row of r.rows) {
+      const ttl = row.auto_delete === '24h' ? DAY : row.auto_delete === '7d' ? 7 * DAY : row.auto_delete === '30d' ? 30 * DAY : 0;
+      if (ttl === 0) continue;
+      const cutoff = now - ttl;
+      await db.execute({
+        sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL WHERE (from_user = ? OR to_user = ?) AND time < ? AND deleted = 0',
+        args: [row.username, row.username, cutoff]
+      });
+      await db.execute({
+        sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL WHERE from_user = ? AND time < ? AND deleted = 0',
+        args: [row.username, cutoff]
+      });
+    }
+  } catch (e) { console.error('cleanup error:', e); }
+}
+
+// ============ СЕССИИ ============
+async function createSession(username, device, ip) {
+  const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  await db.execute({
+    sql: 'INSERT INTO sessions (id, username, device, ip, last_active, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    args: [id, username, device || 'Web', ip || '', Date.now(), Date.now()]
+  });
+  return id;
+}
+async function updateSession(sessionId) {
+  if (!sessionId) return;
+  await db.execute({
+    sql: 'UPDATE sessions SET last_active = ? WHERE id = ?',
+    args: [Date.now(), sessionId]
+  });
+}
+async function getUserSessions(username) {
+  const r = await db.execute({
+    sql: 'SELECT * FROM sessions WHERE username = ? ORDER BY last_active DESC',
+    args: [username]
+  });
+  return r.rows;
+}
+
 // ============ НАСТРОЙКИ ЧАТА ============
 async function getChatSettings(owner, chatKey) {
   const r = await db.execute({
@@ -187,7 +308,6 @@ async function getChatSettings(owner, chatKey) {
   return r.rows[0] || { archived: 0, muted: 0 };
 }
 async function setChatSetting(owner, chatKey, field, value) {
-  // Сначала создаём запись если нет
   await db.execute({
     sql: 'INSERT OR IGNORE INTO chat_settings (owner, chat_key, archived, muted) VALUES (?, ?, 0, 0)',
     args: [owner, chatKey]
@@ -229,7 +349,7 @@ async function isGroupMember(groupId, username) {
 }
 
 // ============ ONLINE ============
-const onlineUsers = {};
+const onlineUsers = {}; // { socketId: username }
 function findSocketsByUsername(username) {
   return Object.entries(onlineUsers).filter(([, u]) => u === username).map(([sid]) => sid);
 }
@@ -246,15 +366,23 @@ async function sendContactsTo(username) {
   for (const row of contactRows) {
     const info = await getContactInfo(row.contact);
     const settings = await getChatSettings(username, row.contact);
+    const blockedByMe = await isBlocked(username, row.contact);
+    let online = isOnline(row.contact);
+    let lastSeenVisible = true;
+    if (info && info.last_seen_visibility === 'nobody') lastSeenVisible = false;
+    if (info && info.last_seen_visibility === 'contacts') lastSeenVisible = true;
     list.push({
       name: row.contact,
       displayName: row.display_name || row.contact,
       avatar: info ? info.avatar : null,
       verified: info ? !!info.verified : false,
-      bio: info ? info.bio : null,
-      online: isOnline(row.contact),
+      firstName: info ? info.first_name : null,
+      lastName: info ? info.last_name : null,
+      emojiStatus: info ? info.emoji_status : null,
+      online: lastSeenVisible ? online : false,
       archived: !!settings.archived,
-      muted: !!settings.muted
+      muted: !!settings.muted,
+      blocked: blockedByMe
     });
   }
   sockets.forEach(sid => io.to(sid).emit('contacts', list));
@@ -288,7 +416,12 @@ async function refreshForFriends(username) {
   const r = await db.execute({ sql: 'SELECT owner FROM contacts WHERE contact = ?', args: [username] });
   for (const row of r.rows) await sendContactsTo(row.owner);
 }
-
+async function notifyAllFriends(username, event, payload) {
+  const r = await db.execute({ sql: 'SELECT owner FROM contacts WHERE contact = ?', args: [username] });
+  for (const row of r.rows) {
+    findSocketsByUsername(row.owner).forEach(sid => io.to(sid).emit(event, payload));
+  }
+}
 async function notifyGroupMembers(groupId, event, payload) {
   const members = await getGroupMembers(groupId);
   members.forEach(u => {
@@ -312,27 +445,44 @@ io.on('connection', (socket) => {
       if (await getUser(username)) return cb && cb({ ok: false, error: 'Такой ник уже занят' });
       const hash = bcrypt.hashSync(password, 10);
       await db.execute({
-        sql: 'INSERT INTO users (username, password, avatar, verified, bio, registered_at) VALUES (?, ?, ?, 0, NULL, ?)',
+        sql: 'INSERT INTO users (username, password, avatar, verified, bio, first_name, last_name, birthday, emoji_status, last_seen_visibility, phone, registered_at) VALUES (?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, \'everyone\', NULL, ?)',
         args: [username, hash, null, Date.now()]
       });
+      await getSettings(username); // создадим настройки
       cb && cb({ ok: true });
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
 
   // ---- Вход ----
-  socket.on('login', async ({ username, password }, cb) => {
+  socket.on('login', async ({ username, password, device, sessionId }, cb) => {
     try {
       username = String(username || '').trim().toLowerCase();
       password = String(password || '');
       const user = await getUser(username);
       if (!user) return cb && cb({ ok: false, error: 'Пользователь не найден' });
       if (!bcrypt.compareSync(password, user.password)) return cb && cb({ ok: false, error: 'Неверный пароль' });
+
       onlineUsers[socket.id] = username;
       socket.username = username;
-      cb && cb({ ok: true, avatar: user.avatar, username, verified: !!user.verified, bio: user.bio });
+
+      // Создаём/обновляем сессию
+      let sessId = sessionId;
+      if (sessId) {
+        const r = await db.execute({ sql: 'SELECT * FROM sessions WHERE id = ?', args: [sessId] });
+        if (r.rows.length === 0) sessId = await createSession(username, device, socket.handshake.address);
+        else await updateSession(sessId);
+      } else {
+        sessId = await createSession(username, device, socket.handshake.address);
+      }
+      socket.sessionId = sessId;
+
+      const settings = await getSettings(username);
+      cb && cb({ ok: true, avatar: user.avatar, username, verified: !!user.verified, bio: user.bio, sessionId: sessId });
+
       await sendContactsTo(username);
       await sendGroupsTo(username);
       await refreshForFriends(username);
+      socket.emit('settings', settings);
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
 
@@ -344,32 +494,186 @@ io.on('connection', (socket) => {
     await notifyAllFriends(socket.username, 'friend updated', { username: socket.username, avatar });
   });
 
-  // ---- Bio ----
-  socket.on('set bio', async ({ bio }) => {
-    if (!socket.username) return;
-    bio = String(bio || '').slice(0, 200);
-    await db.execute({ sql: 'UPDATE users SET bio = ? WHERE username = ?', args: [bio, socket.username] });
-    await notifyAllFriends(socket.username, 'friend updated', { username: socket.username, bio });
+  // ---- Обновить профиль ----
+  socket.on('update profile', async ({ firstName, lastName, bio, birthday, emojiStatus }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      firstName = firstName !== undefined ? String(firstName).slice(0, 40) : undefined;
+      lastName = lastName !== undefined ? String(lastName).slice(0, 40) : undefined;
+      bio = bio !== undefined ? String(bio).slice(0, 200) : undefined;
+      birthday = birthday !== undefined ? String(birthday).slice(0, 20) : undefined;
+      emojiStatus = emojiStatus !== undefined ? String(emojiStatus).slice(0, 10) : undefined;
+
+      const updates = [];
+      const args = [];
+      if (firstName !== undefined) { updates.push('first_name = ?'); args.push(firstName || null); }
+      if (lastName !== undefined) { updates.push('last_name = ?'); args.push(lastName || null); }
+      if (bio !== undefined) { updates.push('bio = ?'); args.push(bio || null); }
+      if (birthday !== undefined) { updates.push('birthday = ?'); args.push(birthday || null); }
+      if (emojiStatus !== undefined) { updates.push('emoji_status = ?'); args.push(emojiStatus || null); }
+      if (updates.length === 0) return cb && cb({ ok: true });
+      args.push(socket.username);
+      await db.execute({ sql: `UPDATE users SET ${updates.join(', ')} WHERE username = ?`, args });
+      await refreshForFriends(socket.username);
+      await notifyAllFriends(socket.username, 'friend updated', { username: socket.username });
+      const user = await getUser(socket.username);
+      socket.emit('me updated', { firstName: user.first_name, lastName: user.last_name, bio: user.bio, birthday: user.birthday, emojiStatus: user.emoji_status, avatar: user.avatar, verified: !!user.verified });
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
-  // ---- Галочка ----
-  socket.on('verify', async ({ password }, cb) => {
+  // ---- Настройки ----
+  socket.on('get settings', async () => {
+    if (!socket.username) return;
+    const s = await getSettings(socket.username);
+    socket.emit('settings', s);
+  });
+
+  socket.on('update settings', async ({ key, value }, cb) => {
     try {
-      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
-      if (password !== VERIFY_PASSWORD) return cb && cb({ ok: false, error: 'Неверный пароль' });
-      await db.execute({ sql: 'UPDATE users SET verified = 1 WHERE username = ?', args: [socket.username] });
-      await refreshForFriends(socket.username);
-      const u = await getUser(socket.username);
-      socket.emit('me updated', { verified: !!u.verified, avatar: u.avatar, username: u.username, bio: u.bio });
-      await notifyAllFriends(socket.username, 'friend updated', { username: socket.username, verified: true });
+      if (!socket.username) return cb && cb({ ok: false });
+      const allowed = ['theme', 'language', 'font_size', 'accent_color', 'animations', 'sound', 'vibration', 'notif_private', 'notif_groups', 'auto_delete', 'profile_color', 'chat_wallpaper'];
+      if (!allowed.includes(key)) return cb && cb({ ok: false, error: 'Нельзя менять' });
+      await db.execute({
+        sql: `UPDATE user_settings SET ${key} = ? WHERE username = ?`,
+        args: [value, socket.username]
+      });
+      const s = await getSettings(socket.username);
+      socket.emit('settings', s);
       cb && cb({ ok: true });
-    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('set passcode', async ({ passcode }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      if (passcode && passcode.length < 4) return cb && cb({ ok: false, error: 'Минимум 4 символа' });
+      const hash = passcode ? bcrypt.hashSync(passcode, 10) : null;
+      await db.execute({ sql: 'UPDATE user_settings SET passcode = ? WHERE username = ?', args: [hash, socket.username] });
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('check passcode', async ({ passcode }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const s = await getSettings(socket.username);
+      if (!s.passcode) return cb && cb({ ok: true });
+      const ok = bcrypt.compareSync(passcode, s.passcode);
+      cb && cb({ ok });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  socket.on('has passcode', async (cb) => {
+    if (!socket.username) return cb && cb(false);
+    const s = await getSettings(socket.username);
+    cb && cb(!!s.passcode);
+  });
+
+  // ---- Видимость последнего посещения ----
+  socket.on('set last seen visibility', async ({ value }, cb) => {
+    if (!socket.username) return cb && cb({ ok: false });
+    if (!['everyone', 'contacts', 'nobody'].includes(value)) return cb && cb({ ok: false });
+    await db.execute({ sql: 'UPDATE users SET last_seen_visibility = ? WHERE username = ?', args: [value, socket.username] });
+    cb && cb({ ok: true });
+  });
+
+  // ---- Блокировка ----
+  socket.on('block user', async ({ username }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      if (username === socket.username) return cb && cb({ ok: false, error: 'Нельзя себя' });
+      await db.execute({
+        sql: 'INSERT OR REPLACE INTO blocks (blocker, blocked, time) VALUES (?, ?, ?)',
+        args: [socket.username, username, Date.now()]
+      });
+      await sendContactsTo(socket.username);
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('unblock user', async ({ username }, cb) => {
+    if (!socket.username) return cb && cb({ ok: false });
+    await db.execute({ sql: 'DELETE FROM blocks WHERE blocker = ? AND blocked = ?', args: [socket.username, username] });
+    await sendContactsTo(socket.username);
+    cb && cb({ ok: true });
+  });
+
+  socket.on('get blocked', async (cb) => {
+    if (!socket.username) return cb && cb([]);
+    const r = await db.execute({ sql: 'SELECT blocked FROM blocks WHERE blocker = ?', args: [socket.username] });
+    cb && cb(r.rows.map(row => row.blocked));
+  });
+
+  // ---- Сессии ----
+  socket.on('get sessions', async (cb) => {
+    if (!socket.username) return cb && cb([]);
+    const rows = await getUserSessions(socket.username);
+    cb && cb(rows);
+  });
+
+  socket.on('terminate session', async ({ sessionId }, cb) => {
+    if (!socket.username) return cb && cb({ ok: false });
+    // Отключаем все сокеты этой сессии
+    Object.entries(onlineUsers).forEach(([sid, uname]) => {
+      if (sid !== socket.id) {
+        const s = io.sockets.sockets.get(sid);
+        if (s && s.username === socket.username && s.sessionId === sessionId) {
+          s.emit('session terminated');
+          s.disconnect(true);
+        }
+      }
+    });
+    await db.execute({ sql: 'DELETE FROM sessions WHERE id = ? AND username = ?', args: [sessionId, socket.username] });
+    cb && cb({ ok: true });
+  });
+
+  socket.on('delete all other sessions', async (cb) => {
+    if (!socket.username) return cb && cb({ ok: false });
+    Object.entries(onlineUsers).forEach(([sid, uname]) => {
+      if (sid !== socket.id) {
+        const s = io.sockets.sockets.get(sid);
+        if (s && s.username === socket.username) {
+          s.emit('session terminated');
+          s.disconnect(true);
+        }
+      }
+    });
+    await db.execute({ sql: 'DELETE FROM sessions WHERE username = ? AND id != ?', args: [socket.username, socket.sessionId || ''] });
+    cb && cb({ ok: true });
+  });
+
+  // ---- Удаление аккаунта ----
+  socket.on('delete account', async ({ password }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const user = await getUser(socket.username);
+      if (!user) return cb && cb({ ok: false });
+      if (!bcrypt.compareSync(password, user.password)) return cb && cb({ ok: false, error: 'Неверный пароль' });
+
+      const me = socket.username;
+      // Удаляем всё
+      await db.execute({ sql: 'DELETE FROM messages WHERE from_user = ? OR to_user = ?', args: [me, me] });
+      await db.execute({ sql: 'DELETE FROM group_messages WHERE from_user = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM group_members WHERE username = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM groups_table WHERE creator = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM contacts WHERE owner = ? OR contact = ?', args: [me, me] });
+      await db.execute({ sql: 'DELETE FROM chat_settings WHERE owner = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM blocks WHERE blocker = ? OR blocked = ?', args: [me, me] });
+      await db.execute({ sql: 'DELETE FROM sessions WHERE username = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM user_settings WHERE username = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM users WHERE username = ?', args: [me] });
+
+      socket.emit('account deleted');
+      socket.disconnect(true);
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
   // ---- Добавить контакт ----
   socket.on('add contact', async ({ username, displayName }, cb) => {
     try {
-      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      if (!socket.username) return cb && cb({ ok: false });
       username = String(username || '').trim().toLowerCase();
       displayName = String(displayName || '').trim();
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
@@ -382,10 +686,9 @@ io.on('connection', (socket) => {
       });
       await sendContactsTo(socket.username);
       cb && cb({ ok: true });
-    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
-  // ---- Удалить контакт ----
   socket.on('remove contact', async ({ username }, cb) => {
     if (!socket.username) return;
     await db.execute({ sql: 'DELETE FROM contacts WHERE owner = ? AND contact = ?', args: [socket.username, username] });
@@ -398,16 +701,25 @@ io.on('connection', (socket) => {
     if (!socket.username) return cb && cb(null);
     const info = await getContactInfo(username);
     if (!info) return cb && cb(null);
+    let lastSeenVisible = true;
+    if (info.last_seen_visibility === 'nobody') lastSeenVisible = false;
+    const blockedByMe = await isBlocked(socket.username, username);
+    const blockedMe = await isBlocked(username, socket.username);
     cb && cb({
       username: info.username,
       avatar: info.avatar,
       verified: !!info.verified,
       bio: info.bio,
-      online: isOnline(username)
+      firstName: info.first_name,
+      lastName: info.last_name,
+      emojiStatus: info.emoji_status,
+      online: lastSeenVisible && isOnline(username),
+      blockedByMe,
+      blockedMe
     });
   });
 
-  // ---- Настройки чата: архив ----
+  // ---- Настройки чата ----
   socket.on('toggle archive', async ({ chatKey }, cb) => {
     if (!socket.username) return;
     const settings = await getChatSettings(socket.username, chatKey);
@@ -418,7 +730,6 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true, archived: !!newVal });
   });
 
-  // ---- Настройки чата: mute ----
   socket.on('toggle mute', async ({ chatKey }, cb) => {
     if (!socket.username) return;
     const settings = await getChatSettings(socket.username, chatKey);
@@ -429,7 +740,7 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true, muted: !!newVal });
   });
 
-  // ---- История личных ----
+  // ---- История ----
   socket.on('load history', async ({ withUser }) => {
     if (!socket.username) return;
     try {
@@ -450,6 +761,10 @@ io.on('connection', (socket) => {
   // ---- Личное сообщение ----
   socket.on('private message', async ({ to, text, image, voice, voiceDuration, replyTo }) => {
     if (!socket.username) return;
+    if (await isBlockedEither(socket.username, to)) {
+      socket.emit('message blocked', { reason: 'Пользователь заблокирован' });
+      return;
+    }
     try {
       const from = socket.username;
       const time = Date.now();
@@ -470,18 +785,18 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); }
   });
 
-  // ---- Редактировать сообщение ----
+  // ---- Редактирование ----
   socket.on('edit message', async ({ messageId, text, isGroup }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
       if (isGroup) {
         const msg = await getGroupMessageById(messageId);
-        if (!msg || msg.from_user !== socket.username) return cb && cb({ ok: false, error: 'Нет доступа' });
+        if (!msg || msg.from_user !== socket.username) return cb && cb({ ok: false });
         await db.execute({ sql: 'UPDATE group_messages SET text = ?, edited = 1 WHERE id = ?', args: [text, messageId] });
         await notifyGroupMembers(msg.group_id, 'message edited', { messageId, text, isGroup: true });
       } else {
         const msg = await getMessageById(messageId);
-        if (!msg || msg.from_user !== socket.username) return cb && cb({ ok: false, error: 'Нет доступа' });
+        if (!msg || msg.from_user !== socket.username) return cb && cb({ ok: false });
         await db.execute({ sql: 'UPDATE messages SET text = ?, edited = 1 WHERE id = ?', args: [text, messageId] });
         const payload = { messageId, text, isGroup: false };
         findSocketsByUsername(msg.to_user).forEach(sid => io.to(sid).emit('message edited', payload));
@@ -491,7 +806,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
-  // ---- Удалить сообщение ----
+  // ---- Удаление ----
   socket.on('delete message', async ({ messageId, forAll, isGroup }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -500,13 +815,13 @@ io.on('connection', (socket) => {
         if (!msg) return cb && cb({ ok: false });
         const group = await getGroupById(msg.group_id);
         const canDelete = msg.from_user === socket.username || group?.creator === socket.username;
-        if (!canDelete) return cb && cb({ ok: false, error: 'Нет доступа' });
+        if (!canDelete) return cb && cb({ ok: false });
         await db.execute({ sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL WHERE id = ?', args: [messageId] });
         await notifyGroupMembers(msg.group_id, 'message deleted', { messageId, isGroup: true });
       } else {
         const msg = await getMessageById(messageId);
         if (!msg) return cb && cb({ ok: false });
-        if (msg.from_user !== socket.username) return cb && cb({ ok: false, error: 'Нет доступа' });
+        if (msg.from_user !== socket.username) return cb && cb({ ok: false });
         await db.execute({ sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL WHERE id = ?', args: [messageId] });
         const payload = { messageId, isGroup: false };
         findSocketsByUsername(msg.to_user).forEach(sid => io.to(sid).emit('message deleted', payload));
@@ -523,9 +838,7 @@ io.on('connection', (socket) => {
       sql: 'UPDATE messages SET read_at = ? WHERE from_user = ? AND to_user = ? AND read_at IS NULL',
       args: [Date.now(), withUser, socket.username]
     });
-    findSocketsByUsername(withUser).forEach(sid =>
-      io.to(sid).emit('messages read', { by: socket.username })
-    );
+    findSocketsByUsername(withUser).forEach(sid => io.to(sid).emit('messages read', { by: socket.username }));
   });
 
   // ---- Печатает ----
@@ -534,7 +847,7 @@ io.on('connection', (socket) => {
     findSocketsByUsername(to).forEach(sid => io.to(sid).emit('typing', { from: socket.username, isTyping }));
   });
 
-  // ---- Реакции личные ----
+  // ---- Реакции ----
   socket.on('react', async ({ messageId, emoji }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -555,7 +868,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
-  // ============ ГРУППЫ ============
+  // ---- Группы ----
   socket.on('create group', async ({ name, members }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -583,7 +896,7 @@ io.on('connection', (socket) => {
       const allMembers = await getGroupMembers(groupId);
       for (const u of allMembers) await sendGroupsTo(u);
       cb && cb({ ok: true, groupId });
-    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
   socket.on('add group members', async ({ groupId, members }, cb) => {
@@ -611,10 +924,7 @@ io.on('connection', (socket) => {
 
   socket.on('leave group', async ({ groupId }, cb) => {
     if (!socket.username) return;
-    await db.execute({
-      sql: 'DELETE FROM group_members WHERE group_id = ? AND username = ?',
-      args: [groupId, socket.username]
-    });
+    await db.execute({ sql: 'DELETE FROM group_members WHERE group_id = ? AND username = ?', args: [groupId, socket.username] });
     const allMembers = await getGroupMembers(groupId);
     for (const u of allMembers) await sendGroupsTo(u);
     await sendGroupsTo(socket.username);
@@ -626,7 +936,7 @@ io.on('connection', (socket) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
       const group = await getGroupById(groupId);
-      if (!group) return cb && cb({ ok: false, error: 'Группа не найдена' });
+      if (!group) return cb && cb({ ok: false });
       if (group.creator !== socket.username) return cb && cb({ ok: false, error: 'Только создатель' });
       const members = await getGroupMembers(groupId);
       await db.execute({ sql: 'DELETE FROM group_messages WHERE group_id = ?', args: [groupId] });
@@ -706,9 +1016,7 @@ io.on('connection', (socket) => {
     getGroupMembers(groupId).then(members => {
       members.forEach(u => {
         if (u === socket.username) return;
-        findSocketsByUsername(u).forEach(sid =>
-          io.to(sid).emit('group typing', { groupId, from: socket.username, isTyping })
-        );
+        findSocketsByUsername(u).forEach(sid => io.to(sid).emit('group typing', { groupId, from: socket.username, isTyping }));
       });
     });
   });
@@ -732,7 +1040,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
-  // ============ ПОИСК ============
+  // ---- Поиск ----
   socket.on('search messages', async ({ query, withUser, groupId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, results: [] });
@@ -741,17 +1049,13 @@ io.on('connection', (socket) => {
       let rows = [];
       if (groupId) {
         const r = await db.execute({
-          sql: `SELECT * FROM group_messages WHERE group_id = ? AND deleted = 0 AND text LIKE ?
-                ORDER BY time DESC LIMIT 50`,
+          sql: `SELECT * FROM group_messages WHERE group_id = ? AND deleted = 0 AND text LIKE ? ORDER BY time DESC LIMIT 50`,
           args: [groupId, '%' + query + '%']
         });
         rows = r.rows;
       } else if (withUser) {
         const r = await db.execute({
-          sql: `SELECT * FROM messages
-                WHERE deleted = 0 AND text LIKE ?
-                AND ((from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?))
-                ORDER BY time DESC LIMIT 50`,
+          sql: `SELECT * FROM messages WHERE deleted = 0 AND text LIKE ? AND ((from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)) ORDER BY time DESC LIMIT 50`,
           args: ['%' + query + '%', socket.username, withUser, withUser, socket.username]
         });
         rows = r.rows;
@@ -760,9 +1064,13 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false, results: [] }); }
   });
 
-  // ============ ЗВОНКИ ============
-  socket.on('call-user', ({ to, offer, video }) => {
+  // ---- Звонки ----
+  socket.on('call-user', async ({ to, offer, video }) => {
     if (!socket.username) return;
+    if (await isBlockedEither(socket.username, to)) {
+      socket.emit('call-failed', { reason: 'Пользователь заблокирован' });
+      return;
+    }
     const toSockets = findSocketsByUsername(to);
     if (toSockets.length > 0) {
       toSockets.forEach(sid => io.to(sid).emit('incoming-call', { from: socket.username, offer, video }));
@@ -797,14 +1105,13 @@ io.on('connection', (socket) => {
   });
 });
 
-// Оповестить всех, у кого username в контактах, об изменении профиля
-async function notifyAllFriends(username, event, payload) {
-  const r = await db.execute({ sql: 'SELECT owner FROM contacts WHERE contact = ?', args: [username] });
-  for (const row of r.rows) {
-    findSocketsByUsername(row.owner).forEach(sid => io.to(sid).emit(event, payload));
-  }
-}
+// ============ АВТООЧИСТКА ============
+setInterval(cleanupOldMessages, 10 * 60 * 1000); // каждые 10 минут
 
+// ============ СТАРТ ============
 initDB()
-  .then(() => server.listen(3000, () => console.log('🌌 Aurora запущена на порту 3000 (Turso)')))
+  .then(() => {
+    cleanupOldMessages().catch(() => {});
+    server.listen(3000, () => console.log('🌌 Aurora запущена на порту 3000 (Turso)'));
+  })
   .catch(err => { console.error('❌ Ошибка инициализации базы:', err); process.exit(1); });
