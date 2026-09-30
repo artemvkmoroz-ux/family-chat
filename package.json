@@ -8,7 +8,7 @@
   "dependencies": {
     "express": "^4.19.2",
     "socket.io": "^4.7.5",
-    "better-sqlite3": "^11.3.0",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "@libsql/client": "^0.14.0"
   }
 }
