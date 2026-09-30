@@ -51,9 +51,41 @@ async function initDB() {
       time INTEGER NOT NULL
     )
   `);
+  // Группы
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS groups_table (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      creator TEXT NOT NULL,
+      avatar TEXT,
+      created_at INTEGER NOT NULL
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS group_members (
+      group_id INTEGER NOT NULL,
+      username TEXT NOT NULL,
+      joined_at INTEGER NOT NULL,
+      PRIMARY KEY (group_id, username)
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS group_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      from_user TEXT NOT NULL,
+      text TEXT,
+      image TEXT,
+      voice TEXT,
+      voice_duration INTEGER,
+      reactions TEXT DEFAULT '{}',
+      time INTEGER NOT NULL
+    )
+  `);
   console.log('✅ База данных готова (Turso)');
 }
 
+// ============ ХЕЛПЕРЫ ============
 async function getUser(username) {
   const r = await db.execute({ sql: 'SELECT * FROM users WHERE username = ?', args: [username] });
   return r.rows[0] || null;
@@ -91,6 +123,70 @@ function safeParseReactions(raw) {
   catch (e) { return {}; }
 }
 
+// ============ ГРУППЫ ============
+async function getGroupById(id) {
+  const r = await db.execute({ sql: 'SELECT * FROM groups_table WHERE id = ?', args: [id] });
+  return r.rows[0] || null;
+}
+async function getGroupMembers(groupId) {
+  const r = await db.execute({
+    sql: 'SELECT username FROM group_members WHERE group_id = ? ORDER BY joined_at ASC',
+    args: [groupId]
+  });
+  return r.rows.map(row => row.username);
+}
+async function getUserGroups(username) {
+  const r = await db.execute({
+    sql: `SELECT g.* FROM groups_table g
+          INNER JOIN group_members gm ON g.id = gm.group_id
+          WHERE gm.username = ?
+          ORDER BY g.created_at ASC`,
+    args: [username]
+  });
+  return r.rows;
+}
+async function getGroupHistory(groupId) {
+  const r = await db.execute({
+    sql: 'SELECT * FROM group_messages WHERE group_id = ? ORDER BY time ASC LIMIT 200',
+    args: [groupId]
+  });
+  return r.rows;
+}
+async function isGroupMember(groupId, username) {
+  const r = await db.execute({
+    sql: 'SELECT 1 FROM group_members WHERE group_id = ? AND username = ?',
+    args: [groupId, username]
+  });
+  return r.rows.length > 0;
+}
+
+async function sendGroupsTo(username) {
+  const sockets = findSocketsByUsername(username);
+  if (sockets.length === 0) return;
+  const groups = await getUserGroups(username);
+  const list = [];
+  for (const g of groups) {
+    const members = await getGroupMembers(g.id);
+    list.push({
+      id: g.id,
+      name: g.name,
+      avatar: g.avatar,
+      creator: g.creator,
+      members: members,
+      memberCount: members.length
+    });
+  }
+  sockets.forEach(sid => io.to(sid).emit('groups', list));
+}
+
+async function notifyGroupMembers(groupId, event, payload) {
+  const members = await getGroupMembers(groupId);
+  members.forEach(u => {
+    findSocketsByUsername(u).forEach(sid => io.to(sid).emit(event, payload));
+  });
+}
+
+// ============ ONLINE ============
 const onlineUsers = {};
 function findSocketsByUsername(username) {
   return Object.entries(onlineUsers).filter(([, u]) => u === username).map(([sid]) => sid);
@@ -98,6 +194,7 @@ function findSocketsByUsername(username) {
 function isOnline(username) {
   return Object.values(onlineUsers).includes(username);
 }
+
 async function sendContactsTo(username) {
   const sockets = findSocketsByUsername(username);
   if (sockets.length === 0) return;
@@ -120,6 +217,7 @@ async function refreshForFriends(username) {
   for (const row of r.rows) await sendContactsTo(row.owner);
 }
 
+// ============ SOCKET ============
 io.on('connection', (socket) => {
   socket.on('register', async ({ username, password }, cb) => {
     try {
@@ -150,6 +248,7 @@ io.on('connection', (socket) => {
       socket.username = username;
       cb && cb({ ok: true, avatar: user.avatar, username, verified: !!user.verified });
       await sendContactsTo(username);
+      await sendGroupsTo(username);
       await refreshForFriends(username);
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
@@ -158,6 +257,7 @@ io.on('connection', (socket) => {
     if (!socket.username || !avatar) return;
     await db.execute({ sql: 'UPDATE users SET avatar = ? WHERE username = ?', args: [avatar, socket.username] });
     await refreshForFriends(socket.username);
+    await notifyGroupMembers(-1, 'noop', {}); // noop
   });
 
   socket.on('verify', async ({ password }, cb) => {
@@ -228,6 +328,154 @@ io.on('connection', (socket) => {
     findSocketsByUsername(to).forEach(sid => io.to(sid).emit('typing', { from: socket.username, isTyping }));
   });
 
+  // ============ ГРУППЫ ============
+  socket.on('create group', async ({ name, members }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      name = String(name || '').trim();
+      if (!name) return cb && cb({ ok: false, error: 'Введи название' });
+      if (name.length > 50) return cb && cb({ ok: false, error: 'Название максимум 50 символов' });
+      members = Array.isArray(members) ? members : [];
+
+      const now = Date.now();
+      const r = await db.execute({
+        sql: 'INSERT INTO groups_table (name, creator, avatar, created_at) VALUES (?, ?, NULL, ?)',
+        args: [name, socket.username, now]
+      });
+      const groupId = Number(r.lastInsertRowid);
+
+      // Создатель всегда участник
+      await db.execute({
+        sql: 'INSERT INTO group_members (group_id, username, joined_at) VALUES (?, ?, ?)',
+        args: [groupId, socket.username, now]
+      });
+
+      // Остальные — только те, кто есть в контактах
+      for (const m of members) {
+        const mu = String(m || '').trim().toLowerCase();
+        if (!mu || mu === socket.username) continue;
+        await db.execute({
+          sql: 'INSERT OR IGNORE INTO group_members (group_id, username, joined_at) VALUES (?, ?, ?)',
+          args: [groupId, mu, Date.now()]
+        });
+      }
+
+      // Оповестить всех участников
+      const allMembers = await getGroupMembers(groupId);
+      for (const u of allMembers) await sendGroupsTo(u);
+
+      cb && cb({ ok: true, groupId });
+    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+  });
+
+  socket.on('add group members', async ({ groupId, members }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      if (!await isGroupMember(groupId, socket.username)) return cb && cb({ ok: false, error: 'Нет доступа' });
+      members = Array.isArray(members) ? members : [];
+
+      const added = [];
+      for (const m of members) {
+        const mu = String(m || '').trim().toLowerCase();
+        if (!mu) continue;
+        if (await isGroupMember(groupId, mu)) continue; // уже в группе
+        await db.execute({
+          sql: 'INSERT OR IGNORE INTO group_members (group_id, username, joined_at) VALUES (?, ?, ?)',
+          args: [groupId, mu, Date.now()]
+        });
+        added.push(mu);
+      }
+
+      // Обновить группы у всех
+      const allMembers = await getGroupMembers(groupId);
+      for (const u of allMembers) await sendGroupsTo(u);
+
+      cb && cb({ ok: true, added });
+    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+  });
+
+  socket.on('leave group', async ({ groupId }, cb) => {
+    if (!socket.username) return;
+    await db.execute({
+      sql: 'DELETE FROM group_members WHERE group_id = ? AND username = ?',
+      args: [groupId, socket.username]
+    });
+    const allMembers = await getGroupMembers(groupId);
+    for (const u of allMembers) await sendGroupsTo(u);
+    await sendGroupsTo(socket.username);
+    cb && cb({ ok: true });
+  });
+
+  socket.on('load group history', async ({ groupId }) => {
+    if (!socket.username) return;
+    if (!await isGroupMember(groupId, socket.username)) return;
+    try {
+      const rows = await getGroupHistory(groupId);
+      const messages = rows.map(m => ({ ...m, reactions: safeParseReactions(m.reactions) }));
+      socket.emit('group history', { groupId, messages });
+    } catch (e) { console.error(e); }
+  });
+
+  socket.on('group message', async ({ groupId, text, image, voice, voiceDuration }) => {
+    if (!socket.username) return;
+    if (!await isGroupMember(groupId, socket.username)) return;
+    try {
+      const from = socket.username;
+      const time = Date.now();
+      const result = await db.execute({
+        sql: `INSERT INTO group_messages (group_id, from_user, text, image, voice, voice_duration, reactions, time)
+              VALUES (?, ?, ?, ?, ?, ?, '{}', ?)`,
+        args: [groupId, from, text || null, image || null, voice || null, voiceDuration || null, time]
+      });
+      const msgId = Number(result.lastInsertRowid);
+      const payload = { id: msgId, groupId, from, text, image, voice, voiceDuration, reactions: {}, time, self: false };
+      await notifyGroupMembers(groupId, 'group message', payload);
+      // Отправителю — с пометкой self
+      socket.emit('group message', { ...payload, self: true });
+    } catch (e) { console.error(e); }
+  });
+
+  socket.on('group typing', ({ groupId, isTyping }) => {
+    if (!socket.username) return;
+    getGroupMembers(groupId).then(members => {
+      members.forEach(u => {
+        if (u === socket.username) return;
+        findSocketsByUsername(u).forEach(sid =>
+          io.to(sid).emit('group typing', { groupId, from: socket.username, isTyping })
+        );
+      });
+    });
+  });
+
+  socket.on('group react', async ({ groupId, messageId, emoji }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      if (!await isGroupMember(groupId, socket.username)) return cb && cb({ ok: false });
+      const r = await db.execute({
+        sql: 'SELECT * FROM group_messages WHERE id = ? AND group_id = ?',
+        args: [messageId, groupId]
+      });
+      const msg = r.rows[0];
+      if (!msg) return cb && cb({ ok: false, error: 'Сообщение не найдено' });
+
+      let reactions = safeParseReactions(msg.reactions);
+      if (!reactions[emoji]) reactions[emoji] = [];
+      const me = socket.username;
+      const idx = reactions[emoji].indexOf(me);
+      if (idx === -1) reactions[emoji].push(me);
+      else { reactions[emoji].splice(idx, 1); if (reactions[emoji].length === 0) delete reactions[emoji]; }
+
+      await db.execute({
+        sql: 'UPDATE group_messages SET reactions = ? WHERE id = ?',
+        args: [JSON.stringify(reactions), messageId]
+      });
+
+      await notifyGroupMembers(groupId, 'group reaction updated', { groupId, messageId, reactions });
+      cb && cb({ ok: true, reactions });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  // ============ ЛИЧНЫЕ РЕАКЦИИ ============
   socket.on('react', async ({ messageId, emoji }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -248,6 +496,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
+  // ============ ЗВОНКИ ============
   socket.on('call-user', ({ to, offer, video }) => {
     if (!socket.username) return;
     const toSockets = findSocketsByUsername(to);
