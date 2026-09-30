@@ -11,10 +11,8 @@ const io = new Server(server, { maxHttpBufferSize: 1e7 });
 
 app.use(express.static(path.join(__dirname)));
 
-// 🔑 СЕКРЕТНЫЙ ПАРОЛЬ ДЛЯ ГАЛОЧКИ
 const VERIFY_PASSWORD = 'aurora2026';
 
-// ============ БАЗА (TURSO) ============
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
@@ -56,12 +54,10 @@ async function initDB() {
   console.log('✅ База данных готова (Turso)');
 }
 
-// ============ ХЕЛПЕРЫ ============
 async function getUser(username) {
   const r = await db.execute({ sql: 'SELECT * FROM users WHERE username = ?', args: [username] });
   return r.rows[0] || null;
 }
-
 async function getContactsOf(username) {
   const r = await db.execute({
     sql: 'SELECT contact, display_name FROM contacts WHERE owner = ? ORDER BY added_at ASC',
@@ -69,7 +65,6 @@ async function getContactsOf(username) {
   });
   return r.rows.map(row => ({ contact: row.contact, display_name: row.display_name }));
 }
-
 async function getContactInfo(username) {
   const r = await db.execute({
     sql: 'SELECT username, avatar, verified FROM users WHERE username = ?',
@@ -77,7 +72,6 @@ async function getContactInfo(username) {
   });
   return r.rows[0] || null;
 }
-
 async function getHistory(me, withUser) {
   const r = await db.execute({
     sql: `SELECT * FROM messages
@@ -87,34 +81,26 @@ async function getHistory(me, withUser) {
   });
   return r.rows;
 }
-
 async function getMessageById(id) {
   const r = await db.execute({ sql: 'SELECT * FROM messages WHERE id = ?', args: [id] });
   return r.rows[0] || null;
 }
-
 function safeParseReactions(raw) {
   if (!raw) return {};
-  try {
-    const obj = JSON.parse(raw);
-    return (obj && typeof obj === 'object') ? obj : {};
-  } catch (e) { return {}; }
+  try { const obj = JSON.parse(raw); return (obj && typeof obj === 'object') ? obj : {}; }
+  catch (e) { return {}; }
 }
 
-// ============ ONLINE ============
 const onlineUsers = {};
-
 function findSocketsByUsername(username) {
   return Object.entries(onlineUsers).filter(([, u]) => u === username).map(([sid]) => sid);
 }
 function isOnline(username) {
   return Object.values(onlineUsers).includes(username);
 }
-
 async function sendContactsTo(username) {
   const sockets = findSocketsByUsername(username);
   if (sockets.length === 0) return;
-
   const contactRows = await getContactsOf(username);
   const list = [];
   for (const row of contactRows) {
@@ -129,19 +115,12 @@ async function sendContactsTo(username) {
   }
   sockets.forEach(sid => io.to(sid).emit('contacts', list));
 }
-
 async function refreshForFriends(username) {
   const r = await db.execute({ sql: 'SELECT owner FROM contacts WHERE contact = ?', args: [username] });
-  for (const row of r.rows) {
-    await sendContactsTo(row.owner);
-  }
+  for (const row of r.rows) await sendContactsTo(row.owner);
 }
 
-// ============ SOCKET ============
 io.on('connection', (socket) => {
-  console.log('Подключился:', socket.id);
-
-  // Регистрация
   socket.on('register', async ({ username, password }, cb) => {
     try {
       username = String(username || '').trim().toLowerCase();
@@ -151,7 +130,6 @@ io.on('connection', (socket) => {
       if (!/^[a-z0-9_]+$/.test(username)) return cb && cb({ ok: false, error: 'Только латиница, цифры и _' });
       if (password.length < 4) return cb && cb({ ok: false, error: 'Пароль минимум 4 символа' });
       if (await getUser(username)) return cb && cb({ ok: false, error: 'Такой ник уже занят' });
-
       const hash = bcrypt.hashSync(password, 10);
       await db.execute({
         sql: 'INSERT INTO users (username, password, avatar, verified, registered_at) VALUES (?, ?, ?, 0, ?)',
@@ -161,7 +139,6 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
 
-  // Вход
   socket.on('login', async ({ username, password }, cb) => {
     try {
       username = String(username || '').trim().toLowerCase();
@@ -169,29 +146,24 @@ io.on('connection', (socket) => {
       const user = await getUser(username);
       if (!user) return cb && cb({ ok: false, error: 'Пользователь не найден' });
       if (!bcrypt.compareSync(password, user.password)) return cb && cb({ ok: false, error: 'Неверный пароль' });
-
       onlineUsers[socket.id] = username;
       socket.username = username;
       cb && cb({ ok: true, avatar: user.avatar, username, verified: !!user.verified });
-
       await sendContactsTo(username);
       await refreshForFriends(username);
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
 
-  // Аватарка
   socket.on('set avatar', async ({ avatar }) => {
     if (!socket.username || !avatar) return;
     await db.execute({ sql: 'UPDATE users SET avatar = ? WHERE username = ?', args: [avatar, socket.username] });
     await refreshForFriends(socket.username);
   });
 
-  // Галочка
   socket.on('verify', async ({ password }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
       if (password !== VERIFY_PASSWORD) return cb && cb({ ok: false, error: 'Неверный пароль' });
-
       await db.execute({ sql: 'UPDATE users SET verified = 1 WHERE username = ?', args: [socket.username] });
       await refreshForFriends(socket.username);
       const u = await getUser(socket.username);
@@ -200,7 +172,6 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
 
-  // Добавить контакт (с именем!)
   socket.on('add contact', async ({ username, displayName }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
@@ -210,7 +181,6 @@ io.on('connection', (socket) => {
       if (!displayName) return cb && cb({ ok: false, error: 'Введи имя' });
       if (username === socket.username) return cb && cb({ ok: false, error: 'Это твой ник' });
       if (!(await getUser(username))) return cb && cb({ ok: false, error: 'Такого пользователя нет' });
-
       await db.execute({
         sql: 'INSERT OR REPLACE INTO contacts (owner, contact, display_name, added_at) VALUES (?, ?, ?, ?)',
         args: [socket.username, username, displayName, Date.now()]
@@ -220,7 +190,6 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
 
-  // Удалить контакт
   socket.on('remove contact', async ({ username }, cb) => {
     if (!socket.username) return;
     await db.execute({ sql: 'DELETE FROM contacts WHERE owner = ? AND contact = ?', args: [socket.username, username] });
@@ -228,7 +197,6 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
-  // История
   socket.on('load history', async ({ withUser }) => {
     if (!socket.username) return;
     try {
@@ -238,7 +206,6 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); }
   });
 
-  // Сообщение
   socket.on('private message', async ({ to, text, image, voice, voiceDuration }) => {
     if (!socket.username) return;
     try {
@@ -256,13 +223,11 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); }
   });
 
-  // Печатает
   socket.on('typing', ({ to, isTyping }) => {
     if (!socket.username) return;
     findSocketsByUsername(to).forEach(sid => io.to(sid).emit('typing', { from: socket.username, isTyping }));
   });
 
-  // Реакции
   socket.on('react', async ({ messageId, emoji }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -270,13 +235,11 @@ io.on('connection', (socket) => {
       if (!msg) return cb && cb({ ok: false, error: 'Сообщение не найдено' });
       const me = socket.username;
       if (msg.from_user !== me && msg.to_user !== me) return cb && cb({ ok: false, error: 'Нет доступа' });
-
       let reactions = safeParseReactions(msg.reactions);
       if (!reactions[emoji]) reactions[emoji] = [];
       const idx = reactions[emoji].indexOf(me);
       if (idx === -1) reactions[emoji].push(me);
       else { reactions[emoji].splice(idx, 1); if (reactions[emoji].length === 0) delete reactions[emoji]; }
-
       await db.execute({ sql: 'UPDATE messages SET reactions = ? WHERE id = ?', args: [JSON.stringify(reactions), messageId] });
       const payload = { messageId, reactions, from: msg.from_user, to: msg.to_user };
       const targets = new Set([msg.from_user, msg.to_user]);
@@ -285,7 +248,6 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
-  // Звонки
   socket.on('call-user', ({ to, offer, video }) => {
     if (!socket.username) return;
     const toSockets = findSocketsByUsername(to);
@@ -308,7 +270,6 @@ io.on('connection', (socket) => {
     findSocketsByUsername(to).forEach(sid => io.to(sid).emit('call-ended'));
   });
 
-  // Отключение
   socket.on('disconnect', async () => {
     const u = socket.username;
     delete onlineUsers[socket.id];
@@ -322,7 +283,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// ============ СТАРТ ============
 initDB()
   .then(() => server.listen(3000, () => console.log('🌌 Aurora запущена на порту 3000 (Turso)')))
   .catch(err => { console.error('❌ Ошибка инициализации базы:', err); process.exit(1); });
