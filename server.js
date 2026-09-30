@@ -7,7 +7,7 @@ const { createClient } = require('@libsql/client');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 1e7 });
+const io = new Server(server, { maxHttpBufferSize: 2e7 }); // 20 МБ для видео-кружков
 
 app.use(express.static(path.join(__dirname)));
 
@@ -71,6 +71,8 @@ async function initDB() {
       image TEXT,
       voice TEXT,
       voice_duration INTEGER,
+      video_circle TEXT,
+      video_duration INTEGER,
       reactions TEXT DEFAULT '{}',
       reply_to INTEGER,
       edited INTEGER DEFAULT 0,
@@ -83,6 +85,8 @@ async function initDB() {
   await db.execute(`ALTER TABLE messages ADD COLUMN edited INTEGER DEFAULT 0`).catch(() => {});
   await db.execute(`ALTER TABLE messages ADD COLUMN deleted INTEGER DEFAULT 0`).catch(() => {});
   await db.execute(`ALTER TABLE messages ADD COLUMN read_at INTEGER`).catch(() => {});
+  await db.execute(`ALTER TABLE messages ADD COLUMN video_circle TEXT`).catch(() => {});
+  await db.execute(`ALTER TABLE messages ADD COLUMN video_duration INTEGER`).catch(() => {});
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS groups_table (
@@ -116,6 +120,8 @@ async function initDB() {
       image TEXT,
       voice TEXT,
       voice_duration INTEGER,
+      video_circle TEXT,
+      video_duration INTEGER,
       reactions TEXT DEFAULT '{}',
       reply_to INTEGER,
       edited INTEGER DEFAULT 0,
@@ -126,6 +132,8 @@ async function initDB() {
   await db.execute(`ALTER TABLE group_messages ADD COLUMN reply_to INTEGER`).catch(() => {});
   await db.execute(`ALTER TABLE group_messages ADD COLUMN edited INTEGER DEFAULT 0`).catch(() => {});
   await db.execute(`ALTER TABLE group_messages ADD COLUMN deleted INTEGER DEFAULT 0`).catch(() => {});
+  await db.execute(`ALTER TABLE group_messages ADD COLUMN video_circle TEXT`).catch(() => {});
+  await db.execute(`ALTER TABLE group_messages ADD COLUMN video_duration INTEGER`).catch(() => {});
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS chat_settings (
@@ -258,11 +266,11 @@ async function cleanupOldMessages() {
       if (ttl === 0) continue;
       const cutoff = now - ttl;
       await db.execute({
-        sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL WHERE (from_user = ? OR to_user = ?) AND time < ? AND deleted = 0',
+        sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL WHERE (from_user = ? OR to_user = ?) AND time < ? AND deleted = 0',
         args: [row.username, row.username, cutoff]
       });
       await db.execute({
-        sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL WHERE from_user = ? AND time < ? AND deleted = 0',
+        sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL WHERE from_user = ? AND time < ? AND deleted = 0',
         args: [row.username, cutoff]
       });
     }
@@ -279,10 +287,7 @@ async function createSession(username, device, ip) {
 }
 async function updateSession(sessionId) {
   if (!sessionId) return;
-  await db.execute({
-    sql: 'UPDATE sessions SET last_active = ? WHERE id = ?',
-    args: [Date.now(), sessionId]
-  });
+  await db.execute({ sql: 'UPDATE sessions SET last_active = ? WHERE id = ?', args: [Date.now(), sessionId] });
 }
 async function getUserSessions(username) {
   const r = await db.execute({
@@ -704,6 +709,22 @@ io.on('connection', (socket) => {
     });
   });
 
+  // ============ QR: получить публичный профиль ============
+  socket.on('get public profile', async ({ username }, cb) => {
+    if (!socket.username) return cb && cb(null);
+    const info = await getContactInfo(username);
+    if (!info) return cb && cb(null);
+    cb && cb({
+      username: info.username,
+      avatar: info.avatar,
+      verified: !!info.verified,
+      bio: info.bio,
+      firstName: info.first_name,
+      lastName: info.last_name,
+      emojiStatus: info.emoji_status
+    });
+  });
+
   socket.on('toggle archive', async ({ chatKey }, cb) => {
     if (!socket.username) return;
     const settings = await getChatSettings(socket.username, chatKey);
@@ -724,6 +745,67 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true, muted: !!newVal });
   });
 
+  // ============ ИЗБРАННОЕ ============
+  socket.on('load saved history', async () => {
+    if (!socket.username) return;
+    try {
+      const me = socket.username;
+      // Избранное — сообщения, где from_user = me и to_user = me (сам себе)
+      const r = await db.execute({
+        sql: `SELECT * FROM messages WHERE from_user = ? AND to_user = ? ORDER BY time ASC LIMIT 300`,
+        args: [me, me]
+      });
+      const messages = [];
+      for (const m of r.rows) {
+        let replyData = null;
+        if (m.reply_to) {
+          const rp = await getMessageById(m.reply_to);
+          if (rp) replyData = { id: rp.id, from: rp.from_user, text: rp.text, image: !!rp.image, voice: !!rp.voice, deleted: !!rp.deleted };
+        }
+        messages.push({ ...m, reactions: safeParseReactions(m.reactions), replyData });
+      }
+      socket.emit('saved history', { messages });
+    } catch (e) { console.error(e); }
+  });
+
+  socket.on('save to saved', async ({ originalMessageId, isGroup }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      let origMsg;
+      if (isGroup) {
+        origMsg = await getGroupMessageById(originalMessageId);
+      } else {
+        origMsg = await getMessageById(originalMessageId);
+      }
+      if (!origMsg) return cb && cb({ ok: false, error: 'Сообщение не найдено' });
+
+      const me = socket.username;
+      const time = Date.now();
+      await db.execute({
+        sql: `INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, time)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', NULL, 0, 0, ?)`,
+        args: [me, me, origMsg.text || null, origMsg.image || null, origMsg.voice || null, origMsg.voice_duration || null, origMsg.video_circle || null, origMsg.video_duration || null, time]
+      });
+      // Отправим себе — чтобы обновилось в чате
+      const r2 = await db.execute({
+        sql: `SELECT * FROM messages WHERE from_user = ? AND to_user = ? ORDER BY id DESC LIMIT 1`,
+        args: [me, me]
+      });
+      const newMsg = r2.rows[0];
+      if (newMsg) {
+        const payload = {
+          id: newMsg.id, from: me, to: me,
+          text: newMsg.text, image: newMsg.image, voice: newMsg.voice,
+          voiceDuration: newMsg.voice_duration,
+          videoCircle: newMsg.video_circle, videoDuration: newMsg.video_duration,
+          reactions: {}, time: newMsg.time, self: true, saved: true
+        };
+        socket.emit('private message', payload);
+      }
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
   socket.on('load history', async ({ withUser }) => {
     if (!socket.username) return;
     try {
@@ -741,7 +823,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); }
   });
 
-  socket.on('private message', async ({ to, text, image, voice, voiceDuration, replyTo }) => {
+  socket.on('private message', async ({ to, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo }) => {
     if (!socket.username) return;
     if (await isBlockedEither(socket.username, to)) {
       socket.emit('message blocked', { reason: 'Пользователь заблокирован' });
@@ -751,9 +833,9 @@ io.on('connection', (socket) => {
       const from = socket.username;
       const time = Date.now();
       const result = await db.execute({
-        sql: `INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, reactions, reply_to, edited, deleted, time)
-              VALUES (?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?)`,
-        args: [from, to, text || null, image || null, voice || null, voiceDuration || null, replyTo || null, time]
+        sql: `INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, time)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?)`,
+        args: [from, to, text || null, image || null, voice || null, voiceDuration || null, videoCircle || null, videoDuration || null, replyTo || null, time]
       });
       const msgId = Number(result.lastInsertRowid);
       let replyData = null;
@@ -761,7 +843,7 @@ io.on('connection', (socket) => {
         const r = await getMessageById(replyTo);
         if (r) replyData = { id: r.id, from: r.from_user, text: r.text, image: !!r.image, voice: !!r.voice, deleted: !!r.deleted };
       }
-      const payload = { id: msgId, from, text, image, voice, voiceDuration, reactions: {}, replyData, time, read: false };
+      const payload = { id: msgId, from, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions: {}, replyData, time, read: false };
       findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
       socket.emit('private message', { ...payload, self: true, to });
     } catch (e) { console.error(e); }
@@ -796,13 +878,13 @@ io.on('connection', (socket) => {
         const group = await getGroupById(msg.group_id);
         const canDelete = msg.from_user === socket.username || group?.creator === socket.username;
         if (!canDelete) return cb && cb({ ok: false });
-        await db.execute({ sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL WHERE id = ?', args: [messageId] });
+        await db.execute({ sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL WHERE id = ?', args: [messageId] });
         await notifyGroupMembers(msg.group_id, 'message deleted', { messageId, isGroup: true });
       } else {
         const msg = await getMessageById(messageId);
         if (!msg) return cb && cb({ ok: false });
         if (msg.from_user !== socket.username) return cb && cb({ ok: false });
-        await db.execute({ sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL WHERE id = ?', args: [messageId] });
+        await db.execute({ sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL WHERE id = ?', args: [messageId] });
         const payload = { messageId, isGroup: false };
         findSocketsByUsername(msg.to_user).forEach(sid => io.to(sid).emit('message deleted', payload));
         socket.emit('message deleted', payload);
@@ -968,16 +1050,16 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); }
   });
 
-  socket.on('group message', async ({ groupId, text, image, voice, voiceDuration, replyTo }) => {
+  socket.on('group message', async ({ groupId, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo }) => {
     if (!socket.username) return;
     if (!await isGroupMember(groupId, socket.username)) return;
     try {
       const from = socket.username;
       const time = Date.now();
       const result = await db.execute({
-        sql: `INSERT INTO group_messages (group_id, from_user, text, image, voice, voice_duration, reactions, reply_to, edited, deleted, time)
-              VALUES (?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?)`,
-        args: [groupId, from, text || null, image || null, voice || null, voiceDuration || null, replyTo || null, time]
+        sql: `INSERT INTO group_messages (group_id, from_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, time)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?)`,
+        args: [groupId, from, text || null, image || null, voice || null, voiceDuration || null, videoCircle || null, videoDuration || null, replyTo || null, time]
       });
       const msgId = Number(result.lastInsertRowid);
       let replyData = null;
@@ -985,7 +1067,7 @@ io.on('connection', (socket) => {
         const r = await getGroupMessageById(replyTo);
         if (r) replyData = { id: r.id, from: r.from_user, text: r.text, image: !!r.image, voice: !!r.voice, deleted: !!r.deleted };
       }
-      const payload = { id: msgId, groupId, from, text, image, voice, voiceDuration, reactions: {}, replyData, time, self: false };
+      const payload = { id: msgId, groupId, from, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions: {}, replyData, time, self: false };
       await notifyGroupMembers(groupId, 'group message', payload);
       socket.emit('group message', { ...payload, self: true });
     } catch (e) { console.error(e); }
@@ -1094,6 +1176,5 @@ initDB()
   })
   .catch(err => {
     console.error('❌ ОШИБКА ИНИЦИАЛИЗАЦИИ БАЗЫ:', err);
-    console.error('❌ Проверь TURSO_DATABASE_URL и TURSO_AUTH_TOKEN');
     process.exit(1);
   });
