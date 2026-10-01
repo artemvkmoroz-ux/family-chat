@@ -11,11 +11,13 @@ const io = new Server(server, { maxHttpBufferSize: 2e7 });
 
 app.use(express.static(path.join(__dirname)));
 
-const VERIFY_PASSWORD = 'aurora2026';
+// 🔒 ТОЛЬКО ЭТОТ НИК может выдавать галочки
+const ADMIN_USERNAME = 'moroz';
 
 console.log('🚀 Aurora: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? 'задан' : '❌ НЕ ЗАДАН');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? 'задан' : '❌ НЕ ЗАДАН');
+console.log('👑 Админ (выдаёт галочки):', ADMIN_USERNAME);
 
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
@@ -468,6 +470,65 @@ io.on('connection', (socket) => {
       cb && cb({ ok: true });
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
+
+  // ═══════════════════════════════════════════
+  // 🔒 ГАЛОЧКИ — ТОЛЬКО moroz
+  // ═══════════════════════════════════════════
+  socket.on('verify', async ({ username }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+
+      // Только moroz может выдавать
+      if (socket.username !== ADMIN_USERNAME) {
+        return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может выдавать галочки' });
+      }
+
+      username = String(username || '').trim().toLowerCase();
+      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
+
+      const target = await getUser(username);
+      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
+      if (target.verified) return cb && cb({ ok: false, error: 'У него уже есть галочка' });
+
+      await db.execute({ sql: 'UPDATE users SET verified = 1 WHERE username = ?', args: [username] });
+      await refreshForFriends(username);
+      await notifyAllFriends(username, 'friend updated', { username, verified: true });
+
+      if (username === socket.username) {
+        socket.emit('me updated', { verified: true, username });
+      }
+
+      console.log(`✓ ${socket.username} выдал галочку @${username}`);
+      cb && cb({ ok: true, username });
+    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+  });
+
+  socket.on('unverify', async ({ username }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      if (socket.username !== ADMIN_USERNAME) {
+        return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может забирать галочки' });
+      }
+
+      username = String(username || '').trim().toLowerCase();
+      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
+
+      const target = await getUser(username);
+      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
+
+      await db.execute({ sql: 'UPDATE users SET verified = 0 WHERE username = ?', args: [username] });
+      await refreshForFriends(username);
+      await notifyAllFriends(username, 'friend updated', { username, verified: false });
+
+      if (username === socket.username) {
+        socket.emit('me updated', { verified: false, username });
+      }
+
+      console.log(`✗ ${socket.username} забрал галочку у @${username}`);
+      cb && cb({ ok: true, username });
+    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+  });
+  // ═══════════════════════════════════════════
 
   socket.on('set passcode', async ({ passcode }, cb) => {
     try {
