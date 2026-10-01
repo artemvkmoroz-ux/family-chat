@@ -160,11 +160,13 @@ async function initDB() {
       passcode TEXT,
       profile_color TEXT DEFAULT '#a855f7',
       chat_wallpaper TEXT DEFAULT '',
+      premium INTEGER DEFAULT 1,
       FOREIGN KEY (username) REFERENCES users(username)
     )
   `);
   await db.execute(`ALTER TABLE user_settings ADD COLUMN profile_color TEXT DEFAULT '#a855f7'`).catch(() => {});
   await db.execute(`ALTER TABLE user_settings ADD COLUMN chat_wallpaper TEXT DEFAULT ''`).catch(() => {});
+  await db.execute(`ALTER TABLE user_settings ADD COLUMN premium INTEGER DEFAULT 1`).catch(() => {});
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS blocks (
@@ -459,7 +461,7 @@ io.on('connection', (socket) => {
   socket.on('update settings', async ({ key, value }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
-      const allowed = ['theme', 'language', 'font_size', 'accent_color', 'animations', 'sound', 'vibration', 'notif_private', 'notif_groups', 'auto_delete', 'profile_color', 'chat_wallpaper'];
+      const allowed = ['theme', 'language', 'font_size', 'accent_color', 'animations', 'sound', 'vibration', 'notif_private', 'notif_groups', 'auto_delete', 'profile_color', 'chat_wallpaper', 'premium'];
       if (!allowed.includes(key)) return cb && cb({ ok: false });
       await db.execute({ sql: `UPDATE user_settings SET ${key} = ? WHERE username = ?`, args: [value, socket.username] });
       socket.emit('settings', await getSettings(socket.username));
