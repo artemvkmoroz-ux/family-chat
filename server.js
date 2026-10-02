@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const { createClient } = require('@libsql/client');
 
@@ -10,6 +11,11 @@ const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 2e7 });
 
 app.use(express.static(path.join(__dirname)));
+
+// 📸 Папка для историй
+const STORIES_DIR = path.join(__dirname, 'stories');
+if (!fs.existsSync(STORIES_DIR)) fs.mkdirSync(STORIES_DIR, { recursive: true });
+app.use('/stories', express.static(STORIES_DIR));
 
 // 🔒 ТОЛЬКО ЭТОТ НИК может выдавать галочки
 const ADMIN_USERNAME = 'moroz';
@@ -190,6 +196,28 @@ async function initDB() {
     )
   `);
 
+  // 📸 Истории
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS stories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      image TEXT NOT NULL,
+      caption TEXT,
+      time INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    )
+  `);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(username, expires_at DESC)`).catch(() => {});
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS story_views (
+      story_id INTEGER NOT NULL,
+      viewer TEXT NOT NULL,
+      time INTEGER NOT NULL,
+      PRIMARY KEY (story_id, viewer)
+    )
+  `);
+
   console.log(`✅ База данных готова за ${Date.now() - start}мс`);
 }
 
@@ -268,7 +296,83 @@ async function cleanupOldMessages() {
         args: [row.username, cutoff]
       });
     }
+    // 📸 Чистим истёкшие истории
+    await cleanupExpiredStories();
   } catch (e) { console.error('cleanup error:', e); }
+}
+async function cleanupExpiredStories() {
+  try {
+    const now = Date.now();
+    const r = await db.execute({ sql: 'SELECT id, image FROM stories WHERE expires_at < ?', args: [now] });
+    for (const row of r.rows) {
+      if (row.image && row.image.startsWith('/stories/')) {
+        const fname = row.image.replace('/stories/', '');
+        const fpath = path.join(STORIES_DIR, fname);
+        try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch (e) {}
+      }
+    }
+    await db.execute({ sql: 'DELETE FROM stories WHERE expires_at < ?', args: [now] });
+    await db.execute({ sql: 'DELETE FROM story_views WHERE story_id NOT IN (SELECT id FROM stories)' }).catch(() => {});
+  } catch (e) { console.error('cleanup stories error:', e); }
+}
+async function getActiveStories(viewer) {
+  const now = Date.now();
+  const contactsR = await db.execute({ sql: 'SELECT contact FROM contacts WHERE owner = ?', args: [viewer] });
+  const allowedUsers = contactsR.rows.map(r => r.contact);
+  allowedUsers.push(viewer);
+
+  if (allowedUsers.length === 0) return [];
+  const placeholders = allowedUsers.map(() => '?').join(',');
+  const r = await db.execute({
+    sql: `SELECT s.*, u.avatar, u.verified, u.first_name, u.last_name FROM stories s
+          LEFT JOIN users u ON u.username = s.username
+          WHERE s.username IN (${placeholders}) AND s.expires_at > ?
+          ORDER BY s.time ASC`,
+    args: [...allowedUsers, now]
+  });
+
+  const byUser = {};
+  for (const row of r.rows) {
+    if (!byUser[row.username]) {
+      byUser[row.username] = {
+        username: row.username,
+        avatar: row.avatar,
+        verified: !!row.verified,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        stories: []
+      };
+    }
+    const viewedR = await db.execute({ sql: 'SELECT 1 FROM story_views WHERE story_id = ? AND viewer = ?', args: [row.id, viewer] });
+    byUser[row.username].stories.push({
+      id: row.id,
+      image: row.image,
+      caption: row.caption,
+      time: row.time,
+      expires_at: row.expires_at,
+      viewed: viewedR.rows.length > 0
+    });
+  }
+  return Object.values(byUser).sort((a, b) => {
+    const aUnviewed = a.stories.some(s => !s.viewed);
+    const bUnviewed = b.stories.some(s => !s.viewed);
+    if (aUnviewed !== bUnviewed) return aUnviewed ? -1 : 1;
+    return b.stories[b.stories.length - 1].time - a.stories[a.stories.length - 1].time;
+  });
+}
+async function deleteStory(storyId, username) {
+  const r = await db.execute({ sql: 'SELECT * FROM stories WHERE id = ?', args: [storyId] });
+  const story = r.rows[0];
+  if (!story) return { ok: false, error: 'История не найдена' };
+  if (story.username !== username) return { ok: false, error: 'Не твоя история' };
+  if (story.image && story.image.startsWith('/stories/')) {
+    const fname = story.image.replace('/stories/', '');
+    const fpath = path.join(STORIES_DIR, fname);
+    try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch (e) {}
+  }
+  await db.execute({ sql: 'DELETE FROM stories WHERE id = ?', args: [storyId] });
+  await db.execute({ sql: 'DELETE FROM story_views WHERE story_id = ?', args: [storyId] });
+  return { ok: true };
 }
 async function createSession(username, device, ip) {
   const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -477,27 +581,18 @@ io.on('connection', (socket) => {
   socket.on('verify', async ({ username }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
-
-      // Только moroz может выдавать
       if (socket.username !== ADMIN_USERNAME) {
         return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может выдавать галочки' });
       }
-
       username = String(username || '').trim().toLowerCase();
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
-
       const target = await getUser(username);
       if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
       if (target.verified) return cb && cb({ ok: false, error: 'У него уже есть галочка' });
-
       await db.execute({ sql: 'UPDATE users SET verified = 1 WHERE username = ?', args: [username] });
       await refreshForFriends(username);
       await notifyAllFriends(username, 'friend updated', { username, verified: true });
-
-      if (username === socket.username) {
-        socket.emit('me updated', { verified: true, username });
-      }
-
+      if (username === socket.username) socket.emit('me updated', { verified: true, username });
       console.log(`✓ ${socket.username} выдал галочку @${username}`);
       cb && cb({ ok: true, username });
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
@@ -509,26 +604,18 @@ io.on('connection', (socket) => {
       if (socket.username !== ADMIN_USERNAME) {
         return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может забирать галочки' });
       }
-
       username = String(username || '').trim().toLowerCase();
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
-
       const target = await getUser(username);
       if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-
       await db.execute({ sql: 'UPDATE users SET verified = 0 WHERE username = ?', args: [username] });
       await refreshForFriends(username);
       await notifyAllFriends(username, 'friend updated', { username, verified: false });
-
-      if (username === socket.username) {
-        socket.emit('me updated', { verified: false, username });
-      }
-
+      if (username === socket.username) socket.emit('me updated', { verified: false, username });
       console.log(`✗ ${socket.username} забрал галочку у @${username}`);
       cb && cb({ ok: true, username });
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
-  // ═══════════════════════════════════════════
 
   socket.on('set passcode', async ({ passcode }, cb) => {
     try {
@@ -618,6 +705,16 @@ io.on('connection', (socket) => {
       await db.execute({ sql: 'DELETE FROM blocks WHERE blocker = ? OR blocked = ?', args: [me, me] });
       await db.execute({ sql: 'DELETE FROM sessions WHERE username = ?', args: [me] });
       await db.execute({ sql: 'DELETE FROM user_settings WHERE username = ?', args: [me] });
+      // 📸 Удаляем истории
+      const myStories = await db.execute({ sql: 'SELECT id, image FROM stories WHERE username = ?', args: [me] });
+      for (const s of myStories.rows) {
+        if (s.image && s.image.startsWith('/stories/')) {
+          const fpath = path.join(STORIES_DIR, s.image.replace('/stories/', ''));
+          try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch (e) {}
+        }
+      }
+      await db.execute({ sql: 'DELETE FROM stories WHERE username = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM story_views WHERE viewer = ?', args: [me] });
       await db.execute({ sql: 'DELETE FROM users WHERE username = ?', args: [me] });
       socket.emit('account deleted');
       socket.disconnect(true);
@@ -988,6 +1085,91 @@ io.on('connection', (socket) => {
       cb && cb({ ok: true, results: rows });
     } catch (e) { cb && cb({ ok: false, results: [] }); }
   });
+
+  // ═══════════════════════════════════════════
+  // 📸 ИСТОРИИ
+  // ═══════════════════════════════════════════
+  socket.on('load stories', async (cb) => {
+    if (!socket.username) return cb && cb({ ok: false, users: [] });
+    try {
+      const users = await getActiveStories(socket.username);
+      cb && cb({ ok: true, users, me: socket.username });
+    } catch (e) { console.error(e); cb && cb({ ok: false, users: [] }); }
+  });
+
+  socket.on('post story', async ({ image, caption }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      if (!image || typeof image !== 'string') return cb && cb({ ok: false, error: 'Нет картинки' });
+
+      let imagePath = image;
+      if (image.startsWith('data:image/')) {
+        const m = image.match(/^data:image\/([a-z]+);base64,(.+)$/i);
+        if (!m) return cb && cb({ ok: false, error: 'Неверный формат' });
+        const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+        const buf = Buffer.from(m[2], 'base64');
+        if (buf.length > 5_000_000) return cb && cb({ ok: false, error: 'Слишком большая картинка (макс 5MB)' });
+        const fname = `${socket.username}_${Date.now()}.${ext}`;
+        const fpath = path.join(STORIES_DIR, fname);
+        fs.writeFileSync(fpath, buf);
+        imagePath = '/stories/' + fname;
+      }
+
+      const now = Date.now();
+      const expires = now + 24 * 60 * 60 * 1000;
+      const cap = caption ? String(caption).slice(0, 200) : null;
+
+      const r = await db.execute({
+        sql: 'INSERT INTO stories (username, image, caption, time, expires_at) VALUES (?, ?, ?, ?, ?)',
+        args: [socket.username, imagePath, cap, now, expires]
+      });
+      const storyId = Number(r.lastInsertRowid);
+
+      const contactsR = await db.execute({ sql: 'SELECT owner FROM contacts WHERE contact = ?', args: [socket.username] });
+      const payload = { id: storyId, username: socket.username, image: imagePath, caption: cap, time: now, expires_at: expires };
+      contactsR.rows.forEach(row => {
+        findSocketsByUsername(row.owner).forEach(sid => io.to(sid).emit('story new', payload));
+      });
+
+      cb && cb({ ok: true, id: storyId, image: imagePath });
+    } catch (e) { console.error('post story error:', e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+  });
+
+  socket.on('delete story', async ({ storyId }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const res = await deleteStory(storyId, socket.username);
+      if (!res.ok) return cb && cb(res);
+      const contactsR = await db.execute({ sql: 'SELECT owner FROM contacts WHERE contact = ?', args: [socket.username] });
+      contactsR.rows.forEach(row => {
+        findSocketsByUsername(row.owner).forEach(sid => io.to(sid).emit('story deleted', { storyId }));
+      });
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('view story', async ({ storyId }) => {
+    try {
+      if (!socket.username) return;
+      await db.execute({ sql: 'INSERT OR IGNORE INTO story_views (story_id, viewer, time) VALUES (?, ?, ?)', args: [storyId, socket.username, Date.now()] });
+      const r = await db.execute({ sql: 'SELECT username FROM stories WHERE id = ?', args: [storyId] });
+      if (r.rows[0]) findSocketsByUsername(r.rows[0].username).forEach(sid => io.to(sid).emit('story viewed', { storyId, viewer: socket.username }));
+    } catch (e) { console.error(e); }
+  });
+
+  socket.on('get story views', async ({ storyId }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, viewers: [] });
+      const r = await db.execute({ sql: 'SELECT username FROM stories WHERE id = ?', args: [storyId] });
+      if (!r.rows[0] || r.rows[0].username !== socket.username) return cb && cb({ ok: false });
+      const views = await db.execute({ sql: 'SELECT viewer, time FROM story_views WHERE story_id = ? ORDER BY time DESC', args: [storyId] });
+      cb && cb({ ok: true, viewers: views.rows });
+    } catch (e) { cb && cb({ ok: false, viewers: [] }); }
+  });
+
+  // ═══════════════════════════════════════════
+  // 📞 ЗВОНКИ
+  // ═══════════════════════════════════════════
   socket.on('call-user', async ({ to, offer, video }) => {
     if (!socket.username) return;
     if (await isBlockedEither(socket.username, to)) { socket.emit('call-failed', { reason: 'Пользователь заблокирован' }); return; }
