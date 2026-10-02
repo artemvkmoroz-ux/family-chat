@@ -8,27 +8,59 @@ const { createClient } = require('@libsql/client');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 2e7 });
+const io = new Server(server, { maxHttpBufferSize: 5e7 });
 
 app.use(express.static(path.join(__dirname)));
 
-// 📸 Папка для историй
+// 📁 Папки
 const STORIES_DIR = path.join(__dirname, 'stories');
 if (!fs.existsSync(STORIES_DIR)) fs.mkdirSync(STORIES_DIR, { recursive: true });
 app.use('/stories', express.static(STORIES_DIR));
 
-// 🔒 ТОЛЬКО ЭТОТ НИК может выдавать галочки
+const STICKERS_DIR = path.join(__dirname, 'stickers');
+if (!fs.existsSync(STICKERS_DIR)) fs.mkdirSync(STICKERS_DIR, { recursive: true });
+app.use('/stickers', express.static(STICKERS_DIR));
+
 const ADMIN_USERNAME = 'moroz';
 
 console.log('🚀 Aurora: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? 'задан' : '❌ НЕ ЗАДАН');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? 'задан' : '❌ НЕ ЗАДАН');
-console.log('👑 Админ (выдаёт галочки):', ADMIN_USERNAME);
+console.log('👑 Админ:', ADMIN_USERNAME);
 
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
+
+// 🛡 Rate limit
+const rateBuckets = new Map();
+function rateLimit(key, max, windowMs) {
+  const now = Date.now();
+  let b = rateBuckets.get(key);
+  if (!b || now > b.resetAt) { b = { count: 0, resetAt: now + windowMs }; rateBuckets.set(key, b); }
+  b.count++;
+  return b.count <= max;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, b] of rateBuckets) if (now > b.resetAt) rateBuckets.delete(k);
+}, 10 * 60 * 1000);
+
+// 📏 Лимиты
+const MAX_TEXT = 4000;
+const MAX_IMAGE = 3_000_000;
+const MAX_VOICE = 4_000_000;
+const MAX_VIDEO = 15_000_000;
+const MAX_STICKER = 4_000_000;
+
+function validImage(s) { return typeof s === 'string' && s.startsWith('data:image/') && s.length <= MAX_IMAGE; }
+function validVoice(s) { return typeof s === 'string' && s.startsWith('data:audio/') && s.length <= MAX_VOICE; }
+function validVideo(s) { return typeof s === 'string' && s.startsWith('data:video/') && s.length <= MAX_VIDEO; }
+function validStickerData(s) {
+  if (typeof s !== 'string' || s.length > MAX_STICKER) return false;
+  return s.startsWith('data:image/') || s.startsWith('data:video/');
+}
 
 async function initDB() {
   console.log('📦 Инициализация базы...');
@@ -85,6 +117,7 @@ async function initDB() {
       edited INTEGER DEFAULT 0,
       deleted INTEGER DEFAULT 0,
       read_at INTEGER,
+      sticker TEXT,
       time INTEGER NOT NULL
     )
   `);
@@ -94,6 +127,7 @@ async function initDB() {
   await db.execute(`ALTER TABLE messages ADD COLUMN read_at INTEGER`).catch(() => {});
   await db.execute(`ALTER TABLE messages ADD COLUMN video_circle TEXT`).catch(() => {});
   await db.execute(`ALTER TABLE messages ADD COLUMN video_duration INTEGER`).catch(() => {});
+  await db.execute(`ALTER TABLE messages ADD COLUMN sticker TEXT`).catch(() => {});
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS groups_table (
@@ -133,6 +167,7 @@ async function initDB() {
       reply_to INTEGER,
       edited INTEGER DEFAULT 0,
       deleted INTEGER DEFAULT 0,
+      sticker TEXT,
       time INTEGER NOT NULL
     )
   `);
@@ -141,6 +176,7 @@ async function initDB() {
   await db.execute(`ALTER TABLE group_messages ADD COLUMN deleted INTEGER DEFAULT 0`).catch(() => {});
   await db.execute(`ALTER TABLE group_messages ADD COLUMN video_circle TEXT`).catch(() => {});
   await db.execute(`ALTER TABLE group_messages ADD COLUMN video_duration INTEGER`).catch(() => {});
+  await db.execute(`ALTER TABLE group_messages ADD COLUMN sticker TEXT`).catch(() => {});
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS chat_settings (
@@ -196,7 +232,6 @@ async function initDB() {
     )
   `);
 
-  // 📸 Истории
   await db.execute(`
     CREATE TABLE IF NOT EXISTS stories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -217,6 +252,20 @@ async function initDB() {
       PRIMARY KEY (story_id, viewer)
     )
   `);
+
+  // 🐱 Стикеры (свои + из видео)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS stickers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      url TEXT NOT NULL,
+      type TEXT DEFAULT 'image',
+      emoji TEXT,
+      time INTEGER NOT NULL
+    )
+  `);
+  await db.execute(`ALTER TABLE stickers ADD COLUMN type TEXT DEFAULT 'image'`).catch(() => {});
+  await db.execute(`ALTER TABLE stickers ADD COLUMN emoji TEXT`).catch(() => {});
 
   console.log(`✅ База данных готова за ${Date.now() - start}мс`);
 }
@@ -288,15 +337,14 @@ async function cleanupOldMessages() {
       if (ttl === 0) continue;
       const cutoff = now - ttl;
       await db.execute({
-        sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL WHERE (from_user = ? OR to_user = ?) AND time < ? AND deleted = 0',
+        sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL, sticker = NULL WHERE (from_user = ? OR to_user = ?) AND time < ? AND deleted = 0',
         args: [row.username, row.username, cutoff]
       });
       await db.execute({
-        sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL WHERE from_user = ? AND time < ? AND deleted = 0',
+        sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL, sticker = NULL WHERE from_user = ? AND time < ? AND deleted = 0',
         args: [row.username, cutoff]
       });
     }
-    // 📸 Чистим истёкшие истории
     await cleanupExpiredStories();
   } catch (e) { console.error('cleanup error:', e); }
 }
@@ -345,18 +393,15 @@ async function getActiveStories(viewer) {
     }
     const viewedR = await db.execute({ sql: 'SELECT 1 FROM story_views WHERE story_id = ? AND viewer = ?', args: [row.id, viewer] });
     byUser[row.username].stories.push({
-      id: row.id,
-      image: row.image,
-      caption: row.caption,
-      time: row.time,
-      expires_at: row.expires_at,
+      id: row.id, image: row.image, caption: row.caption,
+      time: row.time, expires_at: row.expires_at,
       viewed: viewedR.rows.length > 0
     });
   }
   return Object.values(byUser).sort((a, b) => {
-    const aUnviewed = a.stories.some(s => !s.viewed);
-    const bUnviewed = b.stories.some(s => !s.viewed);
-    if (aUnviewed !== bUnviewed) return aUnviewed ? -1 : 1;
+    const aU = a.stories.some(s => !s.viewed);
+    const bU = b.stories.some(s => !s.viewed);
+    if (aU !== bU) return aU ? -1 : 1;
     return b.stories[b.stories.length - 1].time - a.stories[a.stories.length - 1].time;
   });
 }
@@ -373,6 +418,29 @@ async function deleteStory(storyId, username) {
   await db.execute({ sql: 'DELETE FROM stories WHERE id = ?', args: [storyId] });
   await db.execute({ sql: 'DELETE FROM story_views WHERE story_id = ?', args: [storyId] });
   return { ok: true };
+}
+async function getUserStickers(username) {
+  const r = await db.execute({ sql: 'SELECT * FROM stickers WHERE username = ? ORDER BY time DESC', args: [username] });
+  return r.rows;
+}
+async function addSticker(username, url, type, emoji) {
+  const r = await db.execute({
+    sql: 'INSERT INTO stickers (username, url, type, emoji, time) VALUES (?, ?, ?, ?, ?)',
+    args: [username, url, type || 'image', emoji || null, Date.now()]
+  });
+  return Number(r.lastInsertRowid);
+}
+async function deleteSticker(id, username) {
+  const r = await db.execute({ sql: 'SELECT url FROM stickers WHERE id = ? AND username = ?', args: [id, username] });
+  if (r.rows[0]) {
+    const url = r.rows[0].url;
+    if (url && url.startsWith('/stickers/')) {
+      const fname = url.replace('/stickers/', '');
+      const fpath = path.join(STICKERS_DIR, fname);
+      try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch (e) {}
+    }
+  }
+  await db.execute({ sql: 'DELETE FROM stickers WHERE id = ? AND username = ?', args: [id, username] });
 }
 async function createSession(username, device, ip) {
   const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -395,8 +463,11 @@ async function getChatSettings(owner, chatKey) {
   return r.rows[0] || { archived: 0, muted: 0 };
 }
 async function setChatSetting(owner, chatKey, field, value) {
+  const FIELD_MAP = { archived: 'archived', muted: 'muted' };
+  const col = FIELD_MAP[field];
+  if (!col) throw new Error('Invalid field');
   await db.execute({ sql: 'INSERT OR IGNORE INTO chat_settings (owner, chat_key, archived, muted) VALUES (?, ?, 0, 0)', args: [owner, chatKey] });
-  await db.execute({ sql: `UPDATE chat_settings SET ${field} = ? WHERE owner = ? AND chat_key = ?`, args: [value, owner, chatKey] });
+  await db.execute({ sql: `UPDATE chat_settings SET ${col} = ? WHERE owner = ? AND chat_key = ?`, args: [value, owner, chatKey] });
 }
 async function getGroupById(id) {
   const r = await db.execute({ sql: 'SELECT * FROM groups_table WHERE id = ?', args: [id] });
@@ -488,6 +559,7 @@ io.on('connection', (socket) => {
 
   socket.on('register', async ({ username, password }, cb) => {
     try {
+      if (!rateLimit('reg:' + socket.handshake.address, 5, 60_000)) return cb && cb({ ok: false, error: 'Слишком много попыток. Подожди минуту.' });
       username = String(username || '').trim().toLowerCase();
       password = String(password || '');
       if (!username || !password) return cb && cb({ ok: false, error: 'Заполни все поля' });
@@ -507,6 +579,7 @@ io.on('connection', (socket) => {
 
   socket.on('login', async ({ username, password, device, sessionId }, cb) => {
     try {
+      if (!rateLimit('login:' + socket.handshake.address, 10, 60_000)) return cb && cb({ ok: false, error: 'Слишком много попыток. Подожди минуту.' });
       username = String(username || '').trim().toLowerCase();
       password = String(password || '');
       const user = await getUser(username);
@@ -532,6 +605,7 @@ io.on('connection', (socket) => {
 
   socket.on('set avatar', async ({ avatar }) => {
     if (!socket.username || !avatar) return;
+    if (!validImage(avatar)) return;
     await db.execute({ sql: 'UPDATE users SET avatar = ? WHERE username = ?', args: [avatar, socket.username] });
     await refreshForFriends(socket.username);
     await notifyAllFriends(socket.username, 'friend updated', { username: socket.username, avatar });
@@ -575,15 +649,11 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
-  // ═══════════════════════════════════════════
-  // 🔒 ГАЛОЧКИ — ТОЛЬКО moroz
-  // ═══════════════════════════════════════════
+  // 🔒 ГАЛОЧКИ
   socket.on('verify', async ({ username }, cb) => {
     try {
-      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
-      if (socket.username !== ADMIN_USERNAME) {
-        return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может выдавать галочки' });
-      }
+      if (!socket.username) return cb && cb({ ok: false });
+      if (socket.username !== ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может выдавать галочки' });
       username = String(username || '').trim().toLowerCase();
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
       const target = await getUser(username);
@@ -593,28 +663,23 @@ io.on('connection', (socket) => {
       await refreshForFriends(username);
       await notifyAllFriends(username, 'friend updated', { username, verified: true });
       if (username === socket.username) socket.emit('me updated', { verified: true, username });
-      console.log(`✓ ${socket.username} выдал галочку @${username}`);
       cb && cb({ ok: true, username });
-    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+    } catch (e) { cb && cb({ ok: false }); }
   });
 
   socket.on('unverify', async ({ username }, cb) => {
     try {
-      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
-      if (socket.username !== ADMIN_USERNAME) {
-        return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может забирать галочки' });
-      }
+      if (!socket.username) return cb && cb({ ok: false });
+      if (socket.username !== ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME });
       username = String(username || '').trim().toLowerCase();
-      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
       const target = await getUser(username);
       if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
       await db.execute({ sql: 'UPDATE users SET verified = 0 WHERE username = ?', args: [username] });
       await refreshForFriends(username);
       await notifyAllFriends(username, 'friend updated', { username, verified: false });
       if (username === socket.username) socket.emit('me updated', { verified: false, username });
-      console.log(`✗ ${socket.username} забрал галочку у @${username}`);
       cb && cb({ ok: true, username });
-    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+    } catch (e) { cb && cb({ ok: false }); }
   });
 
   socket.on('set passcode', async ({ passcode }, cb) => {
@@ -624,7 +689,7 @@ io.on('connection', (socket) => {
       const hash = passcode ? bcrypt.hashSync(passcode, 10) : null;
       await db.execute({ sql: 'UPDATE user_settings SET passcode = ? WHERE username = ?', args: [hash, socket.username] });
       cb && cb({ ok: true });
-    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+    } catch (e) { cb && cb({ ok: false }); }
   });
   socket.on('check passcode', async ({ passcode }, cb) => {
     try {
@@ -705,7 +770,7 @@ io.on('connection', (socket) => {
       await db.execute({ sql: 'DELETE FROM blocks WHERE blocker = ? OR blocked = ?', args: [me, me] });
       await db.execute({ sql: 'DELETE FROM sessions WHERE username = ?', args: [me] });
       await db.execute({ sql: 'DELETE FROM user_settings WHERE username = ?', args: [me] });
-      // 📸 Удаляем истории
+      // Истории
       const myStories = await db.execute({ sql: 'SELECT id, image FROM stories WHERE username = ?', args: [me] });
       for (const s of myStories.rows) {
         if (s.image && s.image.startsWith('/stories/')) {
@@ -715,12 +780,22 @@ io.on('connection', (socket) => {
       }
       await db.execute({ sql: 'DELETE FROM stories WHERE username = ?', args: [me] });
       await db.execute({ sql: 'DELETE FROM story_views WHERE viewer = ?', args: [me] });
+      // Стикеры
+      const myStickers = await db.execute({ sql: 'SELECT url FROM stickers WHERE username = ?', args: [me] });
+      for (const s of myStickers.rows) {
+        if (s.url && s.url.startsWith('/stickers/')) {
+          const fpath = path.join(STICKERS_DIR, s.url.replace('/stickers/', ''));
+          try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch (e) {}
+        }
+      }
+      await db.execute({ sql: 'DELETE FROM stickers WHERE username = ?', args: [me] });
       await db.execute({ sql: 'DELETE FROM users WHERE username = ?', args: [me] });
       socket.emit('account deleted');
       socket.disconnect(true);
       cb && cb({ ok: true });
     } catch (e) { cb && cb({ ok: false }); }
   });
+
   socket.on('add contact', async ({ username, displayName }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -818,8 +893,8 @@ io.on('connection', (socket) => {
       const me = socket.username;
       const time = Date.now();
       const result = await db.execute({
-        sql: `INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', NULL, 0, 0, ?)`,
-        args: [me, me, origMsg.text || null, origMsg.image || null, origMsg.voice || null, origMsg.voice_duration || null, origMsg.video_circle || null, origMsg.video_duration || null, time]
+        sql: `INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, sticker, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', NULL, 0, 0, ?, ?)`,
+        args: [me, me, origMsg.text || null, origMsg.image || null, origMsg.voice || null, origMsg.voice_duration || null, origMsg.video_circle || null, origMsg.video_duration || null, origMsg.sticker || null, time]
       });
       const msgId = Number(result.lastInsertRowid);
       const newMsg = await getMessageById(msgId);
@@ -829,24 +904,28 @@ io.on('connection', (socket) => {
           text: newMsg.text, image: newMsg.image, voice: newMsg.voice,
           voiceDuration: newMsg.voice_duration,
           videoCircle: newMsg.video_circle, videoDuration: newMsg.video_duration,
+          sticker: newMsg.sticker,
           reactions: {}, time: newMsg.time, self: true, saved: true
         });
       }
       cb && cb({ ok: true });
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
-  socket.on('private message', async ({ to, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo }) => {
+
+  socket.on('private message', async ({ to, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo, sticker }) => {
     if (!socket.username) return;
-    if (await isBlockedEither(socket.username, to)) {
-      socket.emit('message blocked', { reason: 'Пользователь заблокирован' });
-      return;
-    }
+    if (!rateLimit('pm:' + socket.username, 30, 10_000)) { socket.emit('message blocked', { reason: 'Слишком часто. Подожди.' }); return; }
+    if (text && text.length > MAX_TEXT) return socket.emit('message blocked', { reason: 'Слишком длинное сообщение' });
+    if (image && !validImage(image)) return socket.emit('message blocked', { reason: 'Недопустимое изображение' });
+    if (voice && !validVoice(voice)) return socket.emit('message blocked', { reason: 'Недопустимое голосовое' });
+    if (videoCircle && !validVideo(videoCircle)) return socket.emit('message blocked', { reason: 'Недопустимый кружок' });
+    if (await isBlockedEither(socket.username, to)) { socket.emit('message blocked', { reason: 'Пользователь заблокирован' }); return; }
     try {
       const from = socket.username;
       const time = Date.now();
       const result = await db.execute({
-        sql: `INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?)`,
-        args: [from, to, text || null, image || null, voice || null, voiceDuration || null, videoCircle || null, videoDuration || null, replyTo || null, time]
+        sql: `INSERT INTO messages (from_user, to_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, sticker, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?, ?)`,
+        args: [from, to, text || null, image || null, voice || null, voiceDuration || null, videoCircle || null, videoDuration || null, replyTo || null, sticker || null, time]
       });
       const msgId = Number(result.lastInsertRowid);
       let replyData = null;
@@ -854,11 +933,12 @@ io.on('connection', (socket) => {
         const r = await getMessageById(replyTo);
         if (r) replyData = { id: r.id, from: r.from_user, text: r.text, image: !!r.image, voice: !!r.voice, deleted: !!r.deleted };
       }
-      const payload = { id: msgId, from, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions: {}, replyData, time, read: false };
+      const payload = { id: msgId, from, text, image, voice, voiceDuration, videoCircle, videoDuration, sticker, reactions: {}, replyData, time, read: false };
       findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
       socket.emit('private message', { ...payload, self: true, to });
     } catch (e) { console.error(e); }
   });
+
   socket.on('edit message', async ({ messageId, text, isGroup }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -886,12 +966,12 @@ io.on('connection', (socket) => {
         if (!msg) return cb && cb({ ok: false });
         const group = await getGroupById(msg.group_id);
         if (msg.from_user !== socket.username && group?.creator !== socket.username) return cb && cb({ ok: false });
-        await db.execute({ sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL WHERE id = ?', args: [messageId] });
+        await db.execute({ sql: 'UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL, sticker = NULL WHERE id = ?', args: [messageId] });
         await notifyGroupMembers(msg.group_id, 'message deleted', { messageId, isGroup: true });
       } else {
         const msg = await getMessageById(messageId);
         if (!msg || msg.from_user !== socket.username) return cb && cb({ ok: false });
-        await db.execute({ sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL WHERE id = ?', args: [messageId] });
+        await db.execute({ sql: 'UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL, sticker = NULL WHERE id = ?', args: [messageId] });
         const payload = { messageId, isGroup: false };
         findSocketsByUsername(msg.to_user).forEach(sid => io.to(sid).emit('message deleted', payload));
         socket.emit('message deleted', payload);
@@ -1023,14 +1103,19 @@ io.on('connection', (socket) => {
       socket.emit('group history', { groupId, messages });
     } catch (e) { console.error(e); }
   });
-  socket.on('group message', async ({ groupId, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo }) => {
+  socket.on('group message', async ({ groupId, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo, sticker }) => {
     if (!socket.username || !await isGroupMember(groupId, socket.username)) return;
+    if (!rateLimit('gm:' + socket.username, 30, 10_000)) { socket.emit('message blocked', { reason: 'Слишком часто в группах.' }); return; }
+    if (text && text.length > MAX_TEXT) return socket.emit('message blocked', { reason: 'Слишком длинное сообщение' });
+    if (image && !validImage(image)) return socket.emit('message blocked', { reason: 'Недопустимое изображение' });
+    if (voice && !validVoice(voice)) return socket.emit('message blocked', { reason: 'Недопустимое голосовое' });
+    if (videoCircle && !validVideo(videoCircle)) return socket.emit('message blocked', { reason: 'Недопустимый кружок' });
     try {
       const from = socket.username;
       const time = Date.now();
       const result = await db.execute({
-        sql: `INSERT INTO group_messages (group_id, from_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?)`,
-        args: [groupId, from, text || null, image || null, voice || null, voiceDuration || null, videoCircle || null, videoDuration || null, replyTo || null, time]
+        sql: `INSERT INTO group_messages (group_id, from_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, sticker, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?, ?)`,
+        args: [groupId, from, text || null, image || null, voice || null, voiceDuration || null, videoCircle || null, videoDuration || null, replyTo || null, sticker || null, time]
       });
       const msgId = Number(result.lastInsertRowid);
       let replyData = null;
@@ -1038,7 +1123,7 @@ io.on('connection', (socket) => {
         const r = await getGroupMessageById(replyTo);
         if (r) replyData = { id: r.id, from: r.from_user, text: r.text, image: !!r.image, voice: !!r.voice, deleted: !!r.deleted };
       }
-      const payload = { id: msgId, groupId, from, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions: {}, replyData, time, self: false };
+      const payload = { id: msgId, groupId, from, text, image, voice, voiceDuration, videoCircle, videoDuration, sticker, reactions: {}, replyData, time, self: false };
       await notifyGroupMembers(groupId, 'group message', payload);
       socket.emit('group message', { ...payload, self: true });
     } catch (e) { console.error(e); }
@@ -1101,38 +1186,33 @@ io.on('connection', (socket) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
       if (!image || typeof image !== 'string') return cb && cb({ ok: false, error: 'Нет картинки' });
-
       let imagePath = image;
       if (image.startsWith('data:image/')) {
         const m = image.match(/^data:image\/([a-z]+);base64,(.+)$/i);
         if (!m) return cb && cb({ ok: false, error: 'Неверный формат' });
         const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
         const buf = Buffer.from(m[2], 'base64');
-        if (buf.length > 5_000_000) return cb && cb({ ok: false, error: 'Слишком большая картинка (макс 5MB)' });
+        if (buf.length > 5_000_000) return cb && cb({ ok: false, error: 'Слишком большая картинка' });
         const fname = `${socket.username}_${Date.now()}.${ext}`;
         const fpath = path.join(STORIES_DIR, fname);
         fs.writeFileSync(fpath, buf);
         imagePath = '/stories/' + fname;
       }
-
       const now = Date.now();
       const expires = now + 24 * 60 * 60 * 1000;
       const cap = caption ? String(caption).slice(0, 200) : null;
-
       const r = await db.execute({
         sql: 'INSERT INTO stories (username, image, caption, time, expires_at) VALUES (?, ?, ?, ?, ?)',
         args: [socket.username, imagePath, cap, now, expires]
       });
       const storyId = Number(r.lastInsertRowid);
-
       const contactsR = await db.execute({ sql: 'SELECT owner FROM contacts WHERE contact = ?', args: [socket.username] });
       const payload = { id: storyId, username: socket.username, image: imagePath, caption: cap, time: now, expires_at: expires };
       contactsR.rows.forEach(row => {
         findSocketsByUsername(row.owner).forEach(sid => io.to(sid).emit('story new', payload));
       });
-
       cb && cb({ ok: true, id: storyId, image: imagePath });
-    } catch (e) { console.error('post story error:', e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
 
   socket.on('delete story', async ({ storyId }, cb) => {
@@ -1168,18 +1248,87 @@ io.on('connection', (socket) => {
   });
 
   // ═══════════════════════════════════════════
-  // 📞 ЗВОНКИ
+  // 🐱 СТИКЕРЫ (image + video/gif)
   // ═══════════════════════════════════════════
-  socket.on('call-user', async ({ to, offer, video }) => {
-    if (!socket.username) return;
-    if (await isBlockedEither(socket.username, to)) { socket.emit('call-failed', { reason: 'Пользователь заблокирован' }); return; }
-    const toSockets = findSocketsByUsername(to);
-    if (toSockets.length > 0) toSockets.forEach(sid => io.to(sid).emit('incoming-call', { from: socket.username, offer, video }));
-    else socket.emit('call-failed', { reason: 'Пользователь не в сети' });
+  socket.on('load stickers', async (cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, stickers: [] });
+      const rows = await getUserStickers(socket.username);
+      cb && cb({ ok: true, stickers: rows });
+    } catch (e) { console.error(e); cb && cb({ ok: false, stickers: [] }); }
   });
-  socket.on('answer-call', ({ to, answer }) => { if (!socket.username) return; findSocketsByUsername(to).forEach(sid => io.to(sid).emit('call-answered', { answer })); });
-  socket.on('ice-candidate', ({ to, candidate }) => { if (!socket.username) return; findSocketsByUsername(to).forEach(sid => io.to(sid).emit('ice-candidate', { candidate })); });
-  socket.on('end-call', ({ to }) => { if (!socket.username) return; findSocketsByUsername(to).forEach(sid => io.to(sid).emit('call-ended')); });
+
+  socket.on('add sticker', async ({ data, type, emoji }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      if (!data || typeof data !== 'string') return cb && cb({ ok: false, error: 'Нет данных' });
+      if (!validStickerData(data)) return cb && cb({ ok: false, error: 'Файл больше 4MB или неверный формат' });
+
+      let url = data;
+      // Если base64 — сохраняем в файл
+      if (data.startsWith('data:')) {
+        const m = data.match(/^data:(image|video)\/([a-z0-9+.-]+);base64,(.+)$/i);
+        if (!m) return cb && cb({ ok: false, error: 'Неверный формат' });
+        const kind = m[1];
+        const ext = m[2] === 'jpeg' ? 'jpg' : (m[2] === 'quicktime' ? 'mov' : m[2]);
+        const buf = Buffer.from(m[3], 'base64');
+        const fname = `sticker_${socket.username}_${Date.now()}.${ext}`;
+        const fpath = path.join(STICKERS_DIR, fname);
+        fs.writeFileSync(fpath, buf);
+        url = '/stickers/' + fname;
+        type = type || (kind === 'video' ? 'video' : 'image');
+      } else {
+        type = type || 'image';
+      }
+
+      const id = await addSticker(socket.username, url, type, emoji || null);
+      cb && cb({ ok: true, id, url, type });
+    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+  });
+
+  socket.on('delete sticker', async ({ id }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      await deleteSticker(id, socket.username);
+      cb && cb({ ok: true });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  socket.on('send sticker', async ({ to, groupId, url, type }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      if (!url) return cb && cb({ ok: false });
+      const from = socket.username;
+      const time = Date.now();
+      const stickerType = type || 'image';
+
+      if (groupId) {
+        if (!await isGroupMember(groupId, from)) return cb && cb({ ok: false });
+        const result = await db.execute({
+          sql: `INSERT INTO group_messages (group_id, from_user, sticker, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, '{}', NULL, 0, 0, ?)`,
+          args: [groupId, from, url, time]
+        });
+        const msgId = Number(result.lastInsertRowid);
+        const payload = { id: msgId, groupId, from, sticker: url, stickerType, reactions: {}, replyData: null, time, self: false };
+        await notifyGroupMembers(groupId, 'group message', payload);
+        socket.emit('group message', { ...payload, self: true });
+        cb && cb({ ok: true, id: msgId });
+      } else if (to) {
+        if (await isBlockedEither(from, to)) return cb && cb({ ok: false, error: 'Заблокирован' });
+        const result = await db.execute({
+          sql: `INSERT INTO messages (from_user, to_user, sticker, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, '{}', NULL, 0, 0, ?)`,
+          args: [from, to, url, time]
+        });
+        const msgId = Number(result.lastInsertRowid);
+        const payload = { id: msgId, from, to, sticker: url, stickerType, reactions: {}, replyData: null, time };
+        findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
+        socket.emit('private message', { ...payload, self: true });
+        cb && cb({ ok: true, id: msgId });
+      } else {
+        cb && cb({ ok: false });
+      }
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
 
   socket.on('disconnect', async () => {
     const u = socket.username;
