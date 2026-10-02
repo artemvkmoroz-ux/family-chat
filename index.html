@@ -62,7 +62,7 @@
   }
   body > * { position: relative; z-index: 1; }
 
-  /* ПРЕМИУМ-РЕЖИМ */
+  /* ПРЕМИУМ */
   body.premium .avatar { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
   body.premium .msg.self { box-shadow: 0 4px 16px rgba(168, 85, 247, 0.3); }
   body.premium .chat-badge { box-shadow: 0 0 12px var(--accent-glow); }
@@ -123,6 +123,7 @@
   body:not(.premium) .call-btn.hangup { background: #e53935; }
   body:not(.premium) .incoming-btn.accept { background: #22c55e; }
   body:not(.premium) .incoming-btn.decline { background: #e53935; }
+  body:not(.premium) .nav-btn.active .nav-icon { background: var(--accent); box-shadow: none; }
  
   /* СТАТУС СВЯЗИ */
   #conn-status {
@@ -260,6 +261,8 @@
   .msg .check.read { color: #60d394; }
   .msg .edited { font-size: 10px; opacity: 0.6; margin-right: 4px; }
   .msg img.photo { max-width: 100%; border-radius: 12px; display: block; margin-bottom: 4px; cursor: pointer; }
+  .msg .sticker-img { max-width: 140px; max-height: 140px; display: block; background: transparent; border-radius: 0; margin-bottom: 2px; }
+  .msg .sticker-video { max-width: 160px; max-height: 160px; display: block; border-radius: 12px; background: #000; margin-bottom: 2px; }
   .video-circle-wrap { display: inline-block; position: relative; margin-bottom: 4px; }
   .video-circle { width: 200px; height: 200px; border-radius: 50%; object-fit: cover; cursor: pointer; display: block; border: 3px solid var(--accent); background: #000; }
   .video-circle-wrap .video-play-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; border-radius: 50%; background: rgba(168, 85, 247, 0.85); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 24px; pointer-events: none; }
@@ -427,7 +430,7 @@
   .incoming-btn.accept { background: #22c55e; }
   .incoming-btn.decline { background: #e53935; }
 
-  /* ⬇ НОВОЕ: Кнопка «вниз» */
+  /* Кнопка «вниз» */
   #scroll-down-btn {
     position: absolute; right: 14px; bottom: 90px;
     width: 42px; height: 42px; border-radius: 50%;
@@ -444,7 +447,7 @@
     border-radius: 10px; padding: 0 6px;
   }
 
-  /* ⬇ НОВОЕ: НИЖНЯЯ ПАНЕЛЬ */
+  /* Нижняя панель */
   #bottom-nav {
     display: flex;
     justify-content: space-around;
@@ -494,10 +497,6 @@
     box-shadow: 0 4px 14px var(--accent-glow);
     transform: scale(1.05);
   }
-  body:not(.premium) .nav-btn.active .nav-icon {
-    background: var(--accent);
-    box-shadow: none;
-  }
   .nav-btn .nav-label { font-size: 11px; letter-spacing: 0.3px; }
   .nav-badge {
     position: absolute;
@@ -516,19 +515,10 @@
     pointer-events: none;
   }
 
-  /* ⬇ НОВОЕ: ВКЛАДКИ */
-  .app-tab {
-    display: none;
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 0 20px;
-    background: var(--bg-deep);
-  }
+  /* Вкладки */
+  .app-tab { display: none; flex: 1; overflow-y: auto; padding: 8px 0 20px; background: var(--bg-deep); }
   .app-tab.active { display: block; }
-  #tab-contacts .tab-search-wrap {
-    padding: 8px 14px 12px;
-    background: var(--bg-header);
-  }
+  #tab-contacts .tab-search-wrap { padding: 8px 14px 12px; background: var(--bg-header); }
   #contacts-search {
     width: 100%;
     padding: 11px 16px;
@@ -539,13 +529,7 @@
     font-size: 15px;
     outline: none;
   }
-  .tab-empty {
-    text-align: center;
-    color: var(--text-muted);
-    padding: 70px 20px;
-    font-size: 15px;
-    line-height: 1.5;
-  }
+  .tab-empty { text-align: center; color: var(--text-muted); padding: 70px 20px; font-size: 15px; line-height: 1.5; }
   .tab-empty .big { font-size: 56px; margin-bottom: 16px; }
   .tab-empty-sub { font-size: 13px; margin-top: 6px; opacity: 0.7; }
 
@@ -559,7 +543,7 @@
   #app[data-tab="contacts"] #stories-bar,
   #app[data-tab="settings"] #stories-bar { display: none; }
 
-  /* ⬇ НОВОЕ: ИСТОРИИ */
+  /* Истории */
   #stories-bar {
     display: none;
     padding: 12px 8px 10px;
@@ -568,219 +552,208 @@
     flex-shrink: 0;
   }
   #app[data-tab="chats"] #stories-bar { display: block; }
-  #stories-row {
-    display: flex;
-    gap: 10px;
-    overflow-x: auto;
-    padding: 0 6px 4px;
-    scrollbar-width: none;
-  }
+  #stories-row { display: flex; gap: 10px; overflow-x: auto; padding: 0 6px 4px; scrollbar-width: none; }
   #stories-row::-webkit-scrollbar { display: none; }
-  .story-bubble {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    min-width: 70px;
-    cursor: pointer;
-    user-select: none;
-    flex-shrink: 0;
-  }
-  .story-ring {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    padding: 3px;
-    background: linear-gradient(135deg, #a855f7, #ec4899, #fbbf24);
-    position: relative;
-    transition: transform 0.15s;
-  }
+  .story-bubble { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 70px; cursor: pointer; user-select: none; flex-shrink: 0; }
+  .story-ring { width: 64px; height: 64px; border-radius: 50%; padding: 3px; background: linear-gradient(135deg, #a855f7, #ec4899, #fbbf24); position: relative; transition: transform 0.15s; }
   .story-bubble:active .story-ring { transform: scale(0.92); }
   .story-ring.viewed { background: rgba(255,255,255,0.15); }
-  .story-ring.mine {
-    background: rgba(255,255,255,0.2);
-    border: 2px dashed var(--accent);
-  }
-  .story-ring.mine.has-story {
-    background: linear-gradient(135deg, #a855f7, #ec4899, #fbbf24);
-    border: none;
-  }
+  .story-ring.mine { background: rgba(255,255,255,0.2); border: 2px dashed var(--accent); }
+  .story-ring.mine.has-story { background: linear-gradient(135deg, #a855f7, #ec4899, #fbbf24); border: none; }
   .story-ring-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
+    width: 100%; height: 100%; border-radius: 50%;
     background: var(--bg-panel);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    font-weight: 700;
-    color: #fff;
-    background-size: cover;
-    background-position: center;
-    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700; color: #fff;
+    background-size: cover; background-position: center; overflow: hidden;
   }
   .story-ring .story-add-badge {
-    position: absolute;
-    bottom: -2px;
-    right: -2px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: #fff;
-    font-size: 14px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: absolute; bottom: -2px; right: -2px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: 14px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
     border: 2px solid var(--bg-header);
   }
   .story-bubble .story-name {
-    font-size: 11px;
-    color: var(--text-muted);
-    max-width: 70px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 11px; color: var(--text-muted);
+    max-width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     text-align: center;
   }
 
-  #story-viewer {
-    position: fixed;
-    inset: 0;
-    background: #000;
-    z-index: 9800;
-    display: none;
-    flex-direction: column;
-    user-select: none;
-  }
+  #story-viewer { position: fixed; inset: 0; background: #000; z-index: 9800; display: none; flex-direction: column; user-select: none; }
   #story-viewer.active { display: flex; }
-  #story-progress-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    gap: 4px;
-    padding: 10px 10px 8px;
-    z-index: 20;
-  }
-  .story-progress-segment {
-    flex: 1;
-    height: 3px;
-    background: rgba(255,255,255,0.3);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-  .story-progress-segment .fill {
-    height: 100%;
-    width: 0%;
-    background: #fff;
-  }
+  #story-progress-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; gap: 4px; padding: 10px 10px 8px; z-index: 20; }
+  .story-progress-segment { flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden; }
+  .story-progress-segment .fill { height: 100%; width: 0%; background: #fff; }
   .story-progress-segment.done .fill { width: 100%; }
-  #story-header {
-    position: absolute;
-    top: 22px;
-    left: 0;
-    right: 0;
-    padding: 8px 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    z-index: 20;
-    color: #fff;
-  }
+  #story-header { position: absolute; top: 22px; left: 0; right: 0; padding: 8px 14px; display: flex; align-items: center; gap: 10px; z-index: 20; color: #fff; }
   #story-header .story-avatar {
     width: 36px; height: 36px; border-radius: 50%;
     background: linear-gradient(135deg, #6d28d9, #a855f7);
     background-size: cover; background-position: center;
     display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 700;
-    flex-shrink: 0;
+    font-size: 14px; font-weight: 700; flex-shrink: 0;
   }
   #story-header .story-info { flex: 1; min-width: 0; }
   #story-header .story-name { font-weight: 700; font-size: 14px; }
   #story-header .story-time { font-size: 12px; opacity: 0.7; }
-  #story-header .story-close {
-    background: none; border: none; color: #fff;
-    font-size: 26px; cursor: pointer; padding: 4px 8px;
-  }
-  #story-image-wrap {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-  }
-  #story-image {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-  }
+  #story-header .story-close { background: none; border: none; color: #fff; font-size: 26px; cursor: pointer; padding: 4px 8px; }
+  #story-image-wrap { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  #story-image { max-width: 100%; max-height: 100%; object-fit: contain; }
   #story-caption {
-    position: absolute;
-    bottom: 70px;
-    left: 20px;
-    right: 20px;
-    color: #fff;
-    text-align: center;
-    font-size: 15px;
-    background: rgba(0,0,0,0.5);
-    padding: 10px 16px;
-    border-radius: 14px;
-    backdrop-filter: blur(10px);
-    display: none;
+    position: absolute; bottom: 70px; left: 20px; right: 20px;
+    color: #fff; text-align: center; font-size: 15px;
+    background: rgba(0,0,0,0.5); padding: 10px 16px; border-radius: 14px;
+    backdrop-filter: blur(10px); display: none;
   }
   #story-caption.show { display: block; }
-  #story-nav-left, #story-nav-right {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 35%;
-    cursor: pointer;
-    z-index: 15;
-  }
+  #story-nav-left, #story-nav-right { position: absolute; top: 0; bottom: 0; width: 35%; cursor: pointer; z-index: 15; }
   #story-nav-left { left: 0; }
   #story-nav-right { right: 0; }
   #story-bottom {
     padding: 14px 20px calc(20px + var(--safe-bottom));
     background: linear-gradient(0deg, rgba(0,0,0,0.85), transparent);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    z-index: 20;
+    display: flex; align-items: center; gap: 12px; z-index: 20;
   }
   #story-views-btn {
-    flex: 1;
-    background: rgba(255,255,255,0.15);
-    border: none;
-    color: #fff;
-    padding: 10px 16px;
-    border-radius: 14px;
-    font-size: 14px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    justify-content: center;
+    flex: 1; background: rgba(255,255,255,0.15); border: none; color: #fff;
+    padding: 10px 16px; border-radius: 14px; font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; justify-content: center;
   }
-  .story-action-btn {
-    background: rgba(255,255,255,0.15);
-    border: none;
-    color: #fff;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    font-size: 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+  .story-action-btn { background: rgba(255,255,255,0.15); border: none; color: #fff; width: 44px; height: 44px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .story-action-btn.danger { background: rgba(239,68,68,0.3); }
   #story-viewers-list { max-height: 60vh; overflow-y: auto; margin-bottom: 12px; }
+
+  /* 🐱 СТИКЕРЫ И GIF */
+  #stickers-panel {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 48vh;
+    max-height: 420px;
+    background: var(--bg-header);
+    border-top: var(--glass-border);
+    border-radius: 20px 20px 0 0;
+    z-index: 480;
+    display: none;
+    flex-direction: column;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
+  }
+  #stickers-panel.active { display: flex; }
+  #stickers-close {
+    position: absolute;
+    top: 8px; right: 10px;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--bg-input-inner);
+    border: none;
+    color: inherit;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+  }
+  #stickers-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 10px 50px 8px 12px;
+    border-bottom: var(--glass-border);
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 0;
+  }
+  #stickers-tabs::-webkit-scrollbar { display: none; }
+  .sticker-tab {
+    padding: 8px 14px;
+    background: var(--bg-input-inner);
+    border: none;
+    color: var(--text-muted);
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-family: inherit;
+  }
+  .sticker-tab.active { background: var(--accent); color: #fff; }
+  #stickers-search-wrap { padding: 8px 12px; flex-shrink: 0; }
+  #stickers-search {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-input-inner);
+    border: var(--glass-border);
+    border-radius: 12px;
+    color: inherit;
+    font-size: 14px;
+    outline: none;
+  }
+  #stickers-content { flex: 1; overflow-y: auto; padding: 8px 12px 16px; }
+  .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .sticker-item {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    background: var(--bg-input-inner);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    transition: transform 0.1s;
+  }
+  .sticker-item:active { transform: scale(0.92); }
+  .sticker-item img, .sticker-item video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+  .sticker-item .sticker-del {
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(239,68,68,0.9);
+    color: #fff;
+    font-size: 12px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .sticker-item:hover .sticker-del { display: flex; }
+  .sticker-empty { text-align: center; color: var(--text-muted); padding: 40px 20px; font-size: 14px; line-height: 1.6; }
+  .sticker-add-btn {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    background: var(--bg-input-inner);
+    border: 2px dashed var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: var(--accent);
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 700;
+  }
+  .sticker-type-badge {
+    position: absolute;
+    bottom: 4px; right: 4px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: 700;
+  }
+
+  /* Модалка для вставки GIF по URL */
+  #gif-url-modal .modal-box { max-width: 380px; }
 </style>
 </head>
 <body>
@@ -986,7 +959,17 @@
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal')">Отмена</button>
 </div></div>
 
-<!-- 📸 ИСТОРИИ — просмотр -->
+<!-- 🎬 GIF ПО URL -->
+<div class="modal" id="gif-url-modal"><div class="modal-box">
+  <h3>🎬 GIF по ссылке</h3>
+  <div class="modal-desc">Вставь ссылку на GIF (Giphy, Tenor и т.д.)</div>
+  <input id="gif-url-input" placeholder="https://media.giphy.com/..." autocapitalize="none" />
+  <div class="modal-error" id="gif-url-error"></div>
+  <button class="modal-primary" onclick="submitGifUrl()">Сохранить</button>
+  <button class="modal-secondary" onclick="closeModal('gif-url-modal')">Отмена</button>
+</div></div>
+
+<!-- 📸 ИСТОРИИ -->
 <div id="story-viewer">
   <div id="story-progress-bar"></div>
   <div id="story-header">
@@ -1086,7 +1069,7 @@
     <div id="tab-settings-content"></div>
   </div>
 
-  <!-- 🔵 НИЖНЯЯ ПАНЕЛЬ: 4 КРУГЛЫЕ КНОПКИ -->
+  <!-- 🔵 НИЖНЯЯ ПАНЕЛЬ -->
   <div id="bottom-nav">
     <button class="nav-btn active" data-tab="chats" onclick="switchTab('chats')">
       <span class="nav-icon">💬</span>
@@ -1139,13 +1122,32 @@
   <div id="reply-preview"><div class="rp-text"><div class="rp-name" id="rp-name">—</div><div class="rp-msg" id="rp-msg">—</div></div><button class="rp-close" onclick="cancelReply()">✕</button></div>
   <div id="input-area">
     <button class="attach" onclick="document.getElementById('photoFile').click()">📎</button>
+    <button class="attach" id="stickersBtn" onclick="toggleStickersPanel()" title="Стикеры и GIF">😀</button>
     <input type="file" id="photoFile" accept="image/*" style="display:none" onchange="sendPhoto(event)" />
     <input id="msgInput" placeholder="Сообщение" onkeydown="if(event.key==='Enter')sendMsg()" oninput="onInputTyping()" />
     <button class="camera" id="circleBtn" onclick="startCircleRecording()">🎥</button>
     <button class="mic" id="micBtnInput" onclick="toggleVoiceRecording()">🎤</button>
     <button id="send-btn" onclick="sendMsg()">➤</button>
   </div>
+
+  <!-- 🐱 ПАНЕЛЬ СТИКЕРОВ -->
+  <div id="stickers-panel">
+    <button id="stickers-close" onclick="closeStickersPanel()">×</button>
+    <div id="stickers-tabs">
+      <button class="sticker-tab active" data-tab="recent" onclick="switchStickerTab('recent')">🕐 Недавние</button>
+      <button class="sticker-tab" data-tab="my" onclick="switchStickerTab('my')">🐱 Мои</button>
+      <button class="sticker-tab" data-tab="gif" onclick="switchStickerTab('gif')">🎬 GIF</button>
+    </div>
+    <div id="stickers-search-wrap">
+      <input id="stickers-search" placeholder="Поиск стикеров и GIF..." oninput="onStickerSearch()" />
+    </div>
+    <div id="stickers-content"></div>
+  </div>
 </div>
+
+<!-- Скрытые input для загрузки стикеров -->
+<input type="file" id="stickerFileImage" accept="image/*" style="display:none" onchange="uploadSticker(event, 'image')" />
+<input type="file" id="stickerFileVideo" accept="video/*" style="display:none" onchange="uploadSticker(event, 'video')" />
 
 <!-- МЕНЮ РЕАКЦИЙ -->
 <div id="reaction-menu">
@@ -1250,6 +1252,7 @@ const CREDS_KEY = 'aurora-creds';
 const UNREAD_KEY = 'aurora-unread';
 const CONTACTS_CACHE_KEY = 'aurora-contacts-cache';
 const GROUPS_CACHE_KEY = 'aurora-groups-cache';
+const RECENT_STICKERS_KEY = 'aurora-recent-stickers';
 
 function toggleAuthMode() {
   authMode = authMode === 'login' ? 'register' : 'login';
@@ -1905,6 +1908,7 @@ function openChat(name) {
   setTimeout(() => socket.emit('mark read', { withUser: name }), 300);
   renderChatList(); updateTopStatusTyping();
   bindScrollDown();
+  closeStickersPanel();
 }
 function openSavedChat() {
   currentChat = null; currentGroup = null; isSavedChat = true;
@@ -1922,6 +1926,7 @@ function openSavedChat() {
   socket.emit('load saved history');
   renderChatList();
   bindScrollDown();
+  closeStickersPanel();
 }
 function openGroupChat(g) {
   currentGroup = g; currentChat = null; isSavedChat = false;
@@ -1943,6 +1948,7 @@ function openGroupChat(g) {
   else document.getElementById('pinned-bar').classList.remove('active');
   renderChatList();
   bindScrollDown();
+  closeStickersPanel();
 }
 function closeChat() {
   if (currentChat) socket.emit('typing', { to: currentChat, isTyping: false });
@@ -1952,6 +1958,7 @@ function closeChat() {
   currentChat = null; currentGroup = null; isSavedChat = false;
   if (isRecording) stopVoiceRecording(true);
   hideReactionMenu(); hideActionMenu(); cancelReply();
+  closeStickersPanel();
   renderChatList();
 }
 function clearUnread(key) { if (unread[key]) { delete unread[key]; saveUnread(); updateTitle(); renderChatList(); } }
@@ -2007,7 +2014,6 @@ function bumpScrollDownBadge() {
 const SWIPE_THRESHOLD = 60;
 function bindSwipeReply(msgDiv, wrap, msg) {
   if (msg.deleted) return;
-
   const icon = document.createElement('div');
   icon.className = 'swipe-reply-icon';
   icon.textContent = '↩';
@@ -2022,12 +2028,10 @@ function bindSwipeReply(msgDiv, wrap, msg) {
     isDragging = true; locked = false;
     wrap.classList.remove('swipe-ready');
   };
-
   const onMove = (x, y) => {
     if (!isDragging) return;
     const dx = x - startX;
     const dy = y - startY;
-
     if (!locked) {
       if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
         isDragging = false;
@@ -2035,91 +2039,306 @@ function bindSwipeReply(msgDiv, wrap, msg) {
         wrap.classList.remove('swiping', 'swipe-active', 'swipe-ready');
         return;
       }
-      if (Math.abs(dx) > 8) {
-        locked = true;
-        wrap.classList.add('swiping');
-      } else {
-        return;
-      }
+      if (Math.abs(dx) > 8) { locked = true; wrap.classList.add('swiping'); }
+      else return;
     }
-
     let d = dx;
     if (isSelf && d > 0) d = 0;
     if (!isSelf && d < 0) d = 0;
-
     const max = 90;
     if (Math.abs(d) > max) d = (d > 0 ? max : -max);
-
     currentX = d;
     wrap.style.transform = `translateX(${d}px)`;
-
     if (Math.abs(d) > 5) wrap.classList.add('swipe-active');
     if (Math.abs(d) >= SWIPE_THRESHOLD) wrap.classList.add('swipe-ready');
     else wrap.classList.remove('swipe-ready');
   };
-
   const onEnd = () => {
     if (!isDragging) return;
     isDragging = false;
-
-    if (Math.abs(currentX) >= SWIPE_THRESHOLD) {
-      triggerReplyFromSwipe(msg);
-    }
+    if (Math.abs(currentX) >= SWIPE_THRESHOLD) triggerReplyFromSwipe(msg);
     wrap.style.transform = '';
     wrap.classList.remove('swiping', 'swipe-active', 'swipe-ready');
     locked = false;
   };
 
-  msgDiv.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) return;
-    onStart(e.touches[0].clientX, e.touches[0].clientY);
-  }, { passive: true });
-
-  msgDiv.addEventListener('touchmove', (e) => {
-    if (!isDragging) return;
-    if (e.touches.length !== 1) return;
-    onMove(e.touches[0].clientX, e.touches[0].clientY);
-    if (locked) { try { e.preventDefault(); } catch (err) {} }
-  }, { passive: false });
-
+  msgDiv.addEventListener('touchstart', (e) => { if (e.touches.length !== 1) return; onStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+  msgDiv.addEventListener('touchmove', (e) => { if (!isDragging || e.touches.length !== 1) return; onMove(e.touches[0].clientX, e.touches[0].clientY); if (locked) { try { e.preventDefault(); } catch (err) {} } }, { passive: false });
   msgDiv.addEventListener('touchend', onEnd);
   msgDiv.addEventListener('touchcancel', onEnd);
-
-  msgDiv.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
-    onStart(e.clientX, e.clientY);
-  });
-  window.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-    onMove(e.clientX, e.clientY);
-  });
-  window.addEventListener('mouseup', () => {
-    if (!isDragging) return;
-    onEnd();
-  });
+  msgDiv.addEventListener('mousedown', (e) => { if (e.button !== 0) return; onStart(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', (e) => { if (!isDragging) return; onMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', () => { if (!isDragging) return; onEnd(); });
 }
-
 function triggerReplyFromSwipe(msg) {
   if (!msg) return;
   replyToMessage = {
-    id: msg.id,
-    from: msg.from,
-    text: msg.text,
-    image: msg.image,
-    voice: msg.voice,
-    videoCircle: msg.videoCircle,
-    self: msg.self,
-    isGroup: msg.isGroup
+    id: msg.id, from: msg.from, text: msg.text, image: msg.image,
+    voice: msg.voice, videoCircle: msg.videoCircle, sticker: msg.sticker,
+    self: msg.self, isGroup: msg.isGroup
   };
   const name = msg.self ? 'Я' : displayNameForUser(msg.from);
-  let preview = msg.text || (msg.image ? '📷 Фото' : (msg.voice ? '🎤 Голосовое' : (msg.videoCircle ? '🎥 Кружок' : '')));
+  let preview = msg.text || (msg.sticker ? 'Стикер' : (msg.image ? '📷 Фото' : (msg.voice ? '🎤 Голосовое' : (msg.videoCircle ? '🎥 Кружок' : ''))));
   document.getElementById('rp-name').textContent = name;
   document.getElementById('rp-msg').textContent = preview;
   document.getElementById('reply-preview').classList.add('active');
   document.getElementById('msgInput').focus();
-  if (settings.vibration != 0 && 'vibrate' in navigator) {
-    try { navigator.vibrate(15); } catch (e) {}
+  if (settings.vibration != 0 && 'vibrate' in navigator) { try { navigator.vibrate(15); } catch (e) {} }
+}
+
+// ═══════════════════════════════════════════
+// 🐱 СТИКЕРЫ И GIF
+// ═══════════════════════════════════════════
+let stickersData = [];
+let stickerRecent = [];
+let stickerCurrentTab = 'recent';
+let stickerSearchQuery = '';
+
+const BUILTIN_GIFS = [
+  { emoji: '😀', url: 'https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif' },
+  { emoji: '😍', url: 'https://media.giphy.com/media/3o6Zt6ML6BklcajjsA/giphy.gif' },
+  { emoji: '😂', url: 'https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif' },
+  { emoji: '😎', url: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif' },
+  { emoji: '👍', url: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif' },
+  { emoji: '❤️', url: 'https://media.giphy.com/media/l4pTfx2qLszoacZRS/giphy.gif' },
+  { emoji: '🔥', url: 'https://media.giphy.com/media/3o7bu3XilJ5BOiSGic/giphy.gif' },
+  { emoji: '🎉', url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif' },
+  { emoji: '🤔', url: 'https://media.giphy.com/media/3o7aCSPqXE5C6T8tBC/giphy.gif' },
+  { emoji: '😢', url: 'https://media.giphy.com/media/d2lcHJTG5Tscg/giphy.gif' },
+  { emoji: '🙈', url: 'https://media.giphy.com/media/3o7qDEq2bMbcbPRQ2c/giphy.gif' },
+  { emoji: '🚀', url: 'https://media.giphy.com/media/3o7TKu8av7E0e1dFS0/giphy.gif' },
+  { emoji: '🐱', url: 'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif' },
+  { emoji: '🐶', url: 'https://media.giphy.com/media/mCRJDo24UvJMA/giphy.gif' },
+  { emoji: '🍕', url: 'https://media.giphy.com/media/3o7abAHdYvZdBNnGZq/giphy.gif' },
+  { emoji: '👏', url: 'https://media.giphy.com/media/7rj2ZgttvgomY/giphy.gif' }
+];
+
+function loadStickerRecent() { try { const r = localStorage.getItem(RECENT_STICKERS_KEY); stickerRecent = r ? JSON.parse(r) : []; } catch (e) { stickerRecent = []; } }
+function saveStickerRecent() { try { localStorage.setItem(RECENT_STICKERS_KEY, JSON.stringify(stickerRecent.slice(0, 30))); } catch (e) {} }
+function pushStickerRecent(url) { stickerRecent = stickerRecent.filter(x => x !== url); stickerRecent.unshift(url); saveStickerRecent(); }
+
+function toggleStickersPanel() {
+  const p = document.getElementById('stickers-panel');
+  if (!p) return;
+  if (p.classList.contains('active')) closeStickersPanel();
+  else openStickersPanel();
+}
+function openStickersPanel() {
+  const p = document.getElementById('stickers-panel');
+  if (!p) return;
+  loadStickerRecent();
+  p.classList.add('active');
+  socket.emit('load stickers', (res) => {
+    if (res && res.ok) stickersData = res.stickers || [];
+    renderStickersContent();
+  });
+  renderStickersContent();
+}
+function closeStickersPanel() {
+  const p = document.getElementById('stickers-panel');
+  if (p) p.classList.remove('active');
+}
+function switchStickerTab(tab) {
+  stickerCurrentTab = tab;
+  document.querySelectorAll('.sticker-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  renderStickersContent();
+}
+function onStickerSearch() {
+  stickerSearchQuery = (document.getElementById('stickers-search')?.value || '').trim().toLowerCase();
+  renderStickersContent();
+}
+
+function renderStickersContent() {
+  const box = document.getElementById('stickers-content');
+  if (!box) return;
+  const q = stickerSearchQuery;
+
+  if (stickerCurrentTab === 'recent') {
+    if (stickerRecent.length === 0) {
+      box.innerHTML = `<div class="sticker-empty">🕐<br><br>Здесь будут стикеры,<br>которые ты недавно отправлял</div>`;
+      return;
+    }
+    const filtered = stickerRecent.filter(u => !q || u.toLowerCase().includes(q));
+    if (filtered.length === 0) { box.innerHTML = `<div class="sticker-empty">Ничего не найдено</div>`; return; }
+    renderStickerGrid(box, filtered, false);
+    return;
   }
+
+  if (stickerCurrentTab === 'my') {
+    let items = stickersData;
+    if (q) items = items.filter(s => (s.emoji || '').toLowerCase().includes(q) || (s.url || '').toLowerCase().includes(q));
+    box.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.className = 'sticker-grid';
+
+    // Кнопка «+» — выбор типа
+    const addBtn = document.createElement('button');
+    addBtn.className = 'sticker-add-btn';
+    addBtn.textContent = '+';
+    addBtn.title = 'Загрузить стикер';
+    addBtn.onclick = () => {
+      const choice = confirm('OK — загрузить видео (MP4/WebM → GIF), Отмена — загрузить картинку');
+      if (choice) document.getElementById('stickerFileVideo').click();
+      else document.getElementById('stickerFileImage').click();
+    };
+    grid.appendChild(addBtn);
+
+    items.forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'sticker-item';
+      const isVideo = s.type === 'video';
+      let media = '';
+      if (isVideo) {
+        media = `<video src="${escapeHtml(s.url)}" autoplay loop muted playsinline></video>`;
+      } else {
+        media = `<img src="${escapeHtml(s.url)}" alt="">`;
+      }
+      const badge = isVideo ? '<span class="sticker-type-badge">GIF</span>' : '';
+      div.innerHTML = `${media}${badge}<button class="sticker-del" onclick="event.stopPropagation(); removeSticker(${s.id})">×</button>`;
+      div.onclick = () => sendSticker(s.url, s.type);
+      grid.appendChild(div);
+    });
+    box.appendChild(grid);
+    if (items.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'sticker-empty';
+      empty.textContent = 'Пока нет своих стикеров. Нажми «+»';
+      box.appendChild(empty);
+    }
+    return;
+  }
+
+  if (stickerCurrentTab === 'gif') {
+    let items = BUILTIN_GIFS;
+    if (q) items = items.filter(g => g.emoji.toLowerCase().includes(q));
+    if (items.length === 0) { box.innerHTML = `<div class="sticker-empty">Ничего не найдено</div>`; return; }
+    // Кнопка «+» для добавления GIF по URL
+    box.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.className = 'sticker-grid';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'sticker-add-btn';
+    addBtn.textContent = '+';
+    addBtn.title = 'Добавить GIF по URL';
+    addBtn.onclick = () => {
+      document.getElementById('gif-url-input').value = '';
+      document.getElementById('gif-url-error').textContent = '';
+      openModal('gif-url-modal');
+    };
+    grid.appendChild(addBtn);
+    items.forEach(g => {
+      const div = document.createElement('div');
+      div.className = 'sticker-item';
+      const isMp4 = /\.(mp4|webm)(\?|$)/i.test(g.url);
+      if (isMp4) div.innerHTML = `<video src="${escapeHtml(g.url)}" autoplay loop muted playsinline></video>`;
+      else div.innerHTML = `<img src="${escapeHtml(g.url)}" alt="">`;
+      div.onclick = () => sendSticker(g.url, isMp4 ? 'video' : 'image');
+      grid.appendChild(div);
+    });
+    box.appendChild(grid);
+    return;
+  }
+}
+function renderStickerGrid(box, urls, withDelete) {
+  box.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'sticker-grid';
+  urls.forEach(url => {
+    const div = document.createElement('div');
+    div.className = 'sticker-item';
+    const isMp4 = /\.(mp4|webm)(\?|$)/i.test(url);
+    if (isMp4) div.innerHTML = `<video src="${escapeHtml(url)}" autoplay loop muted playsinline></video>`;
+    else div.innerHTML = `<img src="${escapeHtml(url)}" alt="">`;
+    div.onclick = () => sendSticker(url, isMp4 ? 'video' : 'image');
+    grid.appendChild(div);
+  });
+  box.appendChild(grid);
+}
+
+function sendSticker(url, type) {
+  if (!url) return;
+  const payload = { url, type: type || 'image' };
+  let done = false;
+  const cb = (res) => {
+    if (done) return;
+    done = true;
+    if (res && res.ok) {
+      pushStickerRecent(url);
+      closeStickersPanel();
+    } else {
+      alert(res?.error || 'Ошибка отправки');
+    }
+  };
+  if (isSavedChat) { socket.emit('send sticker', { ...payload, to: myName }, cb); return; }
+  if (currentChat) { socket.emit('send sticker', { ...payload, to: currentChat }, cb); return; }
+  if (currentGroup) { socket.emit('send sticker', { ...payload, groupId: currentGroup.id }, cb); return; }
+}
+
+function uploadSticker(event, kind) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const isVideo = kind === 'video';
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    if (isVideo) {
+      // Видео — отправляем как есть, сервер сам сохранит
+      const sizeMB = file.size / 1024 / 1024;
+      if (sizeMB > 4) { alert('Видео больше 4 МБ'); return; }
+      socket.emit('add sticker', { data: e.target.result, type: 'video' }, (res) => {
+        if (!res || !res.ok) { alert(res?.error || 'Ошибка'); return; }
+        stickersData.unshift({ id: res.id, url: res.url, type: 'video', emoji: null, time: Date.now() });
+        renderStickersContent();
+      });
+      return;
+    }
+    // Картинка — сжимаем
+    const img = new Image();
+    img.onload = () => {
+      const maxSize = 512;
+      let w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = h * maxSize / w; w = maxSize; }
+        else { w = w * maxSize / h; h = maxSize; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const isPng = /\.png$/i.test(file.name);
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.9);
+      socket.emit('add sticker', { data: dataUrl, type: 'image' }, (res) => {
+        if (!res || !res.ok) { alert(res?.error || 'Ошибка'); return; }
+        stickersData.unshift({ id: res.id, url: res.url, type: 'image', emoji: null, time: Date.now() });
+        renderStickersContent();
+      });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function removeSticker(id) {
+  if (!confirm('Удалить стикер?')) return;
+  socket.emit('delete sticker', { id }, (res) => {
+    if (!res || !res.ok) return;
+    stickersData = stickersData.filter(s => s.id !== id);
+    renderStickersContent();
+  });
+}
+
+function submitGifUrl() {
+  const url = document.getElementById('gif-url-input').value.trim();
+  const errEl = document.getElementById('gif-url-error');
+  errEl.textContent = '';
+  if (!url) { errEl.textContent = 'Введи ссылку'; return; }
+  if (!/^https?:\/\//i.test(url)) { errEl.textContent = 'Ссылка должна начинаться с http:// или https://'; return; }
+  socket.emit('add sticker', { data: url, type: /\.(mp4|webm)(\?|$)/i.test(url) ? 'video' : 'image' }, (res) => {
+    if (!res || !res.ok) { errEl.textContent = res?.error || 'Ошибка'; return; }
+    stickersData.unshift({ id: res.id, url: res.url, type: res.type || 'image', emoji: null, time: Date.now() });
+    closeModal('gif-url-modal');
+    if (stickerCurrentTab !== 'my') switchStickerTab('my');
+    else renderStickersContent();
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -2220,7 +2439,6 @@ function submitStory() {
   errEl.textContent = '';
   document.getElementById('story-submit-btn').disabled = true;
   document.getElementById('story-submit-btn').textContent = 'Публикую…';
-
   socket.emit('post story', { image: window._storyImageData, caption }, (res) => {
     document.getElementById('story-submit-btn').textContent = '📤 Опубликовать';
     document.getElementById('story-submit-btn').disabled = false;
@@ -2302,10 +2520,7 @@ function renderCurrentStory() {
   } else {
     delBtn.style.display = 'none';
     viewsBtn.style.display = 'none';
-    if (!s.viewed) {
-      s.viewed = true;
-      socket.emit('view story', { storyId: s.id });
-    }
+    if (!s.viewed) { s.viewed = true; socket.emit('view story', { storyId: s.id }); }
   }
 }
 
@@ -2320,36 +2535,26 @@ function startStoryTimer() {
     const elapsed = Date.now() - storyTimerStart;
     const pct = Math.min(100, (elapsed / STORY_DURATION) * 100);
     if (fill) fill.style.width = pct + '%';
-    if (elapsed >= STORY_DURATION) {
-      nextStory();
-      return;
-    }
+    if (elapsed >= STORY_DURATION) { nextStory(); return; }
     storyTimer = requestAnimationFrame(tick);
   };
   storyTimer = requestAnimationFrame(tick);
 }
-function stopStoryTimer() {
-  if (storyTimer) { cancelAnimationFrame(storyTimer); storyTimer = null; }
-}
+function stopStoryTimer() { if (storyTimer) { cancelAnimationFrame(storyTimer); storyTimer = null; } }
 
 function nextStory() {
   const u = storiesUsers[currentStoryUserIdx];
   if (!u) return closeStoryViewer();
   if (currentStoryIdx + 1 < u.stories.length) {
     currentStoryIdx++;
-    renderCurrentStory();
-    startStoryTimer();
+    renderCurrentStory(); startStoryTimer();
   } else {
     let nextUserIdx = currentStoryUserIdx + 1;
     while (nextUserIdx < storiesUsers.length && storiesUsers[nextUserIdx].username === myName) nextUserIdx++;
     if (nextUserIdx < storiesUsers.length) {
-      currentStoryUserIdx = nextUserIdx;
-      currentStoryIdx = 0;
-      renderCurrentStory();
-      startStoryTimer();
-    } else {
-      closeStoryViewer();
-    }
+      currentStoryUserIdx = nextUserIdx; currentStoryIdx = 0;
+      renderCurrentStory(); startStoryTimer();
+    } else closeStoryViewer();
   }
 }
 
@@ -2358,20 +2563,15 @@ function prevStory() {
   if (!u) return;
   if (currentStoryIdx > 0) {
     currentStoryIdx--;
-    renderCurrentStory();
-    startStoryTimer();
+    renderCurrentStory(); startStoryTimer();
   } else {
     let prevUserIdx = currentStoryUserIdx - 1;
     while (prevUserIdx >= 0 && storiesUsers[prevUserIdx].username === myName) prevUserIdx--;
     if (prevUserIdx >= 0) {
       currentStoryUserIdx = prevUserIdx;
       currentStoryIdx = storiesUsers[prevUserIdx].stories.length - 1;
-      renderCurrentStory();
-      startStoryTimer();
-    } else {
-      renderCurrentStory();
-      startStoryTimer();
-    }
+      renderCurrentStory(); startStoryTimer();
+    } else { renderCurrentStory(); startStoryTimer(); }
   }
 }
 
@@ -2390,14 +2590,11 @@ function deleteCurrentStory() {
   socket.emit('delete story', { storyId: s.id }, (res) => {
     if (!res.ok) { alert(res.error || 'Ошибка'); return; }
     u.stories.splice(currentStoryIdx, 1);
-    if (u.stories.length === 0) {
-      storiesUsers.splice(currentStoryUserIdx, 1);
-    }
+    if (u.stories.length === 0) storiesUsers.splice(currentStoryUserIdx, 1);
     if (storiesUsers.length === 0) return closeStoryViewer();
     if (currentStoryUserIdx >= storiesUsers.length) currentStoryUserIdx = storiesUsers.length - 1;
     if (currentStoryIdx >= storiesUsers[currentStoryUserIdx].stories.length) currentStoryIdx = 0;
-    renderCurrentStory();
-    startStoryTimer();
+    renderCurrentStory(); startStoryTimer();
   });
 }
 
@@ -2433,8 +2630,7 @@ socket.on('story deleted', ({ storyId }) => {
   renderStoriesBar();
   if (document.getElementById('story-viewer').classList.contains('active')) {
     if (!storiesUsers[currentStoryUserIdx]) return closeStoryViewer();
-    renderCurrentStory();
-    startStoryTimer();
+    renderCurrentStory(); startStoryTimer();
   }
 });
 
@@ -2453,36 +2649,28 @@ function openChatMenuV2() {
   document.getElementById('chat-menu-archive').textContent = isArchived ? '📤 Убрать из архива' : '📦 В архив';
   openModal('chat-menu-modal');
 }
-function chatMenuToggleMute() {
-  const key = currentChatKey();
-  if (!key) return;
-  socket.emit('toggle mute', { chatKey: key }, () => closeModal('chat-menu-modal'));
-}
-function chatMenuToggleArchive() {
-  const key = currentChatKey();
-  if (!key) return;
-  socket.emit('toggle archive', { chatKey: key }, () => closeModal('chat-menu-modal'));
-}
+function chatMenuToggleMute() { const key = currentChatKey(); if (!key) return; socket.emit('toggle mute', { chatKey: key }, () => closeModal('chat-menu-modal')); }
+function chatMenuToggleArchive() { const key = currentChatKey(); if (!key) return; socket.emit('toggle archive', { chatKey: key }, () => closeModal('chat-menu-modal')); }
 
 socket.on('history', ({ withUser, messages }) => {
   if (withUser !== currentChat && !galleryWaiting) return;
   if (galleryWaiting) { fillGallery(messages); galleryWaiting = false; return; }
   const box = document.getElementById('messages'); box.innerHTML = ''; lastDateShown = '';
-  messages.forEach(m => { renderMessage({ id: m.id, from: m.from_user, to: m.to_user, text: m.text, image: m.image, voice: m.voice, voiceDuration: m.voice_duration, videoCircle: m.video_circle, videoDuration: m.video_duration, reactions: m.reactions || {}, time: m.time, self: m.from_user === myName, replyData: m.replyData, edited: !!m.edited, deleted: !!m.deleted, read: !!m.read_at }); });
+  messages.forEach(m => { renderMessage({ id: m.id, from: m.from_user, to: m.to_user, text: m.text, image: m.image, sticker: m.sticker, voice: m.voice, voiceDuration: m.voice_duration, videoCircle: m.video_circle, videoDuration: m.video_duration, reactions: m.reactions || {}, time: m.time, self: m.from_user === myName, replyData: m.replyData, edited: !!m.edited, deleted: !!m.deleted, read: !!m.read_at }); });
   box.scrollTop = box.scrollHeight;
 });
 socket.on('saved history', ({ messages }) => {
   if (galleryWaiting) { fillGallery(messages); galleryWaiting = false; return; }
   if (!isSavedChat) return;
   const box = document.getElementById('messages'); box.innerHTML = ''; lastDateShown = '';
-  messages.forEach(m => { renderMessage({ id: m.id, from: m.from_user, to: m.to_user, text: m.text, image: m.image, voice: m.voice, voiceDuration: m.voice_duration, videoCircle: m.video_circle, videoDuration: m.video_duration, reactions: m.reactions || {}, time: m.time, self: true, replyData: m.replyData, edited: !!m.edited, deleted: !!m.deleted }); });
+  messages.forEach(m => { renderMessage({ id: m.id, from: m.from_user, to: m.to_user, text: m.text, image: m.image, sticker: m.sticker, voice: m.voice, voiceDuration: m.voice_duration, videoCircle: m.video_circle, videoDuration: m.video_duration, reactions: m.reactions || {}, time: m.time, self: true, replyData: m.replyData, edited: !!m.edited, deleted: !!m.deleted }); });
   box.scrollTop = box.scrollHeight;
 });
 socket.on('group history', ({ groupId, messages }) => {
   if (galleryWaiting) { fillGallery(messages); galleryWaiting = false; return; }
   if (!currentGroup || currentGroup.id !== groupId) return;
   const box = document.getElementById('messages'); box.innerHTML = ''; lastDateShown = '';
-  messages.forEach(m => { renderMessage({ id: m.id, from: m.from_user, text: m.text, image: m.image, voice: m.voice, voiceDuration: m.voice_duration, videoCircle: m.video_circle, videoDuration: m.video_duration, reactions: m.reactions || {}, time: m.time, self: m.from_user === myName, senderName: displayNameForUser(m.from_user), isGroup: true, replyData: m.replyData, edited: !!m.edited, deleted: !!m.deleted }); });
+  messages.forEach(m => { renderMessage({ id: m.id, from: m.from_user, text: m.text, image: m.image, sticker: m.sticker, voice: m.voice, voiceDuration: m.voice_duration, videoCircle: m.video_circle, videoDuration: m.video_duration, reactions: m.reactions || {}, time: m.time, self: m.from_user === myName, senderName: displayNameForUser(m.from_user), isGroup: true, replyData: m.replyData, edited: !!m.edited, deleted: !!m.deleted }); });
   box.scrollTop = box.scrollHeight;
 });
 function displayNameForUser(username) {
@@ -2694,12 +2882,12 @@ function cleanupCircle() {
   circleRecorder = null; circleChunks = [];
 }
 
-socket.on('private message', ({ id, from, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions, self, to, time, replyData }) => {
+socket.on('private message', ({ id, from, text, image, sticker, voice, voiceDuration, videoCircle, videoDuration, reactions, self, to, time, replyData }) => {
   const isSavedMsg = from === myName && to === myName;
-  if (self && currentChat === to && !isSavedMsg) renderMessage({ id, from: myName, to, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: true, replyData, read: false });
-  else if (self && isSavedChat && isSavedMsg) renderMessage({ id, from: myName, to: myName, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: true, replyData, read: false });
+  if (self && currentChat === to && !isSavedMsg) renderMessage({ id, from: myName, to, text, image, sticker, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: true, replyData, read: false });
+  else if (self && isSavedChat && isSavedMsg) renderMessage({ id, from: myName, to: myName, text, image, sticker, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: true, replyData, read: false });
   else if (!self) {
-    if (from === currentChat) { renderMessage({ id, from, to: myName, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: false, replyData }); clearUnread(from); }
+    if (from === currentChat) { renderMessage({ id, from, to: myName, text, image, sticker, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: false, replyData }); clearUnread(from); }
     else {
       const c = contacts.find(c => c.name === from);
       if (!c || !c.muted) { if (settings.notif_private != 0) { playPing(); vibrate(); } }
@@ -2707,6 +2895,7 @@ socket.on('private message', ({ id, from, text, image, voice, voiceDuration, vid
       saveUnread(); renderChatList(); updateTitle();
       if (currentChat === from) bumpScrollDownBadge();
       let preview = text || '';
+      if (sticker) preview = '🖼 Стикер';
       if (image) preview = '📷 Фото'; if (voice) preview = '🎤 Голосовое'; if (videoCircle) preview = '🎥 Кружок';
       showBrowserNotification(displayNameForUser(from), preview);
     }
@@ -2716,17 +2905,18 @@ socket.on('messages read', () => { document.querySelectorAll('.msg.self .check')
 socket.on('message edited', ({ messageId, text }) => { const wrap = document.querySelector(`.msg-wrap[data-id="${messageId}"]`); if (!wrap) return; const ts = wrap.querySelector('.msg .msg-text'); if (ts) ts.textContent = text; });
 socket.on('message deleted', ({ messageId }) => { const wrap = document.querySelector(`.msg-wrap[data-id="${messageId}"]`); if (!wrap) return; const msgEl = wrap.querySelector('.msg'); msgEl.classList.add('deleted'); msgEl.innerHTML = '<i>Сообщение удалено</i>'; });
 socket.on('message blocked', ({ reason }) => alert(reason));
-socket.on('group message', ({ id, groupId, from, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions, self, time, replyData }) => {
+socket.on('group message', ({ id, groupId, from, text, image, sticker, voice, voiceDuration, videoCircle, videoDuration, reactions, self, time, replyData }) => {
   const g = groups.find(g => g.id === groupId);
-  if (self && currentGroup && currentGroup.id === groupId) renderMessage({ id, from, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: true, senderName: 'Я', isGroup: true, replyData });
+  if (self && currentGroup && currentGroup.id === groupId) renderMessage({ id, from, text, image, sticker, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: true, senderName: 'Я', isGroup: true, replyData });
   else if (!self) {
-    if (currentGroup && currentGroup.id === groupId) { renderMessage({ id, from, text, image, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: false, senderName: displayNameForUser(from), isGroup: true, replyData }); clearUnread('g:' + groupId); }
+    if (currentGroup && currentGroup.id === groupId) { renderMessage({ id, from, text, image, sticker, voice, voiceDuration, videoCircle, videoDuration, reactions: reactions || {}, time, self: false, senderName: displayNameForUser(from), isGroup: true, replyData }); clearUnread('g:' + groupId); }
     else {
       if (!g || !g.muted) { if (settings.notif_groups != 0) { playPing(); vibrate(); } }
       unread['g:' + groupId] = (unread['g:' + groupId] || 0) + 1;
       saveUnread(); renderChatList(); updateTitle();
       if (currentGroup && currentGroup.id === groupId) bumpScrollDownBadge();
       let preview = text || '';
+      if (sticker) preview = '🖼 Стикер';
       if (image) preview = '📷 Фото'; if (voice) preview = '🎤 Голосовое'; if (videoCircle) preview = '🎥 Кружок';
       showBrowserNotification((g?.name || 'Группа') + ' — ' + displayNameForUser(from), preview);
     }
@@ -2761,7 +2951,26 @@ function renderMessage(msg) {
   }
   if (msg.deleted) { div.classList.add('deleted'); div.innerHTML += '<i>Сообщение удалено</i>'; }
   else {
-    if (msg.image) { const img = document.createElement('img'); img.className = 'photo'; img.src = msg.image; img.onclick = (e) => { e.stopPropagation(); openLightbox(msg.image); }; div.appendChild(img); }
+    // СТИКЕР (картинка или видео)
+    if (msg.sticker) {
+      const isVideoSticker = /\.(mp4|webm)(\?|$)/i.test(msg.sticker);
+      if (isVideoSticker) {
+        const v = document.createElement('video');
+        v.className = 'sticker-video';
+        v.src = msg.sticker;
+        v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
+        v.onclick = (e) => e.stopPropagation();
+        div.appendChild(v);
+      } else {
+        const s = document.createElement('img');
+        s.className = 'sticker-img';
+        s.src = msg.sticker;
+        s.onclick = (e) => e.stopPropagation();
+        div.appendChild(s);
+      }
+    } else if (msg.image) {
+      const img = document.createElement('img'); img.className = 'photo'; img.src = msg.image; img.onclick = (e) => { e.stopPropagation(); openLightbox(msg.image); }; div.appendChild(img);
+    }
     if (msg.videoCircle) {
       const vwrap = document.createElement('div'); vwrap.className = 'video-circle-wrap';
       const vid = document.createElement('video'); vid.className = 'video-circle'; vid.src = msg.videoCircle; vid.playsInline = true; vid.loop = true;
@@ -2814,7 +3023,6 @@ function renderMessage(msg) {
   div.addEventListener('mouseleave', cancelPress);
   div.addEventListener('contextmenu', (e) => { e.preventDefault(); showActionMenu(e, msg); });
 
-  // ↔️ Свайп-ответ
   bindSwipeReply(div, wrap, msg);
 
   wrap.appendChild(div);
@@ -2866,7 +3074,7 @@ function showActionMenu(e, msg) {
   const touch = (e.touches && e.touches[0]) || e;
   let x = touch.clientX, y = touch.clientY;
   const isMine = msg.from === myName;
-  document.getElementById('action-edit').style.display = isMine && !msg.voice && !msg.image && !msg.videoCircle && msg.text ? 'flex' : 'none';
+  document.getElementById('action-edit').style.display = isMine && !msg.voice && !msg.image && !msg.videoCircle && !msg.sticker && msg.text ? 'flex' : 'none';
   document.getElementById('action-delete').style.display = isMine ? 'flex' : 'none';
   document.getElementById('action-pin').style.display = msg.isGroup ? 'flex' : 'none';
   menu.classList.add('active');
@@ -2882,7 +3090,7 @@ function actionReply() {
   if (!activeMessage) return;
   replyToMessage = activeMessage;
   const name = activeMessage.self ? 'Я' : displayNameForUser(activeMessage.from);
-  let preview = activeMessage.text || (activeMessage.image ? '📷 Фото' : (activeMessage.voice ? '🎤 Голосовое' : (activeMessage.videoCircle ? '🎥 Кружок' : '')));
+  let preview = activeMessage.text || (activeMessage.sticker ? 'Стикер' : (activeMessage.image ? '📷 Фото' : (activeMessage.voice ? '🎤 Голосовое' : (activeMessage.videoCircle ? '🎥 Кружок' : ''))));
   document.getElementById('rp-name').textContent = name;
   document.getElementById('rp-msg').textContent = preview;
   document.getElementById('reply-preview').classList.add('active');
@@ -2963,7 +3171,7 @@ function fillGallery(messages) {
   const box = document.getElementById('gallery-content');
   const emptyEl = document.getElementById('gallery-empty');
   box.innerHTML = '';
-  const media = messages.filter(m => (m.image || m.video_circle) && !m.deleted);
+  const media = messages.filter(m => (m.image || m.video_circle) && !m.deleted && !m.sticker);
   if (media.length === 0) { emptyEl.style.display = 'block'; return; }
   emptyEl.style.display = 'none';
   media.reverse().forEach(m => {
@@ -3069,14 +3277,6 @@ function confirmDeleteGroup() {
   const gid = currentGroup.id;
   socket.emit('delete group', { groupId: gid }, (res) => { if (!res || !res.ok) { alert(res?.error || 'Не удалось'); return; } closeModal('group-info-modal'); closeChat(); });
 }
-function openChatMenu() {
-  const key = currentGroup ? 'g:' + currentGroup.id : currentChat;
-  const isArchived = currentGroup ? currentGroup.archived : (contacts.find(c => c.name === currentChat)?.archived);
-  const isMuted = currentGroup ? currentGroup.muted : (contacts.find(c => c.name === currentChat)?.muted);
-  const choice = prompt('Меню чата:\n1 — ' + (isMuted ? 'Включить уведомления' : 'Отключить уведомления') + '\n2 — ' + (isArchived ? 'Убрать из архива' : 'В архив') + '\n0 — Отмена');
-  if (choice === '1') socket.emit('toggle mute', { chatKey: key });
-  else if (choice === '2') socket.emit('toggle archive', { chatKey: key });
-}
 function openLightbox(src) { document.getElementById('lightbox-img').src = src; document.getElementById('lightbox').classList.add('active'); }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -3117,9 +3317,7 @@ async function toggleScreenShare() {
       if (btn) { btn.style.background = '#fff'; btn.style.color = '#000'; }
       screenTrack.onended = () => { stopScreenShare(); };
     } catch (err) { console.log('Screen share error:', err); alert('Не удалось: ' + err.message); }
-  } else {
-    stopScreenShare();
-  }
+  } else stopScreenShare();
 }
 async function stopScreenShare() {
   if (!isScreenSharing) return;
