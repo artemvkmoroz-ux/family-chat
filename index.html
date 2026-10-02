@@ -79,7 +79,7 @@
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
 
-  /* СТРОГИЙ РЕЖИМ — как Telegram */
+  /* СТРОГИЙ РЕЖИМ */
   body:not(.premium) {
     --bg-deep: #0e1621;
     --bg-dark: #0e1621;
@@ -230,7 +230,19 @@
   #messages { flex: 1; overflow-y: auto; padding: 16px 12px; background: var(--bg-deep); }
   .date-divider { text-align: center; margin: 16px 0; }
   .date-divider span { display: inline-block; background: rgba(168, 85, 247, 0.15); color: #fff; padding: 5px 14px; border-radius: 14px; font-size: 12px; font-weight: 500; }
-  .msg-wrap { display: flex; margin: 3px 0; flex-direction: column; }
+  .msg-wrap { display: flex; margin: 3px 0; flex-direction: column; position: relative; transition: transform 0.2s; }
+  .msg-wrap.swiping { transition: none; }
+  .msg-wrap .swipe-reply-icon {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    left: 12px; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; opacity: 0; transition: opacity 0.15s;
+    pointer-events: none; z-index: 0;
+  }
+  .msg-wrap.self .swipe-reply-icon { left: auto; right: 12px; }
+  .msg-wrap.swipe-active .swipe-reply-icon { opacity: 1; }
+  .msg-wrap.swipe-ready .swipe-reply-icon { background: #22c55e; transform: translateY(-50%) scale(1.15); }
   .msg-wrap.self { align-items: flex-end; }
   .msg-wrap.other { align-items: flex-start; }
   .msg-sender { font-size: 12px; font-weight: 700; margin: 0 14px 3px; color: var(--accent); }
@@ -415,7 +427,7 @@
   .incoming-btn.accept { background: #22c55e; }
   .incoming-btn.decline { background: #e53935; }
 
-  /* ⬇ НОВОЕ: Кнопка «вниз» в чате */
+  /* ⬇ НОВОЕ: Кнопка «вниз» */
   #scroll-down-btn {
     position: absolute; right: 14px; bottom: 90px;
     width: 42px; height: 42px; border-radius: 50%;
@@ -432,7 +444,7 @@
     border-radius: 10px; padding: 0 6px;
   }
 
-  /* ⬇ НОВОЕ: НИЖНЯЯ ПАНЕЛЬ с 4 круглыми кнопками */
+  /* ⬇ НОВОЕ: НИЖНЯЯ ПАНЕЛЬ */
   #bottom-nav {
     display: flex;
     justify-content: space-around;
@@ -634,7 +646,6 @@
     text-align: center;
   }
 
-  /* 📸 Просмотр истории */
   #story-viewer {
     position: fixed;
     inset: 0;
@@ -825,7 +836,7 @@
   <button class="modal-secondary" onclick="closeModal('profile-modal')">Закрыть</button>
 </div></div>
 
-<!-- ВЫДАТЬ ГАЛОЧКУ (только для moroz) -->
+<!-- ВЫДАТЬ ГАЛОЧКУ -->
 <div class="modal" id="verify-modal"><div class="modal-box">
   <h3>✓ Выдать галочку</h3>
   <div class="modal-desc">Введи ник того, кому хочешь дать галочку</div>
@@ -835,6 +846,7 @@
   <button class="modal-secondary" onclick="closeModal('verify-modal')">Отмена</button>
 </div></div>
 
+<!-- ДОБАВИТЬ КОНТАКТ -->
 <div class="modal" id="add-modal"><div class="modal-box">
   <h3>Добавить контакт</h3>
   <input id="add-display-name" placeholder="Имя" />
@@ -844,6 +856,7 @@
   <button class="modal-secondary" onclick="closeModal('add-modal')">Отмена</button>
 </div></div>
 
+<!-- ПРОФИЛЬ КОНТАКТА -->
 <div class="modal" id="contact-profile-modal"><div class="modal-box">
   <div id="contact-profile-content"></div>
   <div style="display: flex; gap: 10px;">
@@ -852,6 +865,7 @@
   </div>
 </div></div>
 
+<!-- СОЗДАТЬ ГРУППУ -->
 <div class="modal" id="create-group-modal"><div class="modal-box">
   <h3>Создать группу</h3>
   <input id="group-name" placeholder="Название группы" />
@@ -862,6 +876,7 @@
   <button class="modal-secondary" onclick="closeModal('create-group-modal')">Отмена</button>
 </div></div>
 
+<!-- ДОБАВИТЬ УЧАСТНИКОВ -->
 <div class="modal" id="add-members-modal"><div class="modal-box">
   <h3>Добавить участников</h3>
   <div class="member-picker" id="add-members-list"></div>
@@ -870,6 +885,7 @@
   <button class="modal-secondary" onclick="closeModal('add-members-modal')">Отмена</button>
 </div></div>
 
+<!-- ИНФО ГРУППЫ -->
 <div class="modal" id="group-info-modal"><div class="modal-box">
   <h3 id="group-info-title">Группа</h3>
   <div id="group-info-desc" class="modal-desc"></div>
@@ -881,6 +897,7 @@
   <button class="modal-secondary" onclick="closeModal('group-info-modal')">Закрыть</button>
 </div></div>
 
+<!-- РЕДАКТИРОВАНИЕ ГРУППЫ -->
 <div class="modal" id="edit-group-modal"><div class="modal-box">
   <h3>Изменить группу</h3>
   <input id="edit-group-name" placeholder="Название" />
@@ -889,6 +906,7 @@
   <button class="modal-secondary" onclick="closeModal('edit-group-modal')">Отмена</button>
 </div></div>
 
+<!-- РЕДАКТИРОВАНИЕ СООБЩЕНИЯ -->
 <div class="modal" id="edit-message-modal"><div class="modal-box">
   <h3>Редактировать</h3>
   <textarea id="edit-message-text" rows="4"></textarea>
@@ -896,6 +914,7 @@
   <button class="modal-secondary" onclick="closeModal('edit-message-modal')">Отмена</button>
 </div></div>
 
+<!-- ПОИСК В ЧАТЕ -->
 <div class="modal" id="search-modal"><div class="modal-box">
   <h3>Поиск в чате</h3>
   <input id="search-input" placeholder="Что искать..." />
@@ -903,6 +922,7 @@
   <button class="modal-secondary" onclick="closeModal('search-modal')">Закрыть</button>
 </div></div>
 
+<!-- КОД-ПАРОЛЬ -->
 <div class="modal" id="passcode-setup-modal"><div class="modal-box">
   <h3>Код-пароль</h3>
   <div class="modal-desc">Защити Aurora паролем (4+ символа)</div>
@@ -914,6 +934,7 @@
   <button class="modal-secondary" onclick="closeModal('passcode-setup-modal')">Отмена</button>
 </div></div>
 
+<!-- УДАЛИТЬ АККАУНТ -->
 <div class="modal" id="delete-account-modal"><div class="modal-box">
   <h3>Удалить аккаунт</h3>
   <div class="modal-desc">Это действие нельзя отменить.</div>
@@ -923,12 +944,14 @@
   <button class="modal-secondary" onclick="closeModal('delete-account-modal')">Отмена</button>
 </div></div>
 
+<!-- ЦВЕТ -->
 <div class="modal" id="color-modal"><div class="modal-box">
   <h3 id="color-modal-title">Выбери цвет</h3>
   <div class="color-grid" id="color-grid"></div>
   <button class="modal-secondary" onclick="closeModal('color-modal')">Закрыть</button>
 </div></div>
 
+<!-- МОЙ QR -->
 <div class="modal" id="my-qr-modal"><div class="modal-box">
   <h3>Мой QR-код</h3>
   <div class="modal-desc">Покажи его — тебя добавят в контакты</div>
@@ -937,6 +960,7 @@
   <button class="modal-secondary" onclick="closeModal('my-qr-modal')">Закрыть</button>
 </div></div>
 
+<!-- QR НАЙДЕН -->
 <div class="modal" id="qr-found-modal"><div class="modal-box">
   <h3>Найден контакт</h3>
   <div id="qr-found-content"></div>
@@ -944,6 +968,7 @@
   <button class="modal-secondary" onclick="closeModal('qr-found-modal')">Отмена</button>
 </div></div>
 
+<!-- ГАЛЕРЕЯ -->
 <div class="modal" id="gallery-modal"><div class="modal-box" style="max-width: 500px;">
   <h3>🖼 Галерея</h3>
   <div id="gallery-content"></div>
@@ -984,7 +1009,7 @@
   </div>
 </div>
 
-<!-- 📸 ИСТОРИИ — модалка добавления -->
+<!-- 📸 ИСТОРИИ — добавление -->
 <div class="modal" id="story-add-modal"><div class="modal-box">
   <h3>📸 Новая история</h3>
   <div class="modal-desc">Картинка будет видна 24 часа. Её увидят твои контакты.</div>
@@ -1032,7 +1057,7 @@
     <div id="stories-row"></div>
   </div>
 
-  <!-- 🔍 Поиск (только для вкладки «Чаты») -->
+  <!-- 🔍 Поиск -->
   <div id="search-wrap"><input id="search" placeholder="Поиск" oninput="filterContacts()" /></div>
 
   <!-- 💬 СПИСОК ЧАТОВ -->
@@ -1083,7 +1108,7 @@
   </div>
 </div>
 
-<!-- НАСТРОЙКИ (полноэкранные, открываются через бургер) -->
+<!-- НАСТРОЙКИ (полноэкранные) -->
 <div id="settings-screen">
   <div id="settings-header"><button class="back-btn" onclick="closeSettings()">‹</button><h2>Настройки</h2></div>
   <div id="settings-content"></div>
@@ -1190,7 +1215,6 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-// ЗАЩИТА ОТ ОШИБОК
 window.addEventListener('error', (e) => {
   console.error('❌ ОШИБКА:', e.message, e.filename, e.lineno);
   showErrorScreen(e.message + '\n' + e.filename + ':' + e.lineno);
@@ -1670,7 +1694,6 @@ function updateMyAvatarBtn() {
   if (!btn) return;
   if (myAvatar) btn.innerHTML = `<img src="${myAvatar}" alt="">`; else btn.textContent = '👤';
 }
-
 function updateVerifyButton() {
   const btn = document.getElementById('verify-btn');
   if (!btn) return;
@@ -1688,7 +1711,6 @@ function updateVerifyButton() {
     btn.style.display = 'none';
   }
 }
-
 function doVerify() {
   const targetUsername = document.getElementById('verify-password').value.trim().toLowerCase();
   const errEl = document.getElementById('verify-error'); errEl.textContent = '';
@@ -1701,7 +1723,6 @@ function doVerify() {
     renderChatList();
   });
 }
-
 socket.on('me updated', (data) => {
   if (data.verified !== undefined) myVerified = !!data.verified;
   if (data.avatar) myAvatar = data.avatar;
@@ -1981,6 +2002,127 @@ function bumpScrollDownBadge() {
 }
 
 // ═══════════════════════════════════════════
+// ↔️ СВАЙП-ОТВЕТ
+// ═══════════════════════════════════════════
+const SWIPE_THRESHOLD = 60;
+function bindSwipeReply(msgDiv, wrap, msg) {
+  if (msg.deleted) return;
+
+  const icon = document.createElement('div');
+  icon.className = 'swipe-reply-icon';
+  icon.textContent = '↩';
+  wrap.appendChild(icon);
+
+  let startX = 0, startY = 0, currentX = 0, isDragging = false, locked = false;
+  const isSelf = msg.self;
+
+  const onStart = (x, y) => {
+    if (msg.deleted) return;
+    startX = x; startY = y; currentX = 0;
+    isDragging = true; locked = false;
+    wrap.classList.remove('swipe-ready');
+  };
+
+  const onMove = (x, y) => {
+    if (!isDragging) return;
+    const dx = x - startX;
+    const dy = y - startY;
+
+    if (!locked) {
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
+        isDragging = false;
+        wrap.style.transform = '';
+        wrap.classList.remove('swiping', 'swipe-active', 'swipe-ready');
+        return;
+      }
+      if (Math.abs(dx) > 8) {
+        locked = true;
+        wrap.classList.add('swiping');
+      } else {
+        return;
+      }
+    }
+
+    let d = dx;
+    if (isSelf && d > 0) d = 0;
+    if (!isSelf && d < 0) d = 0;
+
+    const max = 90;
+    if (Math.abs(d) > max) d = (d > 0 ? max : -max);
+
+    currentX = d;
+    wrap.style.transform = `translateX(${d}px)`;
+
+    if (Math.abs(d) > 5) wrap.classList.add('swipe-active');
+    if (Math.abs(d) >= SWIPE_THRESHOLD) wrap.classList.add('swipe-ready');
+    else wrap.classList.remove('swipe-ready');
+  };
+
+  const onEnd = () => {
+    if (!isDragging) return;
+    isDragging = false;
+
+    if (Math.abs(currentX) >= SWIPE_THRESHOLD) {
+      triggerReplyFromSwipe(msg);
+    }
+    wrap.style.transform = '';
+    wrap.classList.remove('swiping', 'swipe-active', 'swipe-ready');
+    locked = false;
+  };
+
+  msgDiv.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    onStart(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+
+  msgDiv.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    if (e.touches.length !== 1) return;
+    onMove(e.touches[0].clientX, e.touches[0].clientY);
+    if (locked) { try { e.preventDefault(); } catch (err) {} }
+  }, { passive: false });
+
+  msgDiv.addEventListener('touchend', onEnd);
+  msgDiv.addEventListener('touchcancel', onEnd);
+
+  msgDiv.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    onStart(e.clientX, e.clientY);
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    onMove(e.clientX, e.clientY);
+  });
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    onEnd();
+  });
+}
+
+function triggerReplyFromSwipe(msg) {
+  if (!msg) return;
+  replyToMessage = {
+    id: msg.id,
+    from: msg.from,
+    text: msg.text,
+    image: msg.image,
+    voice: msg.voice,
+    videoCircle: msg.videoCircle,
+    self: msg.self,
+    isGroup: msg.isGroup
+  };
+  const name = msg.self ? 'Я' : displayNameForUser(msg.from);
+  let preview = msg.text || (msg.image ? '📷 Фото' : (msg.voice ? '🎤 Голосовое' : (msg.videoCircle ? '🎥 Кружок' : '')));
+  document.getElementById('rp-name').textContent = name;
+  document.getElementById('rp-msg').textContent = preview;
+  document.getElementById('reply-preview').classList.add('active');
+  document.getElementById('msgInput').focus();
+  if (settings.vibration != 0 && 'vibrate' in navigator) {
+    try { navigator.vibrate(15); } catch (e) {}
+  }
+}
+
+// ═══════════════════════════════════════════
 // 📸 ИСТОРИИ
 // ═══════════════════════════════════════════
 let storiesUsers = [];
@@ -2160,7 +2302,6 @@ function renderCurrentStory() {
   } else {
     delBtn.style.display = 'none';
     viewsBtn.style.display = 'none';
-    // Отметить просмотр
     if (!s.viewed) {
       s.viewed = true;
       socket.emit('view story', { storyId: s.id });
@@ -2199,7 +2340,6 @@ function nextStory() {
     renderCurrentStory();
     startStoryTimer();
   } else {
-    // Следующий пользователь
     let nextUserIdx = currentStoryUserIdx + 1;
     while (nextUserIdx < storiesUsers.length && storiesUsers[nextUserIdx].username === myName) nextUserIdx++;
     if (nextUserIdx < storiesUsers.length) {
@@ -2286,15 +2426,9 @@ function openStoryViewers() {
   });
 }
 
-// Реалтайм события историй
-socket.on('story new', (payload) => {
-  loadStories();
-});
+socket.on('story new', () => { loadStories(); });
 socket.on('story deleted', ({ storyId }) => {
-  // удаляем локально
-  storiesUsers.forEach(u => {
-    u.stories = u.stories.filter(s => s.id !== storyId);
-  });
+  storiesUsers.forEach(u => { u.stories = u.stories.filter(s => s.id !== storyId); });
   storiesUsers = storiesUsers.filter(u => u.stories.length > 0);
   renderStoriesBar();
   if (document.getElementById('story-viewer').classList.contains('active')) {
@@ -2307,13 +2441,8 @@ socket.on('story deleted', ({ storyId }) => {
 // ═══════════════════════════════════════════
 // ⋮ МЕНЮ ЧАТА V2
 // ═══════════════════════════════════════════
-function currentChatKey() {
-  return currentGroup ? 'g:' + currentGroup.id : currentChat;
-}
-function currentChatObj() {
-  if (currentGroup) return currentGroup;
-  return contacts.find(c => c.name === currentChat);
-}
+function currentChatKey() { return currentGroup ? 'g:' + currentGroup.id : currentChat; }
+function currentChatObj() { if (currentGroup) return currentGroup; return contacts.find(c => c.name === currentChat); }
 function openChatMenuV2() {
   const obj = currentChatObj();
   const isMuted = obj?.muted;
@@ -2673,6 +2802,7 @@ function renderMessage(msg) {
   metaHTML += t;
   if (msg.self && !msg.isGroup) metaHTML += ` <span class="check${msg.read ? ' read' : ''}">✓✓</span>`;
   meta.innerHTML = metaHTML; div.appendChild(meta);
+
   let pressTimer = null;
   const startPress = (e) => { pressTimer = setTimeout(() => showReactionMenu(e, msg.id, wrap, !!msg.isGroup), 500); };
   const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
@@ -2683,6 +2813,10 @@ function renderMessage(msg) {
   div.addEventListener('mouseup', cancelPress);
   div.addEventListener('mouseleave', cancelPress);
   div.addEventListener('contextmenu', (e) => { e.preventDefault(); showActionMenu(e, msg); });
+
+  // ↔️ Свайп-ответ
+  bindSwipeReply(div, wrap, msg);
+
   wrap.appendChild(div);
   renderReactionsInto(wrap, msg.reactions, !!msg.isGroup);
   box.appendChild(wrap);
