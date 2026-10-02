@@ -543,6 +543,233 @@
   #app[data-tab="calls"] #search-wrap,
   #app[data-tab="contacts"] #search-wrap,
   #app[data-tab="settings"] #search-wrap { display: none; }
+  #app[data-tab="calls"] #stories-bar,
+  #app[data-tab="contacts"] #stories-bar,
+  #app[data-tab="settings"] #stories-bar { display: none; }
+
+  /* ⬇ НОВОЕ: ИСТОРИИ */
+  #stories-bar {
+    display: none;
+    padding: 12px 8px 10px;
+    background: var(--bg-header);
+    border-bottom: var(--glass-border);
+    flex-shrink: 0;
+  }
+  #app[data-tab="chats"] #stories-bar { display: block; }
+  #stories-row {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 0 6px 4px;
+    scrollbar-width: none;
+  }
+  #stories-row::-webkit-scrollbar { display: none; }
+  .story-bubble {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 70px;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .story-ring {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    padding: 3px;
+    background: linear-gradient(135deg, #a855f7, #ec4899, #fbbf24);
+    position: relative;
+    transition: transform 0.15s;
+  }
+  .story-bubble:active .story-ring { transform: scale(0.92); }
+  .story-ring.viewed { background: rgba(255,255,255,0.15); }
+  .story-ring.mine {
+    background: rgba(255,255,255,0.2);
+    border: 2px dashed var(--accent);
+  }
+  .story-ring.mine.has-story {
+    background: linear-gradient(135deg, #a855f7, #ec4899, #fbbf24);
+    border: none;
+  }
+  .story-ring-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--bg-panel);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+  }
+  .story-ring .story-add-badge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-header);
+  }
+  .story-bubble .story-name {
+    font-size: 11px;
+    color: var(--text-muted);
+    max-width: 70px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+  }
+
+  /* 📸 Просмотр истории */
+  #story-viewer {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 9800;
+    display: none;
+    flex-direction: column;
+    user-select: none;
+  }
+  #story-viewer.active { display: flex; }
+  #story-progress-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    gap: 4px;
+    padding: 10px 10px 8px;
+    z-index: 20;
+  }
+  .story-progress-segment {
+    flex: 1;
+    height: 3px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .story-progress-segment .fill {
+    height: 100%;
+    width: 0%;
+    background: #fff;
+  }
+  .story-progress-segment.done .fill { width: 100%; }
+  #story-header {
+    position: absolute;
+    top: 22px;
+    left: 0;
+    right: 0;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 20;
+    color: #fff;
+  }
+  #story-header .story-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, #6d28d9, #a855f7);
+    background-size: cover; background-position: center;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  #story-header .story-info { flex: 1; min-width: 0; }
+  #story-header .story-name { font-weight: 700; font-size: 14px; }
+  #story-header .story-time { font-size: 12px; opacity: 0.7; }
+  #story-header .story-close {
+    background: none; border: none; color: #fff;
+    font-size: 26px; cursor: pointer; padding: 4px 8px;
+  }
+  #story-image-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  #story-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  #story-caption {
+    position: absolute;
+    bottom: 70px;
+    left: 20px;
+    right: 20px;
+    color: #fff;
+    text-align: center;
+    font-size: 15px;
+    background: rgba(0,0,0,0.5);
+    padding: 10px 16px;
+    border-radius: 14px;
+    backdrop-filter: blur(10px);
+    display: none;
+  }
+  #story-caption.show { display: block; }
+  #story-nav-left, #story-nav-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 35%;
+    cursor: pointer;
+    z-index: 15;
+  }
+  #story-nav-left { left: 0; }
+  #story-nav-right { right: 0; }
+  #story-bottom {
+    padding: 14px 20px calc(20px + var(--safe-bottom));
+    background: linear-gradient(0deg, rgba(0,0,0,0.85), transparent);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 20;
+  }
+  #story-views-btn {
+    flex: 1;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 14px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+  }
+  .story-action-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .story-action-btn.danger { background: rgba(239,68,68,0.3); }
+  #story-viewers-list { max-height: 60vh; overflow-y: auto; margin-bottom: 12px; }
 </style>
 </head>
 <body>
@@ -724,7 +951,7 @@
   <button class="modal-secondary" onclick="closeModal('gallery-modal')">Закрыть</button>
 </div></div>
 
-<!-- МЕНЮ ЧАТА (новое — аддитивно) -->
+<!-- МЕНЮ ЧАТА -->
 <div class="modal" id="chat-menu-modal"><div class="modal-box">
   <h3 id="chat-menu-title">Чат</h3>
   <button class="modal-secondary" id="chat-menu-mute" onclick="chatMenuToggleMute()">🔕 Отключить уведомления</button>
@@ -732,6 +959,51 @@
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openSearchInChat();">🔍 Поиск в чате</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openGallery();">🖼 Галерея</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal')">Отмена</button>
+</div></div>
+
+<!-- 📸 ИСТОРИИ — просмотр -->
+<div id="story-viewer">
+  <div id="story-progress-bar"></div>
+  <div id="story-header">
+    <div class="story-avatar" id="story-avatar"></div>
+    <div class="story-info">
+      <div class="story-name" id="story-name">—</div>
+      <div class="story-time" id="story-time">—</div>
+    </div>
+    <button class="story-close" onclick="closeStoryViewer()">×</button>
+  </div>
+  <div id="story-image-wrap">
+    <img id="story-image" src="" alt="">
+    <div id="story-caption"></div>
+    <div id="story-nav-left" onclick="prevStory()"></div>
+    <div id="story-nav-right" onclick="nextStory()"></div>
+  </div>
+  <div id="story-bottom">
+    <button id="story-views-btn" onclick="openStoryViewers()" style="display:none;">👁 0</button>
+    <button class="story-action-btn danger" id="story-delete-btn" onclick="deleteCurrentStory()" style="display:none;">🗑</button>
+  </div>
+</div>
+
+<!-- 📸 ИСТОРИИ — модалка добавления -->
+<div class="modal" id="story-add-modal"><div class="modal-box">
+  <h3>📸 Новая история</h3>
+  <div class="modal-desc">Картинка будет видна 24 часа. Её увидят твои контакты.</div>
+  <input type="file" id="story-file" accept="image/*" style="display:none" onchange="onStoryFileSelected(event)" />
+  <button class="modal-primary" onclick="document.getElementById('story-file').click()">🖼 Выбрать картинку</button>
+  <div id="story-preview-wrap" style="display:none; text-align:center; margin-bottom:12px;">
+    <img id="story-preview-img" style="max-width:100%; max-height:200px; border-radius:14px;" />
+  </div>
+  <input id="story-caption-input" placeholder="Подпись (необязательно)" maxlength="200" />
+  <div class="modal-error" id="story-add-error"></div>
+  <button class="modal-primary" onclick="submitStory()" id="story-submit-btn" disabled>📤 Опубликовать</button>
+  <button class="modal-secondary" onclick="closeModal('story-add-modal')">Отмена</button>
+</div></div>
+
+<!-- 📸 ИСТОРИИ — просмотры -->
+<div class="modal" id="story-viewers-modal"><div class="modal-box">
+  <h3>👁 Просмотры</h3>
+  <div id="story-viewers-list"></div>
+  <button class="modal-secondary" onclick="closeModal('story-viewers-modal')">Закрыть</button>
 </div></div>
 
 <!-- ПРЕВЬЮ КРУЖКА -->
@@ -753,6 +1025,11 @@
     <button class="icon-btn" onclick="openCreateGroupModal()" title="Создать группу">👥</button>
     <button class="icon-btn" onclick="openModal('add-modal')" title="Добавить контакт">＋</button>
     <button class="icon-btn" id="my-avatar-btn" onclick="openSettings()"></button>
+  </div>
+
+  <!-- 📸 Полоса историй -->
+  <div id="stories-bar">
+    <div id="stories-row"></div>
   </div>
 
   <!-- 🔍 Поиск (только для вкладки «Чаты») -->
@@ -943,6 +1220,7 @@ let createSelected = new Set(), addMembersSelected = new Set();
 let replyToMessage = null, editingMessageId = null, pinnedMessageId = null;
 let showArchived = false, settings = {}, blockedList = [], currentColorTarget = null;
 let canCreateGroup = true, qrFoundUser = null;
+let activeTab = 'chats';
 
 const CREDS_KEY = 'aurora-creds';
 const UNREAD_KEY = 'aurora-unread';
@@ -991,6 +1269,7 @@ function onLoggedIn(res) {
   document.getElementById('auth').classList.remove('active');
   document.getElementById('app').classList.add('active');
   updateMyAvatarBtn(); updateVerifyButton();
+  loadStories();
 }
 function tryPasscode() {
   const passcode = document.getElementById('passcode-input').value;
@@ -1001,6 +1280,7 @@ function tryPasscode() {
     document.getElementById('passcode-screen').classList.remove('active');
     document.getElementById('app').classList.add('active');
     updateMyAvatarBtn(); updateVerifyButton();
+    loadStories();
   });
 }
 
@@ -1058,6 +1338,8 @@ window.addEventListener('load', () => {
             if (has) {
               document.getElementById('app').classList.remove('active');
               document.getElementById('passcode-screen').classList.add('active');
+            } else {
+              loadStories();
             }
           });
         } else {
@@ -1078,6 +1360,7 @@ window.addEventListener('load', () => {
     setConnStatus('connected', 'Aurora: снова с тобой ✨');
     reconnectAttempts = 0;
     setTimeout(hideConnStatus, 2500);
+    loadStories();
   });
 });
 
@@ -1129,7 +1412,6 @@ function updateTitle() {
     if (titleFlashInterval) { clearInterval(titleFlashInterval); titleFlashInterval = null; }
     document.title = 'Aurora';
   }
-  // 🔵 НОВОЕ: бейдж на иконке «Чаты»
   const navBadge = document.getElementById('nav-badge-chats');
   if (navBadge) {
     if (total > 0 && activeTab !== 'chats') {
@@ -1140,7 +1422,12 @@ function updateTitle() {
     }
   }
 }
-socket.on('settings', (s) => { settings = s || {}; applyLocalSettings(); if (document.getElementById('settings-screen').classList.contains('active')) renderSettings(); if (activeTab === 'settings') renderSettingsTab(); });
+socket.on('settings', (s) => {
+  settings = s || {};
+  applyLocalSettings();
+  if (document.getElementById('settings-screen').classList.contains('active')) renderSettings();
+  if (activeTab === 'settings') renderSettingsTab();
+});
 function applyLocalSettings() {
   if (settings.theme === 'light') document.body.classList.add('light');
   else document.body.classList.remove('light');
@@ -1154,9 +1441,8 @@ function applyLocalSettings() {
 }
 
 // ═══════════════════════════════════════════
-// 🔵 НИЖНЯЯ НАВИГАЦИЯ (новое)
+// 🔵 НИЖНЯЯ НАВИГАЦИЯ
 // ═══════════════════════════════════════════
-let activeTab = 'chats';
 const TAB_TITLES = { chats: 'Aurora', calls: 'Звонки', contacts: 'Контакты', settings: 'Настройки' };
 
 function switchTab(tab) {
@@ -1177,6 +1463,7 @@ function switchTab(tab) {
     const sw = document.getElementById('search-wrap');
     if (sw) sw.style.display = '';
     renderChatList();
+    renderStoriesBar();
   } else {
     const tabEl = document.getElementById('tab-' + tab);
     if (tabEl) tabEl.classList.add('active');
@@ -1198,19 +1485,8 @@ function renderCallsTab() {
   const box = document.getElementById('calls-list');
   const empty = document.querySelector('#tab-calls .tab-empty');
   if (!box) return;
-  if (!window._callsHistory || window._callsHistory.length === 0) {
-    if (empty) empty.style.display = 'block';
-    box.innerHTML = '';
-    return;
-  }
-  if (empty) empty.style.display = 'none';
+  if (empty) empty.style.display = 'block';
   box.innerHTML = '';
-  window._callsHistory.forEach(c => {
-    const div = document.createElement('div');
-    div.className = 'chat-item';
-    div.innerHTML = `<div class="avatar" style="background:var(--accent)">${initials(c.name || '?')}</div><div class="chat-info"><div class="chat-name">${escapeHtml(c.name)}</div><div class="chat-preview">${c.video ? '📹 Видеозвонок' : '📞 Аудиозвонок'} · ${new Date(c.time).toLocaleString('ru-RU')}</div></div>`;
-    box.appendChild(div);
-  });
 }
 
 function renderContactsTab() {
@@ -1383,6 +1659,7 @@ function uploadAvatar(event) {
       myAvatar = canvas.toDataURL('image/jpeg', 0.8);
       socket.emit('set avatar', { avatar: myAvatar });
       updateMyAvatarBtn(); closeModal('profile-modal');
+      renderStoriesBar();
     };
     img.src = e.target.result;
   };
@@ -1394,7 +1671,6 @@ function updateMyAvatarBtn() {
   if (myAvatar) btn.innerHTML = `<img src="${myAvatar}" alt="">`; else btn.textContent = '👤';
 }
 
-// 🔒 Кнопка галочки — только для moroz
 function updateVerifyButton() {
   const btn = document.getElementById('verify-btn');
   if (!btn) return;
@@ -1413,7 +1689,6 @@ function updateVerifyButton() {
   }
 }
 
-// 🔒 Выдать галочку — только moroz
 function doVerify() {
   const targetUsername = document.getElementById('verify-password').value.trim().toLowerCase();
   const errEl = document.getElementById('verify-error'); errEl.textContent = '';
@@ -1436,6 +1711,7 @@ socket.on('me updated', (data) => {
   if (data.birthday !== undefined) myBirthday = data.birthday;
   if (data.emojiStatus !== undefined) myEmoji = data.emojiStatus;
   updateVerifyButton(); updateMyAvatarBtn(); renderChatList();
+  renderStoriesBar();
 });
 function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
@@ -1662,7 +1938,7 @@ function saveUnread() { try { localStorage.setItem(UNREAD_KEY, JSON.stringify(un
 function loadUnread() { try { const r = localStorage.getItem(UNREAD_KEY); if (r) unread = JSON.parse(r) || {}; } catch (e) {} }
 
 // ═══════════════════════════════════════════
-// ⬇ КНОПКА «ВНИЗ» (новое)
+// ⬇ КНОПКА «ВНИЗ»
 // ═══════════════════════════════════════════
 let scrollDownBound = false;
 function bindScrollDown() {
@@ -1705,7 +1981,331 @@ function bumpScrollDownBadge() {
 }
 
 // ═══════════════════════════════════════════
-// ⋮ МЕНЮ ЧАТА (новое)
+// 📸 ИСТОРИИ
+// ═══════════════════════════════════════════
+let storiesUsers = [];
+let currentStoryUserIdx = 0;
+let currentStoryIdx = 0;
+let storyTimer = null;
+let storyTimerStart = 0;
+const STORY_DURATION = 5000;
+
+function renderStoriesBar() {
+  const row = document.getElementById('stories-row');
+  if (!row) return;
+  row.innerHTML = '';
+  const mine = storiesUsers.find(u => u.username === myName);
+  const mineHasStory = mine && mine.stories.length > 0;
+
+  const mineBubble = document.createElement('div');
+  mineBubble.className = 'story-bubble';
+  const av = myAvatar ? `background-image:url(${myAvatar})` : '';
+  const avContent = myAvatar ? '' : initials(myName || '?');
+  mineBubble.innerHTML = `
+    <div class="story-ring mine ${mineHasStory ? 'has-story' : ''}">
+      <div class="story-ring-inner" style="${av}">${avContent}</div>
+      <div class="story-add-badge">+</div>
+    </div>
+    <div class="story-name">Моя</div>`;
+  mineBubble.onclick = () => {
+    if (mineHasStory) {
+      const idx = storiesUsers.indexOf(mine);
+      openStoryViewer(idx, 0);
+    } else {
+      openStoryAddModal();
+    }
+  };
+  row.appendChild(mineBubble);
+
+  storiesUsers.forEach((u, idx) => {
+    if (u.username === myName) return;
+    const bubble = document.createElement('div');
+    bubble.className = 'story-bubble';
+    const allViewed = u.stories.every(s => s.viewed);
+    const avs = u.avatar ? `background-image:url(${u.avatar})` : 'background:var(--accent)';
+    const avc = u.avatar ? '' : initials(u.firstName || u.username);
+    const displayName = (u.firstName || u.lastName) ? `${u.firstName || ''} ${u.lastName || ''}`.trim() : u.username;
+    bubble.innerHTML = `
+      <div class="story-ring ${allViewed ? 'viewed' : ''}">
+        <div class="story-ring-inner" style="${avs}">${avc}</div>
+      </div>
+      <div class="story-name">${escapeHtml(displayName)}</div>`;
+    bubble.onclick = () => openStoryViewer(idx, 0);
+    row.appendChild(bubble);
+  });
+}
+
+function openStoryAddModal() {
+  document.getElementById('story-file').value = '';
+  document.getElementById('story-preview-wrap').style.display = 'none';
+  document.getElementById('story-caption-input').value = '';
+  document.getElementById('story-add-error').textContent = '';
+  document.getElementById('story-submit-btn').disabled = true;
+  document.getElementById('story-submit-btn').textContent = '📤 Опубликовать';
+  window._storyImageData = null;
+  openModal('story-add-modal');
+}
+
+function onStoryFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxSize = 1080;
+      let w = img.width, h = img.height;
+      if (w > h && w > maxSize) { h = h * maxSize / w; w = maxSize; }
+      else if (h > maxSize) { w = w * maxSize / h; h = maxSize; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      window._storyImageData = dataUrl;
+      document.getElementById('story-preview-img').src = dataUrl;
+      document.getElementById('story-preview-wrap').style.display = 'block';
+      document.getElementById('story-submit-btn').disabled = false;
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function submitStory() {
+  if (!window._storyImageData) return;
+  const caption = document.getElementById('story-caption-input').value.trim();
+  const errEl = document.getElementById('story-add-error');
+  errEl.textContent = '';
+  document.getElementById('story-submit-btn').disabled = true;
+  document.getElementById('story-submit-btn').textContent = 'Публикую…';
+
+  socket.emit('post story', { image: window._storyImageData, caption }, (res) => {
+    document.getElementById('story-submit-btn').textContent = '📤 Опубликовать';
+    document.getElementById('story-submit-btn').disabled = false;
+    if (!res.ok) { errEl.textContent = res.error || 'Ошибка'; return; }
+    closeModal('story-add-modal');
+    window._storyImageData = null;
+    loadStories();
+  });
+}
+
+function loadStories() {
+  socket.emit('load stories', (res) => {
+    if (!res || !res.ok) return;
+    storiesUsers = res.users || [];
+    renderStoriesBar();
+  });
+}
+
+function timeAgo(ms) {
+  const diff = Date.now() - ms;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'только что';
+  if (m < 60) return m + ' мин назад';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' ч назад';
+  const d = Math.floor(h / 24);
+  return d + ' дн назад';
+}
+
+function openStoryViewer(userIdx, storyIdx) {
+  if (!storiesUsers[userIdx]) return;
+  if (!storiesUsers[userIdx].stories[storyIdx]) return;
+  currentStoryUserIdx = userIdx;
+  currentStoryIdx = storyIdx;
+  document.getElementById('story-viewer').classList.add('active');
+  renderCurrentStory();
+  startStoryTimer();
+}
+
+function renderCurrentStory() {
+  const u = storiesUsers[currentStoryUserIdx];
+  if (!u) return closeStoryViewer();
+  const s = u.stories[currentStoryIdx];
+  if (!s) return closeStoryViewer();
+
+  const bar = document.getElementById('story-progress-bar');
+  bar.innerHTML = '';
+  u.stories.forEach((_, i) => {
+    const seg = document.createElement('div');
+    seg.className = 'story-progress-segment' + (i < currentStoryIdx ? ' done' : '');
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    if (i < currentStoryIdx) fill.style.width = '100%';
+    seg.appendChild(fill);
+    bar.appendChild(seg);
+  });
+
+  const av = document.getElementById('story-avatar');
+  if (u.avatar) { av.style.backgroundImage = `url(${u.avatar})`; av.textContent = ''; }
+  else { av.style.backgroundImage = ''; av.textContent = initials(u.firstName || u.username); av.style.background = 'linear-gradient(135deg,#6d28d9,#a855f7)'; }
+  const displayName = (u.firstName || u.lastName) ? `${u.firstName || ''} ${u.lastName || ''}`.trim() : u.username;
+  document.getElementById('story-name').textContent = displayName;
+  document.getElementById('story-time').textContent = timeAgo(s.time);
+  document.getElementById('story-image').src = s.image;
+
+  const cap = document.getElementById('story-caption');
+  if (s.caption) { cap.textContent = s.caption; cap.classList.add('show'); }
+  else cap.classList.remove('show');
+
+  const isMine = u.username === myName;
+  const delBtn = document.getElementById('story-delete-btn');
+  const viewsBtn = document.getElementById('story-views-btn');
+  if (isMine) {
+    delBtn.style.display = 'flex';
+    viewsBtn.style.display = 'flex';
+    socket.emit('get story views', { storyId: s.id }, (res) => {
+      if (res.ok) viewsBtn.textContent = '👁 ' + res.viewers.length;
+    });
+  } else {
+    delBtn.style.display = 'none';
+    viewsBtn.style.display = 'none';
+    // Отметить просмотр
+    if (!s.viewed) {
+      s.viewed = true;
+      socket.emit('view story', { storyId: s.id });
+    }
+  }
+}
+
+function startStoryTimer() {
+  stopStoryTimer();
+  storyTimerStart = Date.now();
+  const u = storiesUsers[currentStoryUserIdx];
+  if (!u) return;
+  const seg = document.querySelectorAll('#story-progress-bar .story-progress-segment')[currentStoryIdx];
+  const fill = seg ? seg.querySelector('.fill') : null;
+  const tick = () => {
+    const elapsed = Date.now() - storyTimerStart;
+    const pct = Math.min(100, (elapsed / STORY_DURATION) * 100);
+    if (fill) fill.style.width = pct + '%';
+    if (elapsed >= STORY_DURATION) {
+      nextStory();
+      return;
+    }
+    storyTimer = requestAnimationFrame(tick);
+  };
+  storyTimer = requestAnimationFrame(tick);
+}
+function stopStoryTimer() {
+  if (storyTimer) { cancelAnimationFrame(storyTimer); storyTimer = null; }
+}
+
+function nextStory() {
+  const u = storiesUsers[currentStoryUserIdx];
+  if (!u) return closeStoryViewer();
+  if (currentStoryIdx + 1 < u.stories.length) {
+    currentStoryIdx++;
+    renderCurrentStory();
+    startStoryTimer();
+  } else {
+    // Следующий пользователь
+    let nextUserIdx = currentStoryUserIdx + 1;
+    while (nextUserIdx < storiesUsers.length && storiesUsers[nextUserIdx].username === myName) nextUserIdx++;
+    if (nextUserIdx < storiesUsers.length) {
+      currentStoryUserIdx = nextUserIdx;
+      currentStoryIdx = 0;
+      renderCurrentStory();
+      startStoryTimer();
+    } else {
+      closeStoryViewer();
+    }
+  }
+}
+
+function prevStory() {
+  const u = storiesUsers[currentStoryUserIdx];
+  if (!u) return;
+  if (currentStoryIdx > 0) {
+    currentStoryIdx--;
+    renderCurrentStory();
+    startStoryTimer();
+  } else {
+    let prevUserIdx = currentStoryUserIdx - 1;
+    while (prevUserIdx >= 0 && storiesUsers[prevUserIdx].username === myName) prevUserIdx--;
+    if (prevUserIdx >= 0) {
+      currentStoryUserIdx = prevUserIdx;
+      currentStoryIdx = storiesUsers[prevUserIdx].stories.length - 1;
+      renderCurrentStory();
+      startStoryTimer();
+    } else {
+      renderCurrentStory();
+      startStoryTimer();
+    }
+  }
+}
+
+function closeStoryViewer() {
+  stopStoryTimer();
+  document.getElementById('story-viewer').classList.remove('active');
+  renderStoriesBar();
+}
+
+function deleteCurrentStory() {
+  const u = storiesUsers[currentStoryUserIdx];
+  if (!u) return;
+  const s = u.stories[currentStoryIdx];
+  if (!s) return;
+  if (!confirm('Удалить эту историю?')) return;
+  socket.emit('delete story', { storyId: s.id }, (res) => {
+    if (!res.ok) { alert(res.error || 'Ошибка'); return; }
+    u.stories.splice(currentStoryIdx, 1);
+    if (u.stories.length === 0) {
+      storiesUsers.splice(currentStoryUserIdx, 1);
+    }
+    if (storiesUsers.length === 0) return closeStoryViewer();
+    if (currentStoryUserIdx >= storiesUsers.length) currentStoryUserIdx = storiesUsers.length - 1;
+    if (currentStoryIdx >= storiesUsers[currentStoryUserIdx].stories.length) currentStoryIdx = 0;
+    renderCurrentStory();
+    startStoryTimer();
+  });
+}
+
+function openStoryViewers() {
+  const u = storiesUsers[currentStoryUserIdx];
+  if (!u) return;
+  const s = u.stories[currentStoryIdx];
+  if (!s) return;
+  socket.emit('get story views', { storyId: s.id }, (res) => {
+    const box = document.getElementById('story-viewers-list');
+    if (!res.ok || !res.viewers || res.viewers.length === 0) {
+      box.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">Пока никто не смотрел</div>';
+    } else {
+      box.innerHTML = '';
+      res.viewers.forEach(v => {
+        const c = contacts.find(x => x.name === v.viewer);
+        const displayName = c?.displayName || v.viewer;
+        const av = c?.avatar;
+        const row = document.createElement('div');
+        row.className = 'member-row';
+        row.innerHTML = `<div class="member-avatar" style="${av ? `background-image:url(${av})` : 'background:var(--accent)'}">${av ? '' : initials(displayName)}</div><div class="member-name">${escapeHtml(displayName)}<div style="font-size:12px; color:var(--text-muted);">${new Date(v.time).toLocaleString('ru-RU')}</div></div>`;
+        box.appendChild(row);
+      });
+    }
+    openModal('story-viewers-modal');
+  });
+}
+
+// Реалтайм события историй
+socket.on('story new', (payload) => {
+  loadStories();
+});
+socket.on('story deleted', ({ storyId }) => {
+  // удаляем локально
+  storiesUsers.forEach(u => {
+    u.stories = u.stories.filter(s => s.id !== storyId);
+  });
+  storiesUsers = storiesUsers.filter(u => u.stories.length > 0);
+  renderStoriesBar();
+  if (document.getElementById('story-viewer').classList.contains('active')) {
+    if (!storiesUsers[currentStoryUserIdx]) return closeStoryViewer();
+    renderCurrentStory();
+    startStoryTimer();
+  }
+});
+
+// ═══════════════════════════════════════════
+// ⋮ МЕНЮ ЧАТА V2
 // ═══════════════════════════════════════════
 function currentChatKey() {
   return currentGroup ? 'g:' + currentGroup.id : currentChat;
