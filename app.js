@@ -1,10 +1,9 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v9.0 — Client
+   🌌 AURORA v10.0 — Client
    ═══════════════════════════════════════════════════════════ */
 
-// ─── СОСТОЯНИЕ ───
 const state = {
   me: { username: null, avatar: null, verified: false, bio: '', firstName: '', lastName: '', birthday: '', emoji: '', stars: 0, sessionId: null },
   contacts: [], groups: [], channels: [], unread: {}, typingUsers: {}, blockedList: [], giftsCatalog: {},
@@ -30,12 +29,14 @@ const state = {
   titleFlashInterval: null, myTypingTimeout: null, typingTimeouts: {},
   createSelected: new Set(), addMembersSelected: new Set(),
   currentColorTarget: null, toastTimeout: null, bootTimeoutId: null, isLoggedIn: false,
+  chatWallpapers: {},
 };
 
 const STORAGE = {
   SESSION: 'aurora-session', UNREAD: 'aurora-unread',
   CONTACTS_CACHE: 'aurora-contacts-cache', GROUPS_CACHE: 'aurora-groups-cache',
   RECENT_STICKERS: 'aurora-recent-stickers', SETTINGS: 'aurora-settings-cache',
+  WALLPAPERS: 'aurora-wallpapers',
 };
 
 const STORY_DURATION = 5000;
@@ -119,14 +120,56 @@ function loadJson(key, fallback) {
   } catch (e) { return fallback !== undefined ? fallback : null; }
 }
 
+function vibrate(ms) {
+  if (state.settings.vibration === 0 || state.settings.vibration === '0') return;
+  if ('vibrate' in navigator) {
+    try { navigator.vibrate(ms || [10, 20, 10]); } catch (e) {}
+  }
+}
+
+// ─── НОВОЕ: показать/скрыть пароль ───
+function togglePassword(inputId) {
+  const input = $(inputId);
+  if (!input) return;
+  const btn = input.parentElement.querySelector('.auth-toggle-password');
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (btn) { btn.textContent = '🙈'; btn.classList.add('showing'); }
+  } else {
+    input.type = 'password';
+    if (btn) { btn.textContent = '👁'; btn.classList.remove('showing'); }
+  }
+  vibrate(10);
+}
+
+// ─── НОВОЕ: спиннер на кнопках ───
+function showBtnSpinner(btnId, text) {
+  const btn = $(btnId);
+  if (!btn) return;
+  const textEl = btn.querySelector('.btn-text');
+  const spinner = btn.querySelector('.btn-spinner');
+  if (textEl && text) textEl.textContent = text;
+  if (spinner) spinner.style.display = 'inline-flex';
+  btn.disabled = true;
+}
+function hideBtnSpinner(btnId, text) {
+  const btn = $(btnId);
+  if (!btn) return;
+  const textEl = btn.querySelector('.btn-text');
+  const spinner = btn.querySelector('.btn-spinner');
+  if (textEl && text) textEl.textContent = text;
+  if (spinner) spinner.style.display = 'none';
+  btn.disabled = false;
+}
+
 // ─── RIPPLE ───
 document.addEventListener('touchstart', function (e) {
-  const btn = e.target.closest('.auth-primary-btn, .modal-primary, .modal-secondary, .modal-danger, .nav-btn, .create-menu-btn, .settings-item');
+  const btn = e.target.closest('.auth-btn-primary, .modal-primary, .modal-secondary, .modal-danger, .nav-btn, .create-menu-btn, .settings-item');
   if (!btn) return;
   btn.style.transform = 'scale(0.97)';
 }, { passive: true });
 document.addEventListener('touchend', function (e) {
-  const btn = e.target.closest('.auth-primary-btn, .modal-primary, .modal-secondary, .modal-danger, .nav-btn, .create-menu-btn, .settings-item');
+  const btn = e.target.closest('.auth-btn-primary, .modal-primary, .modal-secondary, .modal-danger, .nav-btn, .create-menu-btn, .settings-item');
   if (!btn) return;
   setTimeout(function () { btn.style.transform = ''; }, 100);
 }, { passive: true });
@@ -265,6 +308,7 @@ function playLoginTransition(username, firstName, isAutoLogin) {
     loadStories();
     renderChatList();
     renderStoriesBar();
+    applyChatWallpaper();
   }, 200);
 }
 
@@ -281,6 +325,7 @@ function switchAuthScreen(screen) {
     state.regStep = 1;
     regShowStep(1);
   }
+  vibrate(10);
 }
 
 function regShowStep(step) {
@@ -292,21 +337,20 @@ function regShowStep(step) {
   });
   const backBtn = $('reg-back-btn');
   if (backBtn) backBtn.classList.toggle('show', step > 1);
-  document.querySelectorAll('.reg-step').forEach(function (el) {
+  document.querySelectorAll('.reg-step-card').forEach(function (el) {
     const s = Number(el.dataset.step);
     if (s === step) {
       el.classList.add('active');
-      el.style.display = 'flex';
     } else {
       el.classList.remove('active');
-      el.style.display = 'none';
     }
   });
   setTimeout(function () {
     if (step === 1) { const el = $('reg-username'); if (el) el.focus(); }
     else if (step === 2) { const el = $('reg-displayname'); if (el) el.focus(); }
     else if (step === 3) { const el = $('reg-password'); if (el) el.focus(); }
-  }, 100);
+  }, 200);
+  vibrate(10);
 }
 
 function regNext(step) {
@@ -320,7 +364,10 @@ function regNext(step) {
     regShowStep(3);
   }
 }
-function regBack() { if (state.regStep > 1) regShowStep(state.regStep - 1); }
+function regBack() {
+  if (state.regStep > 1) regShowStep(state.regStep - 1);
+  vibrate(10);
+}
 
 function onRegUsernameInput() {
   const input = $('reg-username');
@@ -361,6 +408,7 @@ function onRegUsernameInput() {
         hint.classList.add('success');
         nextBtn.disabled = false;
         state.regUsernameAvailable = true;
+        vibrate(15);
       } else {
         wrap.classList.add('error');
         status.textContent = '❌';
@@ -369,6 +417,7 @@ function onRegUsernameInput() {
         hint.classList.add('error');
         nextBtn.disabled = true;
         state.regUsernameAvailable = false;
+        vibrate([30, 20, 30]);
       }
     });
   }, 350);
@@ -402,9 +451,9 @@ function onRegPassword2Input() {
   const p = $('reg-password').value;
   const p2 = $('reg-password2').value;
   const hint = $('reg-password2-hint');
-  if (!p2) { hint.textContent = ''; }
-  else if (p === p2) { hint.textContent = '✓ Совпадают'; hint.style.color = '#22c55e'; }
-  else { hint.textContent = 'Пароли не совпадают'; hint.style.color = '#ef4444'; }
+  if (!p2) { hint.textContent = ''; hint.classList.remove('success', 'error'); }
+  else if (p === p2) { hint.textContent = '✓ Совпадают'; hint.classList.add('success'); hint.classList.remove('error'); }
+  else { hint.textContent = 'Пароли не совпадают'; hint.classList.add('error'); hint.classList.remove('success'); }
   updateRegSubmit();
 }
 
@@ -424,19 +473,18 @@ function doRegister() {
   const password = $('reg-password').value;
   const errEl = $('reg-error-3');
   errEl.textContent = '';
-  const btn = $('reg-submit');
-  btn.disabled = true;
-  btn.textContent = 'Создаю…';
+  showBtnSpinner('reg-submit', 'Создаю…');
   socket.emit('register', { username: username, password: password, displayName: displayName }, function (res) {
-    btn.textContent = 'Создать аккаунт';
+    hideBtnSpinner('reg-submit', 'Создать аккаунт');
     if (!res || !res.ok) {
       errEl.textContent = res && res.error ? res.error : 'Ошибка регистрации';
-      btn.disabled = false;
+      vibrate([30, 20, 30]);
       return;
     }
     saveJson(STORAGE.SESSION, { username: res.username, sessionId: res.sessionId });
     onLoggedIn(res, false);
     showToast('🎉 Добро пожаловать! +' + res.bonus + ' ⭐');
+    vibrate([50, 30, 50]);
   });
 }
 
@@ -445,10 +493,8 @@ function doLogin() {
   const password = $('login-password').value;
   const errEl = $('login-error');
   errEl.textContent = '';
-  if (!username || !password) { errEl.textContent = 'Заполни все поля'; return; }
-  const btn = $('login-btn');
-  btn.disabled = true;
-  btn.textContent = 'Вхожу…';
+  if (!username || !password) { errEl.textContent = 'Заполни все поля'; vibrate([30, 20, 30]); return; }
+  showBtnSpinner('login-btn', 'Вхожу…');
   const existing = loadJson(STORAGE.SESSION);
   socket.emit('login', {
     username: username,
@@ -456,10 +502,10 @@ function doLogin() {
     device: (navigator.userAgent || '').slice(0, 40),
     sessionId: existing ? existing.sessionId : null
   }, function (res) {
-    btn.disabled = false;
-    btn.textContent = 'Войти';
+    hideBtnSpinner('login-btn', 'Войти');
     if (!res || !res.ok) {
       errEl.textContent = res && res.error ? res.error : 'Ошибка входа';
+      vibrate([30, 20, 30]);
       return;
     }
     saveJson(STORAGE.SESSION, { username: res.username, sessionId: res.sessionId });
@@ -478,6 +524,7 @@ function onLoggedIn(res, isAutoLogin) {
   state.me.emoji = res.emojiStatus || '';
   state.me.sessionId = res.sessionId;
   state.me.stars = Number(res.stars || 0);
+  state.chatWallpapers = loadJson(STORAGE.WALLPAPERS, {}) || {};
   playLoginTransition(res.username, res.firstName, !!isAutoLogin);
   setTimeout(function () {
     socket.emit('get gifts catalog', function (r) {
@@ -491,7 +538,7 @@ function tryPasscode() {
   const errEl = $('passcode-error');
   errEl.textContent = '';
   socket.emit('check passcode', { passcode: passcode }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = 'Неверный код'; return; }
+    if (!res || !res.ok) { errEl.textContent = 'Неверный код'; vibrate([30, 20, 30]); return; }
     $('passcode-screen').classList.remove('active');
     playLoginTransition(state.me.username, state.me.firstName, true);
   });
@@ -554,6 +601,7 @@ async function tryAutoLogin() {
       state.me.emoji = res.emojiStatus || '';
       state.me.sessionId = res.sessionId;
       state.me.stars = Number(res.stars || 0);
+      state.chatWallpapers = loadJson(STORAGE.WALLPAPERS, {}) || {};
       socket.emit('get gifts catalog', function (r) {
         if (r && r.ok) state.giftsCatalog = r.catalog || {};
       });
@@ -640,13 +688,6 @@ function playPing() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.3);
   } catch (e) {}
-}
-
-function vibrate() {
-  if (state.settings.vibration === 0 || state.settings.vibration === '0') return;
-  if ('vibrate' in navigator) {
-    try { navigator.vibrate([100, 50, 100]); } catch (e) {}
-  }
 }
 
 function showBrowserNotification(from, text) {
@@ -834,7 +875,7 @@ function renderSettings() {
 
   html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v9.0<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.0<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
@@ -1024,9 +1065,11 @@ function clearCache() {
   if (!confirm('Очистить кэш?')) return;
   const session = localStorage.getItem(STORAGE.SESSION);
   const unread = localStorage.getItem(STORAGE.UNREAD);
+  const wallpapers = localStorage.getItem(STORAGE.WALLPAPERS);
   localStorage.clear();
   if (session) localStorage.setItem(STORAGE.SESSION, session);
   if (unread) localStorage.setItem(STORAGE.UNREAD, unread);
+  if (wallpapers) localStorage.setItem(STORAGE.WALLPAPERS, wallpapers);
   alert('Кэш очищен');
   showCacheSize();
 }
@@ -1346,6 +1389,81 @@ function clearUnread(key) {
   }
 }
 
+// ─── ОБОИ ЧАТА ───
+function getChatWallpaper(chatKey) {
+  if (!chatKey) return null;
+  return state.chatWallpapers[chatKey] || null;
+}
+
+function setChatWallpaper(chatKey, dataUrl) {
+  if (!chatKey) return;
+  if (dataUrl) {
+    state.chatWallpapers[chatKey] = dataUrl;
+  } else {
+    delete state.chatWallpapers[chatKey];
+  }
+  saveJson(STORAGE.WALLPAPERS, state.chatWallpapers);
+  applyChatWallpaper();
+}
+
+function applyChatWallpaper() {
+  const box = $('messages');
+  if (!box) return;
+  const chatKey = state.currentChat || (state.currentGroup ? 'g:' + state.currentGroup.id : null);
+  const wp = getChatWallpaper(chatKey);
+  if (wp) {
+    box.style.backgroundImage = 'url(' + wp + ')';
+    box.style.backgroundSize = 'cover';
+    box.style.backgroundPosition = 'center';
+    box.classList.add('has-wallpaper');
+  } else {
+    box.style.backgroundImage = '';
+    box.style.backgroundSize = '';
+    box.style.backgroundPosition = '';
+    box.classList.remove('has-wallpaper');
+  }
+}
+
+function openWallpaperPicker() {
+  const chatKey = state.currentChat || (state.currentGroup ? 'g:' + state.currentGroup.id : null);
+  if (!chatKey) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement('canvas');
+        const maxW = 1080;
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = h * maxW / w; w = maxW; }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        setChatWallpaper(chatKey, dataUrl);
+        showToast('🎨 Обои установлены');
+        vibrate(15);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function removeChatWallpaper() {
+  const chatKey = state.currentChat || (state.currentGroup ? 'g:' + state.currentGroup.id : null);
+  if (!chatKey) return;
+  setChatWallpaper(chatKey, null);
+  showToast('🎨 Обои удалены');
+  vibrate(10);
+}
+
 // ─── CHAT LIST ───
 function renderChatList() {
   const box = $('chat-list');
@@ -1511,6 +1629,7 @@ function openChat(name) {
   updateTopStatusTyping();
   bindScrollDown();
   closeStickersPanel();
+  applyChatWallpaper();
 }
 
 function openSavedChat() {
@@ -1538,6 +1657,7 @@ function openSavedChat() {
   renderChatList();
   bindScrollDown();
   closeStickersPanel();
+  applyChatWallpaper();
 }
 
 function openGroupChat(g) {
@@ -1581,6 +1701,7 @@ function openGroupChat(g) {
   renderChatList();
   bindScrollDown();
   closeStickersPanel();
+  applyChatWallpaper();
 }
 
 function closeChat() {
@@ -4015,6 +4136,7 @@ window.addEventListener('load', function () {
     applyLocalSettings();
   }
   state.stickerRecent = loadJson(STORAGE.RECENT_STICKERS, []) || [];
+  state.chatWallpapers = loadJson(STORAGE.WALLPAPERS, {}) || {};
 
   // ?add=username
   const params = new URLSearchParams(window.location.search);
@@ -4047,4 +4169,4 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Aurora v9.0 — Smooth UI — загружена');
+console.log('✅ Aurora v10.0 — Smooth UI — загружена');
