@@ -120,7 +120,7 @@
   body:not(.premium) .incoming-btn.accept { background: #22c55e; }
   body:not(.premium) .incoming-btn.decline { background: #e53935; }
   body:not(.premium) .nav-btn.active .nav-icon { background: var(--accent); box-shadow: none; }
-
+ 
   #conn-status {
     display: none; align-items: center; gap: 8px;
     padding: 8px 16px; font-size: 13px; font-weight: 500;
@@ -271,7 +271,7 @@
   .reactions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; clear: both; }
   .reaction-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; background: rgba(255,255,255,0.1); border: 1px solid transparent; border-radius: 12px; font-size: 12px; color: inherit; cursor: pointer; }
   .reaction-chip.mine { background: rgba(168, 85, 247, 0.3); border-color: var(--accent); }
- 
+  
   #input-area { display: flex; align-items: flex-end; gap: 6px; padding: 10px 12px 16px; background: var(--bg-header); border-top: var(--glass-border); flex-shrink: 0; }
   #input-area .attach, #input-area .mic, #input-area .camera { background: none; border: none; color: var(--accent); font-size: 22px; cursor: pointer; padding: 8px; flex-shrink: 0; }
   #input-area .mic.recording, #input-area .camera.recording { color: #ef4444; }
@@ -1453,9 +1453,7 @@ function applyLocalSettings() {
   if (settings.accent_color) document.documentElement.style.setProperty('--accent', settings.accent_color);
 }
 
-// НИЖНЯЯ НАВИГАЦИЯ
 const TAB_TITLES = { chats: 'Aurora', calls: 'Звонки', contacts: 'Контакты', settings: 'Настройки' };
-
 function switchTab(tab) {
   activeTab = tab;
   const app = document.getElementById('app');
@@ -1776,10 +1774,8 @@ function addFromQr() {
     closeModal('qr-found-modal'); qrFoundUser = null; alert('Контакт добавлен!');
   });
 }
-
 socket.on('contacts', (list) => { contacts = list; try { localStorage.setItem(CONTACTS_CACHE_KEY, JSON.stringify(list)); } catch (e) {} renderChatList(); if (activeTab === 'contacts') renderContactsTab(); });
 socket.on('groups', (list, meta) => { groups = list; if (meta && meta.canCreate !== undefined) canCreateGroup = meta.canCreate; try { localStorage.setItem(GROUPS_CACHE_KEY, JSON.stringify(list)); } catch (e) {} renderChatList(); });
-
 function renderChatList() {
   const box = document.getElementById('chat-list'); if (!box) return; box.innerHTML = '';
   const savedItem = document.createElement('div');
@@ -1842,7 +1838,6 @@ function initials(name) {
   return p.length >= 2 ? (p[0][0] + p[1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
 }
 function filterContacts() { renderChatList(); }
-
 function openChat(name) {
   currentChat = name; currentGroup = null; isSavedChat = false;
   clearUnread(name); lastDateShown = ''; pinnedMessageId = null;
@@ -1923,7 +1918,6 @@ function clearUnread(key) { if (unread[key]) { delete unread[key]; saveUnread();
 function saveUnread() { try { localStorage.setItem(UNREAD_KEY, JSON.stringify(unread)); } catch (e) {} }
 function loadUnread() { try { const r = localStorage.getItem(UNREAD_KEY); if (r) unread = JSON.parse(r) || {}; } catch (e) {} }
 
-// КНОПКА «ВНИЗ»
 let scrollDownBound = false;
 function bindScrollDown() {
   const box = document.getElementById('messages');
@@ -1964,7 +1958,6 @@ function bumpScrollDownBadge() {
   }
 }
 
-// СВАЙП-ОТВЕТ
 const SWIPE_THRESHOLD = 60;
 function bindSwipeReply(msgDiv, wrap, msg) {
   if (msg.deleted) return;
@@ -1974,24 +1967,13 @@ function bindSwipeReply(msgDiv, wrap, msg) {
   wrap.appendChild(icon);
   let startX = 0, startY = 0, currentX = 0, isDragging = false, locked = false;
   const isSelf = msg.self;
-  const onStart = (x, y) => {
-    if (msg.deleted) return;
-    startX = x; startY = y; currentX = 0;
-    isDragging = true; locked = false;
-    wrap.classList.remove('swipe-ready');
-  };
+  const onStart = (x, y) => { if (msg.deleted) return; startX = x; startY = y; currentX = 0; isDragging = true; locked = false; wrap.classList.remove('swipe-ready'); };
   const onMove = (x, y) => {
     if (!isDragging) return;
     const dx = x - startX, dy = y - startY;
     if (!locked) {
-      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
-        isDragging = false;
-        wrap.style.transform = '';
-        wrap.classList.remove('swiping', 'swipe-active', 'swipe-ready');
-        return;
-      }
-      if (Math.abs(dx) > 8) { locked = true; wrap.classList.add('swiping'); }
-      else return;
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) { isDragging = false; wrap.style.transform = ''; wrap.classList.remove('swiping', 'swipe-active', 'swipe-ready'); return; }
+      if (Math.abs(dx) > 8) { locked = true; wrap.classList.add('swiping'); } else return;
     }
     let d = dx;
     if (isSelf && d > 0) d = 0;
@@ -2032,7 +2014,6 @@ function triggerReplyFromSwipe(msg) {
   if (settings.vibration != 0 && 'vibrate' in navigator) { try { navigator.vibrate(15); } catch (e) {} }
 }
 
-// СТИКЕРЫ
 let stickersData = [];
 let stickerRecent = [];
 let stickerCurrentTab = 'recent';
@@ -2258,7 +2239,6 @@ function submitGifUrl() {
   });
 }
 
-// ИСТОРИИ
 let storiesUsers = [];
 let currentStoryUserIdx = 0;
 let currentStoryIdx = 0;
@@ -2515,7 +2495,6 @@ socket.on('story deleted', ({ storyId }) => {
   }
 });
 
-// МЕНЮ ЧАТА V2
 function currentChatKey() { return currentGroup ? 'g:' + currentGroup.id : currentChat; }
 function currentChatObj() { if (currentGroup) return currentGroup; return contacts.find(c => c.name === currentChat); }
 function openChatMenuV2() {
@@ -2801,7 +2780,6 @@ socket.on('group reaction updated', ({ groupId, messageId, reactions }) => { if 
 socket.on('group deleted', ({ groupId }) => { if (currentGroup && currentGroup.id === groupId) { closeModal('group-info-modal'); closeChat(); } groups = groups.filter(g => g.id !== groupId); delete unread['g:' + groupId]; saveUnread(); updateTitle(); renderChatList(); });
 socket.on('session terminated', () => { alert('Сеанс завершён'); clearCreds(); location.reload(); });
 socket.on('account deleted', () => { clearCreds(); location.reload(); });
-
 function renderMessage(msg) {
   const box = document.getElementById('messages');
   if (msg.time) {
@@ -2883,7 +2861,6 @@ function renderMessage(msg) {
   metaHTML += t;
   if (msg.self && !msg.isGroup) metaHTML += ` <span class="check${msg.read ? ' read' : ''}">✓✓</span>`;
   meta.innerHTML = metaHTML; div.appendChild(meta);
-
   let pressTimer = null;
   const startPress = (e) => { pressTimer = setTimeout(() => showReactionMenu(e, msg.id, wrap, !!msg.isGroup), 500); };
   const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
@@ -2894,9 +2871,7 @@ function renderMessage(msg) {
   div.addEventListener('mouseup', cancelPress);
   div.addEventListener('mouseleave', cancelPress);
   div.addEventListener('contextmenu', (e) => { e.preventDefault(); showActionMenu(e, msg); });
-
   bindSwipeReply(div, wrap, msg);
-
   wrap.appendChild(div);
   renderReactionsInto(wrap, msg.reactions, !!msg.isGroup);
   box.appendChild(wrap);
@@ -3149,24 +3124,31 @@ function confirmDeleteGroup() {
 function openLightbox(src) { document.getElementById('lightbox-img').src = src; document.getElementById('lightbox').classList.add('active'); }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// ЗВОНКИ — с TURN
 let peerConnection, localStream, micOn = true, camOn = true;
 let callActive = false, pendingOffer = null, incomingFrom = null, incomingVideo = false;
 let callTimerInterval = null, callStartTime = 0;
 let screenStream = null, screenTrack = null, isScreenSharing = false;
+
+// 🎯 TURN от evan-brass
 const config = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:stun.relay.metered.ca:80' },
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    { 
+      urls: [
+        'turn:turn.evan-brass.net:3478',
+        'turn:turn.evan-brass.net:3478?transport=tcp',
+        'turn:turn.evan-brass.net:443'
+      ], 
+      username: 'user', 
+      credential: 'password' 
+    }
   ],
   iceCandidatePoolSize: 10,
   iceTransportPolicy: 'all'
 };
+
 function startCallTimer() {
   callStartTime = Date.now();
   const el = document.getElementById('call-timer');
