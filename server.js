@@ -66,9 +66,7 @@ function cacheGet(map, key) {
   if (Date.now() > entry.expires) { map.delete(key); return null; }
   return entry.value;
 }
-function cacheSet(map, key, value) {
-  map.set(key, { value, expires: Date.now() + CACHE_TTL });
-}
+function cacheSet(map, key, value) { map.set(key, { value, expires: Date.now() + CACHE_TTL }); }
 function cacheInvalidate(map, key) { map.delete(key); }
 
 async function initDB() {
@@ -274,7 +272,6 @@ async function initDB() {
   await db.execute(`ALTER TABLE stickers ADD COLUMN type TEXT DEFAULT 'image'`).catch(() => {});
   await db.execute(`ALTER TABLE stickers ADD COLUMN emoji TEXT`).catch(() => {});
 
-  // 🎁 ПОДАРОЧНЫЕ КОДЫ
   await db.execute(`
     CREATE TABLE IF NOT EXISTS gift_codes (
       code TEXT PRIMARY KEY,
@@ -285,10 +282,50 @@ async function initDB() {
     )
   `);
 
+  // 📢 КАНАЛЫ
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS channels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT,
+      avatar TEXT,
+      owner TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS channel_members (
+      channel_id INTEGER NOT NULL,
+      username TEXT NOT NULL,
+      role TEXT DEFAULT 'subscriber',
+      joined_at INTEGER NOT NULL,
+      PRIMARY KEY (channel_id, username)
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS channel_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel_id INTEGER NOT NULL,
+      from_user TEXT NOT NULL,
+      text TEXT,
+      image TEXT,
+      voice TEXT,
+      voice_duration INTEGER,
+      video_circle TEXT,
+      video_duration INTEGER,
+      sticker TEXT,
+      reactions TEXT DEFAULT '{}',
+      edited INTEGER DEFAULT 0,
+      deleted INTEGER DEFAULT 0,
+      time INTEGER NOT NULL
+    )
+  `);
+
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_contacts_owner ON contacts(owner)`).catch(() => {});
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_contacts_contact ON contacts(contact)`).catch(() => {});
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(from_user, to_user, time)`).catch(() => {});
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_gmsg_group ON group_messages(group_id, time)`).catch(() => {});
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_channel_posts ON channel_posts(channel_id, time)`).catch(() => {});
 
   console.log(`✅ База данных готова за ${Date.now() - start}мс`);
 }
@@ -541,6 +578,67 @@ async function countUserCreatedGroups(username) {
   return Number(r.rows[0]?.cnt || 0);
 }
 
+// 📢 КАНАЛЫ — хелперы
+async function getUserChannels(username) {
+  const r = await db.execute({
+    sql: `SELECT c.*, cm.role FROM channels c
+          INNER JOIN channel_members cm ON c.id = cm.channel_id
+          WHERE cm.username = ? ORDER BY c.created_at DESC`,
+    args: [username]
+  });
+  return r.rows;
+}
+async function getChannelById(id) {
+  const r = await db.execute({ sql: 'SELECT * FROM channels WHERE id = ?', args: [id] });
+  return r.rows[0] || null;
+}
+async function getChannelMembers(channelId) {
+  const r = await db.execute({
+    sql: 'SELECT username, role FROM channel_members WHERE channel_id = ? ORDER BY joined_at ASC',
+    args: [channelId]
+  });
+  return r.rows;
+}
+async function isChannelMember(channelId, username) {
+  const r = await db.execute({
+    sql: 'SELECT role FROM channel_members WHERE channel_id = ? AND username = ?',
+    args: [channelId, username]
+  });
+  return r.rows[0]?.role || null;
+}
+async function canPostInChannel(channelId, username) {
+  const role = await isChannelMember(channelId, username);
+  return role === 'owner' || role === 'admin';
+}
+async function getChannelPosts(channelId) {
+  const r = await db.execute({
+    sql: 'SELECT * FROM channel_posts WHERE channel_id = ? AND deleted = 0 ORDER BY time ASC LIMIT 300',
+    args: [channelId]
+  });
+  return r.rows;
+}
+async function sendChannelsTo(username) {
+  const sockets = findSocketsByUsername(username);
+  if (sockets.length === 0) return;
+  const channels = await getUserChannels(username);
+  const list = [];
+  for (const c of channels) {
+    const members = await getChannelMembers(c.id);
+    list.push({
+      id: c.id, name: c.name, description: c.description, avatar: c.avatar,
+      owner: c.owner, role: c.role,
+      memberCount: members.length,
+      isOwner: c.owner === username,
+      canPost: c.role === 'owner' || c.role === 'admin'
+    });
+  }
+  sockets.forEach(sid => io.to(sid).emit('channels', list));
+}
+async function notifyChannelMembers(channelId, event, payload) {
+  const members = await getChannelMembers(channelId);
+  members.forEach(m => findSocketsByUsername(m.username).forEach(sid => io.to(sid).emit(event, payload)));
+}
+
 const onlineUsers = {};
 function findSocketsByUsername(username) {
   return Object.entries(onlineUsers).filter(([, u]) => u === username).map(([sid]) => sid);
@@ -697,6 +795,7 @@ io.on('connection', (socket) => {
       getSettings(username).then(s => socket.emit('settings', s)).catch(() => {});
       sendContactsTo(username).catch(() => {});
       sendGroupsTo(username).catch(() => {});
+      sendChannelsTo(username).catch(() => {});
       refreshForFriends(username).catch(() => {});
     } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
   });
@@ -751,12 +850,11 @@ io.on('connection', (socket) => {
   socket.on('verify', async ({ username }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
-      if (socket.username !== ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может выдавать галочки' });
+      if (socket.username !== ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME });
       username = String(username || '').trim().toLowerCase();
-      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
       const target = await getUser(username);
       if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      if (target.verified) return cb && cb({ ok: false, error: 'У него уже есть галочка' });
+      if (target.verified) return cb && cb({ ok: false, error: 'Уже есть' });
       await db.execute({ sql: 'UPDATE users SET verified = 1 WHERE username = ?', args: [username] });
       refreshForFriends(username).catch(() => {});
       notifyAllFriends(username, 'friend updated', { username, verified: true }).catch(() => {});
@@ -777,21 +875,227 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  // 📢 КАНАЛЫ
+  socket.on('create channel', async ({ name, description }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      name = String(name || '').trim();
+      if (!name) return cb && cb({ ok: false, error: 'Введи название' });
+      const now = Date.now();
+      const r = await db.execute({
+        sql: 'INSERT INTO channels (name, description, owner, created_at) VALUES (?, ?, ?, ?)',
+        args: [name, String(description || '').slice(0, 200) || null, socket.username, now]
+      });
+      const channelId = Number(r.lastInsertRowid);
+      await db.execute({
+        sql: 'INSERT INTO channel_members (channel_id, username, role, joined_at) VALUES (?, ?, ?, ?)',
+        args: [channelId, socket.username, 'owner', now]
+      });
+      await sendChannelsTo(socket.username);
+      cb && cb({ ok: true, channelId });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('delete channel', async ({ channelId }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const ch = await getChannelById(channelId);
+      if (!ch || ch.owner !== socket.username) return cb && cb({ ok: false, error: 'Только владелец' });
+      const members = await getChannelMembers(channelId);
+      await db.execute({ sql: 'DELETE FROM channel_posts WHERE channel_id = ?', args: [channelId] });
+      await db.execute({ sql: 'DELETE FROM channel_members WHERE channel_id = ?', args: [channelId] });
+      await db.execute({ sql: 'DELETE FROM channels WHERE id = ?', args: [channelId] });
+      for (const m of members) {
+        sendChannelsTo(m.username).catch(() => {});
+        findSocketsByUsername(m.username).forEach(sid => io.to(sid).emit('channel deleted', { channelId }));
+      }
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('update channel', async ({ channelId, name, description }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const role = await isChannelMember(channelId, socket.username);
+      if (role !== 'owner' && role !== 'admin') return cb && cb({ ok: false, error: 'Нет прав' });
+      if (name) await db.execute({ sql: 'UPDATE channels SET name = ? WHERE id = ?', args: [String(name).slice(0, 60), channelId] });
+      if (typeof description === 'string') await db.execute({ sql: 'UPDATE channels SET description = ? WHERE id = ?', args: [description.slice(0, 200), channelId] });
+      const members = await getChannelMembers(channelId);
+      for (const m of members) sendChannelsTo(m.username).catch(() => {});
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('add channel admin', async ({ channelId, username }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const ch = await getChannelById(channelId);
+      if (!ch || ch.owner !== socket.username) return cb && cb({ ok: false, error: 'Только владелец' });
+      username = String(username || '').trim().toLowerCase();
+      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
+      if (username === ch.owner) return cb && cb({ ok: false, error: 'Это владелец' });
+      const target = await getUser(username);
+      if (!target) return cb && cb({ ok: false, error: 'Пользователя нет' });
+      await db.execute({
+        sql: 'INSERT INTO channel_members (channel_id, username, role, joined_at) VALUES (?, ?, ?, ?) ON CONFLICT(channel_id, username) DO UPDATE SET role = ?',
+        args: [channelId, username, 'admin', Date.now(), 'admin']
+      });
+      sendChannelsTo(username).catch(() => {});
+      const members = await getChannelMembers(channelId);
+      for (const m of members) sendChannelsTo(m.username).catch(() => {});
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('remove channel member', async ({ channelId, username }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const ch = await getChannelById(channelId);
+      if (!ch || ch.owner !== socket.username) return cb && cb({ ok: false, error: 'Только владелец' });
+      if (username === ch.owner) return cb && cb({ ok: false, error: 'Владельца нельзя удалить' });
+      await db.execute({ sql: 'DELETE FROM channel_members WHERE channel_id = ? AND username = ?', args: [channelId, username] });
+      sendChannelsTo(username).catch(() => {});
+      findSocketsByUsername(username).forEach(sid => io.to(sid).emit('channel removed', { channelId }));
+      const members = await getChannelMembers(channelId);
+      for (const m of members) sendChannelsTo(m.username).catch(() => {});
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('subscribe channel', async ({ channelId }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const ch = await getChannelById(channelId);
+      if (!ch) return cb && cb({ ok: false, error: 'Канал не найден' });
+      await db.execute({
+        sql: 'INSERT OR IGNORE INTO channel_members (channel_id, username, role, joined_at) VALUES (?, ?, ?, ?)',
+        args: [channelId, socket.username, 'subscriber', Date.now()]
+      });
+      sendChannelsTo(socket.username).catch(() => {});
+      cb && cb({ ok: true });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  socket.on('leave channel', async ({ channelId }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const ch = await getChannelById(channelId);
+      if (ch && ch.owner === socket.username) return cb && cb({ ok: false, error: 'Владелец не может выйти' });
+      await db.execute({ sql: 'DELETE FROM channel_members WHERE channel_id = ? AND username = ?', args: [channelId, socket.username] });
+      sendChannelsTo(socket.username).catch(() => {});
+      cb && cb({ ok: true });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  socket.on('load channel info', async ({ channelId }, cb) => {
+    try {
+      if (!socket.username) return cb && cb(null);
+      const role = await isChannelMember(channelId, socket.username);
+      if (!role) return cb && cb(null);
+      const ch = await getChannelById(channelId);
+      if (!ch) return cb && cb(null);
+      const members = await getChannelMembers(channelId);
+      cb && cb({
+        id: ch.id, name: ch.name, description: ch.description, avatar: ch.avatar,
+        owner: ch.owner, myRole: role,
+        canPost: role === 'owner' || role === 'admin',
+        isOwner: ch.owner === socket.username,
+        members
+      });
+    } catch (e) { cb && cb(null); }
+  });
+
+  socket.on('load channel posts', async ({ channelId }) => {
+    try {
+      if (!socket.username) return;
+      const role = await isChannelMember(channelId, socket.username);
+      if (!role) return;
+      const rows = await getChannelPosts(channelId);
+      const messages = rows.map(m => ({ ...m, reactions: safeParseReactions(m.reactions) }));
+      socket.emit('channel posts', { channelId, messages });
+    } catch (e) { console.error(e); }
+  });
+
+  socket.on('channel post', async ({ channelId, text, image, voice, voiceDuration, videoCircle, videoDuration, sticker }) => {
+    if (!socket.username) return;
+    if (!await canPostInChannel(channelId, socket.username)) { socket.emit('message blocked', { reason: 'Только админы могут писать' }); return; }
+    if (!rateLimit('ch:' + socket.username, 30, 10_000)) { socket.emit('message blocked', { reason: 'Слишком часто' }); return; }
+    if (text && text.length > MAX_TEXT) return socket.emit('message blocked', { reason: 'Слишком длинный пост' });
+    if (image && !validImage(image)) return socket.emit('message blocked', { reason: 'Недопустимое изображение' });
+    if (voice && !validVoice(voice)) return socket.emit('message blocked', { reason: 'Недопустимое голосовое' });
+    if (videoCircle && !validVideo(videoCircle)) return socket.emit('message blocked', { reason: 'Недопустимый кружок' });
+    try {
+      const from = socket.username;
+      const time = Date.now();
+      const result = await db.execute({
+        sql: `INSERT INTO channel_posts (channel_id, from_user, text, image, voice, voice_duration, video_circle, video_duration, sticker, reactions, edited, deleted, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', 0, 0, ?)`,
+        args: [channelId, from, text || null, image || null, voice || null, voiceDuration || null, videoCircle || null, videoDuration || null, sticker || null, time]
+      });
+      const msgId = Number(result.lastInsertRowid);
+      const payload = { id: msgId, channelId, from, text, image, voice, voiceDuration, videoCircle, videoDuration, sticker, reactions: {}, time };
+      notifyChannelMembers(channelId, 'channel post', payload).catch(() => {});
+      socket.emit('channel post', payload);
+    } catch (e) { console.error(e); }
+  });
+
+  socket.on('delete channel post', async ({ postId }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const r = await db.execute({ sql: 'SELECT * FROM channel_posts WHERE id = ?', args: [postId] });
+      const post = r.rows[0];
+      if (!post) return cb && cb({ ok: false });
+      const ch = await getChannelById(post.channel_id);
+      const role = await isChannelMember(post.channel_id, socket.username);
+      if (post.from_user !== socket.username && ch?.owner !== socket.username && role !== 'admin') return cb && cb({ ok: false });
+      await db.execute({ sql: 'UPDATE channel_posts SET deleted = 1, text = NULL, image = NULL, voice = NULL, video_circle = NULL, sticker = NULL WHERE id = ?', args: [postId] });
+      notifyChannelMembers(post.channel_id, 'channel post deleted', { postId, channelId: post.channel_id }).catch(() => {});
+      cb && cb({ ok: true });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  socket.on('channel react', async ({ postId, emoji }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const r = await db.execute({ sql: 'SELECT * FROM channel_posts WHERE id = ?', args: [postId] });
+      const post = r.rows[0];
+      if (!post) return cb && cb({ ok: false });
+      if (!await isChannelMember(post.channel_id, socket.username)) return cb && cb({ ok: false });
+      let reactions = safeParseReactions(post.reactions);
+      if (!reactions[emoji]) reactions[emoji] = [];
+      const me = socket.username;
+      const idx = reactions[emoji].indexOf(me);
+      if (idx === -1) reactions[emoji].push(me);
+      else { reactions[emoji].splice(idx, 1); if (reactions[emoji].length === 0) delete reactions[emoji]; }
+      await db.execute({ sql: 'UPDATE channel_posts SET reactions = ? WHERE id = ?', args: [JSON.stringify(reactions), postId] });
+      notifyChannelMembers(post.channel_id, 'channel reaction updated', { postId, channelId: post.channel_id, reactions }).catch(() => {});
+      cb && cb({ ok: true });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  socket.on('search channels', async ({ query }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, results: [] });
+      query = String(query || '').trim().toLowerCase();
+      if (!query) return cb && cb({ ok: true, results: [] });
+      const r = await db.execute({
+        sql: 'SELECT id, name, description, owner FROM channels WHERE LOWER(name) LIKE ? LIMIT 30',
+        args: ['%' + query + '%']
+      });
+      cb && cb({ ok: true, results: r.rows });
+    } catch (e) { cb && cb({ ok: false, results: [] }); }
+  });
+
   // 🎁 ПОДАРОЧНЫЕ КОДЫ
   socket.on('generate gift code', async (cb) => {
     try {
-      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
-      if (socket.username !== ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может создавать коды' });
+      if (!socket.username) return cb && cb({ ok: false });
+      if (socket.username !== ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME });
       const rand = () => Math.random().toString(36).slice(2, 6).toUpperCase();
       const code = 'AURORA-' + rand() + '-' + rand();
-      await db.execute({
-        sql: 'INSERT INTO gift_codes (code, created_by, time) VALUES (?, ?, ?)',
-        args: [code, socket.username, Date.now()]
-      });
+      await db.execute({ sql: 'INSERT INTO gift_codes (code, created_by, time) VALUES (?, ?, ?)', args: [code, socket.username, Date.now()] });
       cb && cb({ ok: true, code });
-    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
-
   socket.on('list gift codes', async (cb) => {
     try {
       if (!socket.username || socket.username !== ADMIN_USERNAME) return cb && cb({ ok: false, codes: [] });
@@ -799,12 +1103,10 @@ io.on('connection', (socket) => {
       cb && cb({ ok: true, codes: r.rows });
     } catch (e) { cb && cb({ ok: false, codes: [] }); }
   });
-
   socket.on('redeem gift code', async ({ code }, cb) => {
     try {
-      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      if (!socket.username) return cb && cb({ ok: false });
       code = String(code || '').trim().toUpperCase();
-      if (!code) return cb && cb({ ok: false, error: 'Введи код' });
       const r = await db.execute({ sql: 'SELECT * FROM gift_codes WHERE code = ?', args: [code] });
       const row = r.rows[0];
       if (!row) return cb && cb({ ok: false, error: 'Код не найден' });
@@ -814,7 +1116,7 @@ io.on('connection', (socket) => {
       await db.execute({ sql: 'UPDATE gift_codes SET used_by = ?, used_at = ? WHERE code = ?', args: [socket.username, Date.now(), code] });
       socket.emit('settings', await getSettings(socket.username));
       cb && cb({ ok: true });
-    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+    } catch (e) { cb && cb({ ok: false }); }
   });
 
   socket.on('set passcode', async ({ passcode }, cb) => {
@@ -923,6 +1225,9 @@ io.on('connection', (socket) => {
         }
       }
       await db.execute({ sql: 'DELETE FROM stickers WHERE username = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM channel_posts WHERE from_user = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM channel_members WHERE username = ?', args: [me] });
+      await db.execute({ sql: 'DELETE FROM channels WHERE owner = ?', args: [me] });
       await db.execute({ sql: 'DELETE FROM users WHERE username = ?', args: [me] });
       socket.emit('account deleted');
       socket.disconnect(true);
@@ -1038,7 +1343,7 @@ io.on('connection', (socket) => {
   socket.on('private message', async ({ to, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo, sticker }) => {
     if (!socket.username) return;
     if (!rateLimit('pm:' + socket.username, 30, 10_000)) { socket.emit('message blocked', { reason: 'Слишком часто.' }); return; }
-    if (text && text.length > MAX_TEXT) return socket.emit('message blocked', { reason: 'Слишком длинное сообщение' });
+    if (text && text.length > MAX_TEXT) return socket.emit('message blocked', { reason: 'Слишком длинное' });
     if (image && !validImage(image)) return socket.emit('message blocked', { reason: 'Недопустимое изображение' });
     if (voice && !validVoice(voice)) return socket.emit('message blocked', { reason: 'Недопустимое голосовое' });
     if (videoCircle && !validVideo(videoCircle)) return socket.emit('message blocked', { reason: 'Недопустимый кружок' });
@@ -1221,7 +1526,7 @@ io.on('connection', (socket) => {
   socket.on('group message', async ({ groupId, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo, sticker }) => {
     if (!socket.username || !await isGroupMember(groupId, socket.username)) return;
     if (!rateLimit('gm:' + socket.username, 30, 10_000)) { socket.emit('message blocked', { reason: 'Слишком часто.' }); return; }
-    if (text && text.length > MAX_TEXT) return socket.emit('message blocked', { reason: 'Слишком длинное сообщение' });
+    if (text && text.length > MAX_TEXT) return socket.emit('message blocked', { reason: 'Слишком длинное' });
     if (image && !validImage(image)) return socket.emit('message blocked', { reason: 'Недопустимое изображение' });
     if (voice && !validVoice(voice)) return socket.emit('message blocked', { reason: 'Недопустимое голосовое' });
     if (videoCircle && !validVideo(videoCircle)) return socket.emit('message blocked', { reason: 'Недопустимый кружок' });
@@ -1304,7 +1609,7 @@ io.on('connection', (socket) => {
         if (!m) return cb && cb({ ok: false, error: 'Неверный формат' });
         const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
         const buf = Buffer.from(m[2], 'base64');
-        if (buf.length > 5_000_000) return cb && cb({ ok: false, error: 'Слишком большая картинка' });
+        if (buf.length > 5_000_000) return cb && cb({ ok: false, error: 'Слишком большая' });
         const fname = `${socket.username}_${Date.now()}.${ext}`;
         const fpath = path.join(STORIES_DIR, fname);
         fs.writeFileSync(fpath, buf);
@@ -1371,7 +1676,7 @@ io.on('connection', (socket) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
       if (!data || typeof data !== 'string') return cb && cb({ ok: false, error: 'Нет данных' });
-      if (!validStickerData(data)) return cb && cb({ ok: false, error: 'Файл больше 4MB или неверный формат' });
+      if (!validStickerData(data)) return cb && cb({ ok: false, error: 'Больше 4MB или неверный формат' });
       let url = data;
       if (data.startsWith('data:')) {
         const m = data.match(/^data:(image|video)\/([a-z0-9+.-]+);base64,(.+)$/i);
@@ -1435,13 +1740,10 @@ io.on('connection', (socket) => {
 
   socket.on('call-user', async ({ to, offer, video }) => {
     if (!socket.username) return;
-    if (await isBlockedEither(socket.username, to)) { socket.emit('call-failed', { reason: 'Пользователь заблокирован' }); return; }
+    if (await isBlockedEither(socket.username, to)) { socket.emit('call-failed', { reason: 'Заблокирован' }); return; }
     const toSockets = findSocketsByUsername(to);
-    if (toSockets.length > 0) {
-      toSockets.forEach(sid => io.to(sid).emit('incoming-call', { from: socket.username, offer, video }));
-    } else {
-      socket.emit('call-failed', { reason: 'Пользователь не в сети' });
-    }
+    if (toSockets.length > 0) toSockets.forEach(sid => io.to(sid).emit('incoming-call', { from: socket.username, offer, video }));
+    else socket.emit('call-failed', { reason: 'Пользователь не в сети' });
   });
   socket.on('answer-call', ({ to, answer }) => { if (!socket.username) return; findSocketsByUsername(to).forEach(sid => io.to(sid).emit('call-answered', { answer })); });
   socket.on('ice-candidate', ({ to, candidate }) => { if (!socket.username) return; findSocketsByUsername(to).forEach(sid => io.to(sid).emit('ice-candidate', { candidate })); });
@@ -1463,7 +1765,7 @@ setInterval(cleanupOldMessages, 10 * 60 * 1000);
 console.log('⚙️ Запускаю initDB...');
 initDB()
   .then(() => {
-    console.log('✅ initDB завершён успешно');
+    console.log('✅ initDB завершён');
     cleanupOldMessages().catch(() => {});
     server.listen(process.env.PORT || 3000, () => console.log('🌌 Aurora запущена'));
   })
