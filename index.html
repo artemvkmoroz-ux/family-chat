@@ -120,6 +120,105 @@
   body:not(.premium) .incoming-btn.accept { background: #22c55e; }
   body:not(.premium) .incoming-btn.decline { background: #e53935; }
   body:not(.premium) .nav-btn.active .nav-icon { background: var(--accent); box-shadow: none; }
+
+  /* 🎬 ПЛАВНЫЕ АНИМАЦИИ */
+  .chat-item { transition: background 0.25s, transform 0.15s; }
+  .chat-item:active { transform: scale(0.985); }
+  .nav-btn { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s; }
+  .nav-btn .nav-icon { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s, box-shadow 0.25s; }
+  .msg-wrap { animation: fadeInMsg 0.25s ease-out; }
+  @keyframes fadeInMsg { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .modal-box { animation: modalIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.92) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  .modal.active { animation: fadeIn 0.2s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .story-bubble { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .story-bubble:hover { transform: translateY(-2px); }
+  .avatar { transition: transform 0.2s; }
+  .chat-item:hover .avatar { transform: scale(1.05); }
+  #stories-bar { animation: slideDown 0.3s ease-out; }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  #bottom-nav { animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  #chat-actions button { transition: transform 0.15s, color 0.2s; }
+  #chat-actions button:active { transform: scale(0.85); }
+  #send-btn { transition: transform 0.15s, box-shadow 0.2s; }
+  #send-btn:active { transform: scale(0.9); }
+  .reaction-chip { transition: transform 0.15s, background 0.2s; }
+  .reaction-chip:active { transform: scale(0.92); }
+  .icon-btn { transition: transform 0.15s, background 0.2s; }
+  .icon-btn:active { transform: scale(0.88); }
+  .settings-item { transition: background 0.2s; }
+
+  /* 🌌 SPLASH SCREEN */
+  #splash-screen {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #0f0a1a 0%, #1a1428 50%, #0f0a1a 100%);
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s ease-out;
+  }
+  #splash-screen.hide { opacity: 0; pointer-events: none; }
+  #splash-logo {
+    width: 140px;
+    height: 140px;
+    border-radius: 32px;
+    background: linear-gradient(135deg, #6d28d9, #a855f7, #ec4899);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 72px;
+    box-shadow: 0 20px 60px rgba(168, 85, 247, 0.5);
+    animation: splashPulse 1.2s ease-in-out infinite alternate;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  #splash-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  @keyframes splashPulse {
+    from { transform: scale(1); box-shadow: 0 20px 60px rgba(168, 85, 247, 0.4); }
+    to { transform: scale(1.08); box-shadow: 0 24px 72px rgba(168, 85, 247, 0.7); }
+  }
+  #splash-title {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: 6px;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 8px;
+  }
+  #splash-subtitle {
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    letter-spacing: 2px;
+  }
+  #splash-loader {
+    margin-top: 32px;
+    width: 40px;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #splash-loader::before {
+    content: '';
+    display: block;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(90deg, #a855f7, #ec4899);
+    border-radius: 2px;
+    animation: splashLoad 1.2s ease-in-out infinite;
+  }
+  @keyframes splashLoad { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
  
   #conn-status {
     display: none; align-items: center; gap: 8px;
@@ -271,7 +370,7 @@
   .reactions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; clear: both; }
   .reaction-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; background: rgba(255,255,255,0.1); border: 1px solid transparent; border-radius: 12px; font-size: 12px; color: inherit; cursor: pointer; }
   .reaction-chip.mine { background: rgba(168, 85, 247, 0.3); border-color: var(--accent); }
-  
+ 
   #input-area { display: flex; align-items: flex-end; gap: 6px; padding: 10px 12px 16px; background: var(--bg-header); border-top: var(--glass-border); flex-shrink: 0; }
   #input-area .attach, #input-area .mic, #input-area .camera { background: none; border: none; color: var(--accent); font-size: 22px; cursor: pointer; padding: 8px; flex-shrink: 0; }
   #input-area .mic.recording, #input-area .camera.recording { color: #ef4444; }
@@ -740,9 +839,46 @@
     font-weight: 700;
   }
   #gif-url-modal .modal-box { max-width: 380px; }
+
+  /* 🎁 ПОДАРОЧНЫЕ КОДЫ */
+  #gift-modal .modal-box { max-width: 400px; }
+  .gift-code-item {
+    padding: 12px 14px;
+    background: var(--bg-input-inner);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    font-family: monospace;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .gift-code-item .code {
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 1px;
+    user-select: all;
+  }
+  .gift-code-item .status {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: -apple-system, sans-serif;
+  }
+  .gift-code-item .status.used { color: #22c55e; }
+  .gift-actions { display: flex; gap: 10px; margin-bottom: 12px; }
+  .gift-actions button { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
 </style>
 </head>
 <body>
+
+<!-- 🌌 SPLASH SCREEN -->
+<div id="splash-screen">
+  <div id="splash-logo"><img id="splash-icon" src="icon-192.png" alt="" onerror="this.style.display='none'; this.parentNode.textContent='🌌';"></div>
+  <div id="splash-title">AURORA</div>
+  <div id="splash-subtitle">premium messenger</div>
+  <div id="splash-loader"></div>
+</div>
 
 <!-- ЭКРАН ОШИБКИ -->
 <div id="error-screen">
@@ -953,6 +1089,28 @@
   <div class="modal-error" id="gif-url-error"></div>
   <button class="modal-primary" onclick="submitGifUrl()">Сохранить</button>
   <button class="modal-secondary" onclick="closeModal('gif-url-modal')">Отмена</button>
+</div></div>
+
+<!-- 🎁 ПОДАРОЧНЫЙ КОД -->
+<div class="modal" id="gift-modal"><div class="modal-box">
+  <h3>🎁 Премиум по коду</h3>
+  <div class="modal-desc">Введи подарочный код, чтобы активировать премиум</div>
+  <input id="gift-code-input" placeholder="AURORA-XXXX-XXXX" autocapitalize="characters" style="text-transform:uppercase; letter-spacing:2px; text-align:center; font-family:monospace; font-size:16px;" />
+  <div class="modal-error" id="gift-error"></div>
+  <button class="modal-primary" onclick="redeemGiftCode()">✅ Активировать</button>
+  <button class="modal-secondary" onclick="closeModal('gift-modal')">Отмена</button>
+</div></div>
+
+<!-- 🎁 УПРАВЛЕНИЕ КОДАМИ (только moroz) -->
+<div class="modal" id="gift-admin-modal"><div class="modal-box">
+  <h3>🎁 Управление кодами</h3>
+  <div class="modal-desc">Генерируй подарочные коды для премиума</div>
+  <div class="gift-actions">
+    <button class="modal-primary" onclick="generateGiftCode()">➕ Создать код</button>
+    <button class="modal-secondary" onclick="loadGiftCodes()">🔄 Обновить</button>
+  </div>
+  <div id="gift-codes-list" style="max-height:50vh; overflow-y:auto; margin-bottom:12px;"></div>
+  <button class="modal-secondary" onclick="closeModal('gift-admin-modal')">Закрыть</button>
 </div></div>
 
 <!-- ИСТОРИИ — просмотр -->
@@ -1203,6 +1361,20 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+// 🌌 SPLASH SCREEN — минимум 2.5 сек, максимум 3 сек
+const splashStart = Date.now();
+function hideSplash() {
+  const sp = document.getElementById('splash-screen');
+  if (sp && !sp.classList.contains('hide')) {
+    sp.classList.add('hide');
+    setTimeout(() => { if (sp.parentNode) sp.remove(); }, 500);
+  }
+}
+window.addEventListener('load', () => {
+  setTimeout(hideSplash, Math.max(0, 2500 - (Date.now() - splashStart)));
+});
+setTimeout(hideSplash, 3000);
+
 window.addEventListener('error', (e) => {
   console.error('❌ ОШИБКА:', e.message, e.filename, e.lineno);
   showErrorScreen(e.message + '\n' + e.filename + ':' + e.lineno);
@@ -1458,9 +1630,7 @@ function switchTab(tab) {
   activeTab = tab;
   const app = document.getElementById('app');
   app.dataset.tab = tab;
-  document.querySelectorAll('.nav-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.tab === tab);
-  });
+  document.querySelectorAll('.nav-btn').forEach(b => { b.classList.toggle('active', b.dataset.tab === tab); });
   const h2 = document.querySelector('#main-header h2');
   if (h2) h2.textContent = TAB_TITLES[tab] || 'Aurora';
   document.querySelectorAll('.app-tab').forEach(t => t.classList.remove('active'));
@@ -1522,11 +1692,7 @@ function renderSettingsTab() {
   const box = document.getElementById('tab-settings-content');
   if (!box) return;
   const orig = document.getElementById('settings-content');
-  if (orig) {
-    renderSettings();
-    box.innerHTML = orig.innerHTML;
-    setTimeout(showCacheSize, 100);
-  }
+  if (orig) { renderSettings(); box.innerHTML = orig.innerHTML; setTimeout(showCacheSize, 100); }
 }
 
 function openSettings() { document.getElementById('settings-screen').classList.add('active'); renderSettings(); }
@@ -1536,10 +1702,11 @@ function renderSettings() {
   const displayName = (myFirstName || myLastName) ? `${myFirstName} ${myLastName}`.trim() : '@' + myName;
   const emojiStr = myEmoji ? ' ' + myEmoji : '';
   const tick = myVerified ? '<span class="verified-badge">✓</span>' : '';
+  const isAdmin = myName === 'moroz';
   box.innerHTML = `
     <div class="settings-profile-card" onclick="openProfile()"><div class="avatar" style="${myAvatar ? `background-image:url(${myAvatar})` : ''}">${myAvatar ? '' : initials(myName)}</div><div class="info"><div class="name">${escapeHtml(displayName)}${emojiStr}${tick}</div><div class="sub">@${escapeHtml(myName)}</div></div><div class="si-arrow">›</div></div>
     <div class="settings-section"><div class="settings-section-title">Мой QR-код</div><div class="settings-item" onclick="showMyQr()"><div class="si-icon">📱</div><div class="si-text">Показать QR-код</div><div class="si-arrow">›</div></div></div>
-    <div class="settings-section"><div class="settings-section-title">Внешний вид</div><div class="settings-item" onclick="toggleSetting('premium')"><div class="si-icon">✨</div><div class="si-text">Премиум-дизайн</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${settings.premium != 0 ? 'checked' : ''} onchange="toggleSetting('premium')" /><span class="slider"></span></label></div></div>
+    <div class="settings-section"><div class="settings-section-title">Премиум</div><div class="settings-item" onclick="openGiftModal()"><div class="si-icon">🎁</div><div class="si-text">Активировать по коду</div><div class="si-arrow">›</div></div><div class="settings-item" onclick="toggleSetting('premium')"><div class="si-icon">✨</div><div class="si-text">Премиум-дизайн</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${settings.premium != 0 ? 'checked' : ''} onchange="toggleSetting('premium')" /><span class="slider"></span></label></div>${isAdmin ? '<div class="settings-item" onclick="openGiftAdminModal()"><div class="si-icon">🔑</div><div class="si-text">Управление кодами</div><div class="si-arrow">›</div></div>' : ''}</div>
     <div class="settings-section"><div class="settings-section-title">Уведомления и звуки</div><div class="settings-item" onclick="toggleSetting('sound')"><div class="si-icon">🔔</div><div class="si-text">Звук</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${settings.sound == 1 ? 'checked' : ''} onchange="toggleSetting('sound')" /><span class="slider"></span></label></div><div class="settings-item" onclick="toggleSetting('vibration')"><div class="si-icon">📳</div><div class="si-text">Вибрация</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${settings.vibration == 1 ? 'checked' : ''} onchange="toggleSetting('vibration')" /><span class="slider"></span></label></div><div class="settings-item" onclick="toggleSetting('notif_private')"><div class="si-icon">💬</div><div class="si-text">Личные чаты</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${settings.notif_private == 1 ? 'checked' : ''} onchange="toggleSetting('notif_private')" /><span class="slider"></span></label></div><div class="settings-item" onclick="toggleSetting('notif_groups')"><div class="si-icon">👥</div><div class="si-text">Группы</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${settings.notif_groups == 1 ? 'checked' : ''} onchange="toggleSetting('notif_groups')" /><span class="slider"></span></label></div></div>
     <div class="settings-section"><div class="settings-section-title">Конфиденциальность</div><div class="settings-item" onclick="openPasscodeModal()"><div class="si-icon">🔐</div><div class="si-text">Код-пароль</div><div class="si-value">${settings.passcode ? 'Включён' : 'Выключен'}</div><div class="si-arrow">›</div></div><div class="settings-item" onclick="changeLastSeen()"><div class="si-icon">👁</div><div class="si-text">Последнее посещение</div><div class="si-value">${lastSeenLabel()}</div><div class="si-arrow">›</div></div><div class="settings-item" onclick="changeAutoDelete()"><div class="si-icon">🗑</div><div class="si-text">Автоудаление</div><div class="si-value">${autoDeleteLabel()}</div><div class="si-arrow">›</div></div><div class="settings-item" onclick="openBlockedList()"><div class="si-icon">🚫</div><div class="si-text">Заблокированные</div><div class="si-value">${blockedList.length}</div><div class="si-arrow">›</div></div></div>
     <div class="settings-section"><div class="settings-section-title">Устройства</div><div class="settings-item" onclick="openSessions()"><div class="si-icon">📱</div><div class="si-text">Активные сеансы</div><div class="si-arrow">›</div></div></div>
@@ -1774,6 +1941,60 @@ function addFromQr() {
     closeModal('qr-found-modal'); qrFoundUser = null; alert('Контакт добавлен!');
   });
 }
+
+// 🎁 ПОДАРОЧНЫЕ КОДЫ
+function openGiftModal() {
+  document.getElementById('gift-code-input').value = '';
+  document.getElementById('gift-error').textContent = '';
+  openModal('gift-modal');
+}
+function redeemGiftCode() {
+  const code = document.getElementById('gift-code-input').value.trim().toUpperCase();
+  const errEl = document.getElementById('gift-error');
+  errEl.textContent = '';
+  if (!code) { errEl.textContent = 'Введи код'; return; }
+  socket.emit('redeem gift code', { code }, (res) => {
+    if (!res.ok) { errEl.textContent = res.error || 'Ошибка'; return; }
+    closeModal('gift-modal');
+    alert('🎉 Премиум активирован!');
+    renderSettings(); if (activeTab === 'settings') renderSettingsTab();
+  });
+}
+function openGiftAdminModal() {
+  if (myName !== 'moroz') return;
+  document.getElementById('gift-codes-list').innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Загрузка…</div>';
+  openModal('gift-admin-modal');
+  loadGiftCodes();
+}
+function loadGiftCodes() {
+  socket.emit('list gift codes', (res) => {
+    const box = document.getElementById('gift-codes-list');
+    if (!res || !res.ok) { box.innerHTML = '<div style="text-align:center; padding:20px; color:#ef4444;">Нет доступа</div>'; return; }
+    if (res.codes.length === 0) { box.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Пока нет кодов</div>'; return; }
+    box.innerHTML = '';
+    res.codes.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'gift-code-item';
+      const status = c.used_by ? `<span class="status used">✓ ${escapeHtml(c.used_by)}</span>` : '<span class="status">не использован</span>';
+      div.innerHTML = `<span class="code" onclick="copyText('${c.code}')">${escapeHtml(c.code)}</span>${status}`;
+      box.appendChild(div);
+    });
+  });
+}
+function generateGiftCode() {
+  socket.emit('generate gift code', (res) => {
+    if (!res || !res.ok) { alert(res?.error || 'Ошибка'); return; }
+    alert('🎁 Код создан:\n\n' + res.code + '\n\nСкопируй и отправь другу.');
+    loadGiftCodes();
+  });
+}
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    setConnStatus('connected', '📋 Скопировано');
+    setTimeout(hideConnStatus, 1500);
+  }).catch(() => {});
+}
+
 socket.on('contacts', (list) => { contacts = list; try { localStorage.setItem(CONTACTS_CACHE_KEY, JSON.stringify(list)); } catch (e) {} renderChatList(); if (activeTab === 'contacts') renderContactsTab(); });
 socket.on('groups', (list, meta) => { groups = list; if (meta && meta.canCreate !== undefined) canCreateGroup = meta.canCreate; try { localStorage.setItem(GROUPS_CACHE_KEY, JSON.stringify(list)); } catch (e) {} renderChatList(); });
 function renderChatList() {
@@ -3128,27 +3349,18 @@ let peerConnection, localStream, micOn = true, camOn = true;
 let callActive = false, pendingOffer = null, incomingFrom = null, incomingVideo = false;
 let callTimerInterval = null, callStartTime = 0;
 let screenStream = null, screenTrack = null, isScreenSharing = false;
-
-// 🎯 TURN от evan-brass
 const config = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    { 
-      urls: [
-        'turn:turn.evan-brass.net:3478',
-        'turn:turn.evan-brass.net:3478?transport=tcp',
-        'turn:turn.evan-brass.net:443'
-      ], 
-      username: 'user', 
-      credential: 'password' 
-    }
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
   ],
   iceCandidatePoolSize: 10,
   iceTransportPolicy: 'all'
 };
-
 function startCallTimer() {
   callStartTime = Date.now();
   const el = document.getElementById('call-timer');
@@ -3327,6 +3539,11 @@ window.addEventListener('load', () => {
       window.history.replaceState({}, '', window.location.pathname);
     }, 1500);
   }
+});
+
+// Автозакрытие модалки по клику вне
+document.querySelectorAll('.modal').forEach(m => {
+  m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('active'); });
 });
 
 console.log('✅ Aurora полностью загружена');
