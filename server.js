@@ -274,6 +274,17 @@ async function initDB() {
   await db.execute(`ALTER TABLE stickers ADD COLUMN type TEXT DEFAULT 'image'`).catch(() => {});
   await db.execute(`ALTER TABLE stickers ADD COLUMN emoji TEXT`).catch(() => {});
 
+  // 🎁 ПОДАРОЧНЫЕ КОДЫ
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS gift_codes (
+      code TEXT PRIMARY KEY,
+      created_by TEXT NOT NULL,
+      used_by TEXT,
+      used_at INTEGER,
+      time INTEGER NOT NULL
+    )
+  `);
+
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_contacts_owner ON contacts(owner)`).catch(() => {});
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_contacts_contact ON contacts(contact)`).catch(() => {});
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(from_user, to_user, time)`).catch(() => {});
@@ -301,6 +312,13 @@ async function getContactsOf(username) {
     args: [username]
   });
   return r.rows.map(row => ({ contact: row.contact, display_name: row.display_name }));
+}
+async function getContactInfo(username) {
+  const r = await db.execute({
+    sql: 'SELECT username, avatar, verified, bio, first_name, last_name, emoji_status, last_seen_visibility FROM users WHERE username = ?',
+    args: [username]
+  });
+  return r.rows[0] || null;
 }
 async function getMessageById(id) {
   const r = await db.execute({ sql: 'SELECT * FROM messages WHERE id = ?', args: [id] });
@@ -759,6 +777,46 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  // 🎁 ПОДАРОЧНЫЕ КОДЫ
+  socket.on('generate gift code', async (cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      if (socket.username !== ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только ' + ADMIN_USERNAME + ' может создавать коды' });
+      const rand = () => Math.random().toString(36).slice(2, 6).toUpperCase();
+      const code = 'AURORA-' + rand() + '-' + rand();
+      await db.execute({
+        sql: 'INSERT INTO gift_codes (code, created_by, time) VALUES (?, ?, ?)',
+        args: [code, socket.username, Date.now()]
+      });
+      cb && cb({ ok: true, code });
+    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+  });
+
+  socket.on('list gift codes', async (cb) => {
+    try {
+      if (!socket.username || socket.username !== ADMIN_USERNAME) return cb && cb({ ok: false, codes: [] });
+      const r = await db.execute({ sql: 'SELECT code, used_by, used_at, time FROM gift_codes ORDER BY time DESC LIMIT 100', args: [] });
+      cb && cb({ ok: true, codes: r.rows });
+    } catch (e) { cb && cb({ ok: false, codes: [] }); }
+  });
+
+  socket.on('redeem gift code', async ({ code }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      code = String(code || '').trim().toUpperCase();
+      if (!code) return cb && cb({ ok: false, error: 'Введи код' });
+      const r = await db.execute({ sql: 'SELECT * FROM gift_codes WHERE code = ?', args: [code] });
+      const row = r.rows[0];
+      if (!row) return cb && cb({ ok: false, error: 'Код не найден' });
+      if (row.used_by) return cb && cb({ ok: false, error: 'Код уже использован' });
+      await db.execute({ sql: 'UPDATE user_settings SET premium = 1 WHERE username = ?', args: [socket.username] });
+      cacheInvalidate(settingsCache, socket.username);
+      await db.execute({ sql: 'UPDATE gift_codes SET used_by = ?, used_at = ? WHERE code = ?', args: [socket.username, Date.now(), code] });
+      socket.emit('settings', await getSettings(socket.username));
+      cb && cb({ ok: true });
+    } catch (e) { console.error(e); cb && cb({ ok: false, error: 'Ошибка сервера' }); }
+  });
+
   socket.on('set passcode', async ({ passcode }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -894,11 +952,7 @@ io.on('connection', (socket) => {
   });
   socket.on('get profile', async ({ username }, cb) => {
     if (!socket.username) return cb && cb(null);
-    const r = await db.execute({
-      sql: 'SELECT username, avatar, verified, bio, first_name, last_name, emoji_status, last_seen_visibility FROM users WHERE username = ?',
-      args: [username]
-    });
-    const info = r.rows[0];
+    const info = await getContactInfo(username);
     if (!info) return cb && cb(null);
     const blockedByMe = await isBlocked(socket.username, username);
     const blockedMe = await isBlocked(username, socket.username);
@@ -912,11 +966,7 @@ io.on('connection', (socket) => {
   });
   socket.on('get public profile', async ({ username }, cb) => {
     if (!socket.username) return cb && cb(null);
-    const r = await db.execute({
-      sql: 'SELECT username, avatar, verified, bio, first_name, last_name, emoji_status FROM users WHERE username = ?',
-      args: [username]
-    });
-    const info = r.rows[0];
+    const info = await getContactInfo(username);
     if (!info) return cb && cb(null);
     cb && cb({
       username: info.username, avatar: info.avatar, verified: !!info.verified,
