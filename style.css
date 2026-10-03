@@ -3540,3 +3540,789 @@ body.light .msg.other {
     background: inherit;
   }
 }
+/* ═══════════════════════════════════════════════════════════
+   🔐 AUTH v10 — Красивая авторизация
+   ═══════════════════════════════════════════════════════════ */
+
+#auth {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-deep);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#auth.active {
+  display: flex;
+  animation: fadeIn 0.4s var(--ease-out-expo);
+}
+
+/* ─── Анимированный фон ─── */
+.auth-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+.auth-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.auth-blob-1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #a855f7, transparent 70%);
+  top: -100px;
+  left: -100px;
+  animation: blobFloat1 20s ease-in-out infinite;
+}
+.auth-blob-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #ec4899, transparent 70%);
+  bottom: -150px;
+  right: -150px;
+  animation: blobFloat2 25s ease-in-out infinite;
+}
+.auth-blob-3 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, #6366f1, transparent 70%);
+  top: 40%;
+  left: 60%;
+  animation: blobFloat3 22s ease-in-out infinite;
+}
+@keyframes blobFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(80px, 60px) scale(1.15); }
+}
+@keyframes blobFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-100px, -80px) scale(1.1); }
+}
+@keyframes blobFloat3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-60px, 100px) scale(1.2); }
+}
+
+/* ─── Экраны ─── */
+.auth-screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 400px;
+  position: relative;
+  z-index: 1;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+.auth-screen.active {
+  display: flex;
+  animation: authScreenIn 0.5s var(--ease-out-expo);
+}
+@keyframes authScreenIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* ─── Стеклянная карточка ─── */
+.auth-card {
+  width: 100%;
+  background: rgba(20, 12, 38, 0.6);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
+  padding: 32px 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4),
+              0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+              0 1px 0 rgba(255, 255, 255, 0.1) inset;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+}
+
+body.light .auth-card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.08),
+              0 0 0 1px rgba(0, 0, 0, 0.02) inset;
+}
+
+/* ─── Логотип с pulse ─── */
+.auth-logo {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 20px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #6d28d9, #a855f7, #ec4899);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 16px 40px rgba(168, 85, 247, 0.5),
+              0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+  animation: logoPulse 3s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+.auth-logo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+  animation: shimmer 3s ease-in-out infinite;
+  background-size: 200% 100%;
+}
+.auth-logo-inner {
+  font-size: 44px;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+  animation: logoEmojiFloat 4s ease-in-out infinite;
+}
+@keyframes logoPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 16px 40px rgba(168, 85, 247, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 20px 56px rgba(168, 85, 247, 0.7),
+                0 0 0 1px rgba(255, 255, 255, 0.25) inset;
+  }
+}
+@keyframes logoEmojiFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(-5deg); }
+}
+
+/* ─── Заголовки ─── */
+.auth-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  background: linear-gradient(135deg, #c084fc, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradientShift 6s ease infinite;
+  background-size: 200% 200%;
+}
+body:not(.premium) .auth-title {
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: var(--accent);
+}
+.auth-subtitle {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  margin-bottom: 28px;
+  line-height: 1.4;
+}
+
+/* ─── Поля ввода с плавающими label ─── */
+.auth-input-group {
+  position: relative;
+  width: 100%;
+  margin-bottom: 14px;
+}
+.auth-input {
+  width: 100%;
+  padding: 22px 44px 8px 16px;
+  background: var(--bg-input-inner);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  transition: border-color 0.25s var(--ease-soft),
+              background 0.25s var(--ease-soft),
+              box-shadow 0.25s var(--ease-soft);
+  outline: none;
+}
+.auth-input:focus {
+  border-color: var(--accent);
+  background: var(--bg-active);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.auth-input:not(:placeholder-shown),
+.auth-input:focus {
+  /* label moves up when filled or focused */
+}
+.auth-label {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 500;
+  pointer-events: none;
+  transition: all 0.2s var(--ease-spring);
+  background: transparent;
+  padding: 0 4px;
+}
+.auth-input:focus + .auth-label,
+.auth-input:not(:placeholder-shown) + .auth-label {
+  top: 12px;
+  transform: translateY(0);
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+body.light .auth-input {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+body.light .auth-input:focus {
+  border-color: var(--accent);
+}
+
+/* Иконка в поле */
+.auth-input-icon {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.auth-input:focus ~ .auth-input-icon {
+  opacity: 1;
+}
+.auth-input-prefix {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 2;
+}
+.reg-username-group .auth-input {
+  padding-left: 34px;
+}
+.reg-username-group .auth-label {
+  left: 34px;
+}
+.reg-username-group .auth-input:focus + .auth-label,
+.reg-username-group .auth-input:not(:placeholder-shown) + .auth-label {
+  left: 16px;
+}
+
+/* Кнопка-глаз для пароля */
+.auth-toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.2s, transform 0.15s var(--ease-spring), background 0.2s;
+}
+.auth-toggle-password:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+.auth-toggle-password:active {
+  transform: translateY(-50%) scale(0.85);
+}
+.auth-toggle-password.showing {
+  opacity: 1;
+}
+
+/* ─── Ошибка ─── */
+.auth-err {
+  color: #ef4444;
+  font-size: 13px;
+  margin-bottom: 8px;
+  min-height: 18px;
+  text-align: center;
+  transition: all 0.2s var(--ease-soft);
+}
+.auth-err:not(:empty) {
+  animation: shakeErr 0.4s var(--ease-spring);
+}
+@keyframes shakeErr {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+/* ─── Подсказки ─── */
+.auth-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 16px;
+  text-align: left;
+  width: 100%;
+  padding: 0 4px;
+  margin-bottom: 12px;
+  transition: color 0.2s;
+}
+.auth-hint.error { color: #ef4444; }
+.auth-hint.success { color: #22c55e; }
+
+/* ─── Кнопки ─── */
+.auth-btn-primary {
+  width: 100%;
+  padding: 16px;
+  margin-top: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border: none;
+  border-radius: 16px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 12px 32px rgba(168, 85, 247, 0.4),
+              0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  transition: transform 0.15s var(--ease-spring),
+              box-shadow 0.25s var(--ease-soft),
+              opacity 0.2s;
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+}
+.auth-btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.25) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.auth-btn-primary:hover {
+  box-shadow: 0 16px 40px rgba(168, 85, 247, 0.5),
+              0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+}
+.auth-btn-primary:active {
+  transform: scale(0.97);
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.3);
+}
+.auth-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  animation: none;
+}
+.auth-btn-primary:disabled::before {
+  animation: none;
+}
+.auth-btn-success {
+  background: linear-gradient(135deg, #7c3aed, #a855f7, #ec4899);
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease infinite;
+}
+.btn-text {
+  position: relative;
+  z-index: 1;
+}
+.btn-arrow {
+  position: relative;
+  z-index: 1;
+  font-size: 20px;
+  transition: transform 0.2s var(--ease-spring);
+}
+.auth-btn-primary:hover .btn-arrow {
+  transform: translateX(4px);
+}
+.btn-spinner {
+  display: inline-flex;
+  animation: spin 0.9s linear infinite;
+}
+
+/* Ссылка-переключатель */
+.auth-btn-link {
+  width: 100%;
+  padding: 14px;
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: color 0.2s, background 0.2s;
+}
+.auth-btn-link span {
+  color: var(--accent);
+  font-weight: 600;
+}
+.auth-btn-link:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+.auth-btn-link:active {
+  transform: scale(0.98);
+}
+
+/* ─── Прогресс регистрации ─── */
+.reg-top-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+.reg-back-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--accent);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s var(--ease-spring), background 0.2s;
+  flex-shrink: 0;
+  padding-bottom: 4px;
+}
+.reg-back-btn.show {
+  display: flex;
+  animation: slideInBack 0.3s var(--ease-spring);
+}
+@keyframes slideInBack {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.reg-back-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.reg-back-btn:active {
+  transform: scale(0.85);
+}
+.reg-progress {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+}
+.reg-progress-seg {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  transition: background 0.4s var(--ease-out-expo);
+  position: relative;
+}
+.reg-progress-seg.active,
+.reg-progress-seg.done {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background-size: 200% 100%;
+  animation: gradientShift 3s ease infinite;
+}
+.reg-progress-seg.done::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.15);
+  animation: segPulse 0.6s var(--ease-out-expo);
+}
+@keyframes segPulse {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ─── Карточки шагов регистрации ─── */
+.reg-step-card {
+  display: none;
+  animation: regStepIn 0.5s var(--ease-out-expo);
+}
+.reg-step-card.active {
+  display: block;
+}
+@keyframes regStepIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* ─── Индикатор силы пароля ─── */
+.reg-strength {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  margin-top: -4px;
+}
+.reg-strength-bar {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  transition: width 0.4s var(--ease-out-expo),
+              background 0.3s;
+  background: #ef4444;
+  position: relative;
+}
+.reg-strength-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+.reg-strength-bar.weak { width: 33%; background: #ef4444; }
+.reg-strength-bar.medium { width: 66%; background: #fbbf24; }
+.reg-strength-bar.strong { width: 100%; background: #22c55e; }
+
+/* ─── Статус ника ─── */
+.reg-status {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+  transition: transform 0.3s var(--ease-spring);
+  pointer-events: none;
+}
+.reg-status:not(:empty) {
+  animation: statusPop 0.4s var(--ease-spring);
+}
+@keyframes statusPop {
+  0% { transform: translateY(-50%) scale(0); }
+  60% { transform: translateY(-50%) scale(1.3); }
+  100% { transform: translateY(-50%) scale(1); }
+}
+.reg-username-group.success {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+}
+.reg-username-group.error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+.reg-username-group.success .auth-input {
+  border-color: #22c55e;
+}
+.reg-username-group.error .auth-input {
+  border-color: #ef4444;
+}
+
+/* ─── Бонус новичку ─── */
+.auth-bonus {
+  position: fixed;
+  bottom: calc(20px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px 12px 16px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(251, 191, 36, 0.2);
+  z-index: 2;
+  animation: bonusFloat 3s ease-in-out infinite,
+             fadeIn 1s var(--ease-out-expo) 0.8s backwards;
+  max-width: calc(100vw - 40px);
+  pointer-events: none;
+}
+@keyframes bonusFloat {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-6px); }
+}
+.bonus-emoji {
+  font-size: 32px;
+  filter: drop-shadow(0 4px 12px rgba(251, 191, 36, 0.5));
+  animation: bonusBounce 2s ease-in-out infinite;
+}
+@keyframes bonusBounce {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(-10deg) scale(1.1); }
+}
+.bonus-text {
+  text-align: left;
+}
+.bonus-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fbbf24;
+  line-height: 1.2;
+}
+.bonus-sub {
+  font-size: 12px;
+  color: rgba(251, 191, 36, 0.75);
+  margin-top: 2px;
+}
+#auth-login-screen.active ~ .auth-bonus,
+#auth-register-screen.active ~ .auth-bonus {
+  display: none;
+}
+#auth-login-screen.active ~ .auth-bonus {
+  display: flex;
+}
+
+/* ─── Мобильная адаптация ─── */
+@media (max-width: 420px) {
+  .auth-card {
+    padding: 28px 20px;
+    border-radius: 24px;
+  }
+  .auth-logo {
+    width: 76px;
+    height: 76px;
+    border-radius: 24px;
+    margin-bottom: 16px;
+  }
+  .auth-logo-inner {
+    font-size: 38px;
+  }
+  .auth-title {
+    font-size: 24px;
+  }
+  .auth-subtitle {
+    margin-bottom: 22px;
+  }
+  .auth-input {
+    padding: 20px 40px 8px 14px;
+    font-size: 14px;
+  }
+  .auth-label {
+    left: 14px;
+    font-size: 14px;
+  }
+  .auth-btn-primary {
+    padding: 15px;
+    font-size: 15px;
+  }
+  .reg-back-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 24px;
+  }
+  .auth-bonus {
+    padding: 10px 16px 10px 12px;
+    gap: 10px;
+  }
+  .bonus-emoji {
+    font-size: 28px;
+  }
+  .bonus-title {
+    font-size: 12px;
+  }
+}
+
+/* ─── Планшеты и десктоп ─── */
+@media (min-width: 768px) {
+  .auth-card {
+    padding: 40px 32px;
+  }
+  .auth-logo {
+    width: 100px;
+    height: 100px;
+    border-radius: 32px;
+  }
+  .auth-logo-inner {
+    font-size: 52px;
+  }
+  .auth-title {
+    font-size: 32px;
+  }
+  .auth-input {
+    font-size: 16px;
+  }
+}
+
+/* ─── Анимация выхода #auth ─── */
+#auth.auth-exit {
+  animation: authExit 0.45s var(--ease-in-out-expo) forwards;
+  pointer-events: none;
+}
+@keyframes authExit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+    filter: blur(6px);
+  }
+}
+
+/* ─── Плавные переходы между шагами регистрации ─── */
+.reg-step-card:not(.active) {
+  display: none;
+}
+
+/* ─── Скрытие старых классов (совместимость) ─── */
+.auth-primary-btn,
+.switch-btn,
+.auth-screen .logo,
+.auth-screen h1:not(.auth-title),
+.auth-screen .subtitle:not(.auth-subtitle),
+.auth-screen .err:not(.auth-err),
+.auth-screen input:not(.auth-input),
+.auth-screen .reg-hint:not(.auth-hint),
+.auth-screen .reg-input-wrap:not(.auth-input-group),
+.auth-screen .reg-strength:not(.reg-strength-new) {
+  /* ничего не делаем — просто на случай если остались старые элементы */
+}
