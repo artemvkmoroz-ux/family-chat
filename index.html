@@ -56,24 +56,59 @@
   <button onclick="enableNotifications()">Включить</button>
 </div>
 
-<!-- ═══ AUTH ═══ -->
+<!-- ═══ AUTH v10 — Красивый вход ═══ -->
 <div id="auth">
-  <!-- ЛОГИН -->
-  <div id="auth-login-screen" class="auth-screen active">
-    <div class="logo">🌌</div>
-    <h1>Aurora</h1>
-    <div class="subtitle">Твой премиум-мессенджер</div>
-    <input id="login-username" placeholder="Ник" autocapitalize="none" autocomplete="username" />
-    <input id="login-password" type="password" placeholder="Пароль" autocomplete="current-password" />
-    <div class="err" id="login-error"></div>
-    <button class="auth-primary-btn" id="login-btn" onclick="doLogin()">Войти</button>
-    <button class="switch-btn" onclick="switchAuthScreen('register')">Нет аккаунта? Зарегистрироваться</button>
+
+  <!-- Анимированный фон -->
+  <div class="auth-bg">
+    <div class="auth-blob auth-blob-1"></div>
+    <div class="auth-blob auth-blob-2"></div>
+    <div class="auth-blob auth-blob-3"></div>
   </div>
 
-  <!-- РЕГИСТРАЦИЯ -->
+  <!-- ЭКРАН 1: ВХОД -->
+  <div id="auth-login-screen" class="auth-screen active">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="auth-logo-inner">🌌</div>
+      </div>
+      <h1 class="auth-title">Aurora</h1>
+      <p class="auth-subtitle">Твой премиум-мессенджер</p>
+
+      <div class="auth-input-group">
+        <input id="login-username" class="auth-input" placeholder=" " autocapitalize="none" autocomplete="username" />
+        <label class="auth-label" for="login-username">Ник</label>
+        <span class="auth-input-icon">👤</span>
+      </div>
+
+      <div class="auth-input-group">
+        <input id="login-password" class="auth-input" type="password" placeholder=" " autocomplete="current-password" />
+        <label class="auth-label" for="login-password">Пароль</label>
+        <span class="auth-input-icon">🔒</span>
+        <button type="button" class="auth-toggle-password" onclick="togglePassword('login-password')">👁</button>
+      </div>
+
+      <div class="auth-err" id="login-error"></div>
+
+      <button class="auth-btn-primary" id="login-btn" onclick="doLogin()">
+        <span class="btn-text">Войти</span>
+        <span class="btn-spinner" style="display:none;">
+          <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </span>
+      </button>
+
+      <button class="auth-btn-link" onclick="switchAuthScreen('register')">
+        Нет аккаунта? <span>Зарегистрироваться</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ЭКРАН 2: РЕГИСТРАЦИЯ -->
   <div id="auth-register-screen" class="auth-screen">
-    <div class="reg-header">
-      <button class="reg-back" id="reg-back-btn" onclick="regBack()">‹</button>
+    <div class="reg-top-bar">
+      <button class="reg-back-btn" id="reg-back-btn" onclick="regBack()">
+        <span>‹</span>
+      </button>
       <div class="reg-progress">
         <div class="reg-progress-seg active" data-step="1"></div>
         <div class="reg-progress-seg" data-step="2"></div>
@@ -81,53 +116,107 @@
       </div>
     </div>
 
-    <!-- Шаг 1: Ник -->
-    <div class="reg-step auth-screen active" data-step="1" style="width:100%;">
-      <div class="logo">🌌</div>
-      <h1>Придумай ник</h1>
-      <div class="subtitle">Латиница, цифры и _</div>
-      <div class="reg-input-wrap" id="reg-username-wrap">
-        <span class="reg-at">@</span>
-        <input id="reg-username" placeholder="username" autocapitalize="none" autocomplete="off" maxlength="20" oninput="onRegUsernameInput()" />
+    <!-- ШАГ 1: НИК -->
+    <div class="auth-card reg-step-card active" data-step="1">
+      <div class="auth-logo">
+        <div class="auth-logo-inner">✨</div>
+      </div>
+      <h1 class="auth-title">Придумай ник</h1>
+      <p class="auth-subtitle">Латиница, цифры и _</p>
+
+      <div class="auth-input-group reg-username-group" id="reg-username-wrap">
+        <span class="auth-input-prefix">@</span>
+        <input id="reg-username" class="auth-input" placeholder=" " autocapitalize="none" autocomplete="off" maxlength="20" oninput="onRegUsernameInput()" />
+        <label class="auth-label" for="reg-username">username</label>
         <span class="reg-status" id="reg-username-status"></span>
       </div>
-      <div class="reg-hint" id="reg-username-hint">Минимум 3 символа</div>
-      <div class="err" id="reg-error-1"></div>
-      <button class="auth-primary-btn" id="reg-next-1" onclick="regNext(1)" disabled>Далее</button>
-      <button class="switch-btn" onclick="switchAuthScreen('login')">Уже есть аккаунт? Войти</button>
+      <div class="auth-hint" id="reg-username-hint">Минимум 3 символа</div>
+
+      <div class="auth-err" id="reg-error-1"></div>
+
+      <button class="auth-btn-primary" id="reg-next-1" onclick="regNext(1)" disabled>
+        <span class="btn-text">Далее</span>
+        <span class="btn-arrow">→</span>
+      </button>
+
+      <button class="auth-btn-link" onclick="switchAuthScreen('login')">
+        Уже есть аккаунт? <span>Войти</span>
+      </button>
     </div>
 
-    <!-- Шаг 2: Имя -->
-    <div class="reg-step" data-step="2" style="display:none; width:100%; flex-direction: column; align-items: center;">
-      <div class="logo">👋</div>
-      <h1>Как тебя зовут?</h1>
-      <div class="subtitle">Так тебя увидят другие</div>
-      <input id="reg-displayname" placeholder="Имя" maxlength="40" autocomplete="name" />
-      <div class="reg-hint">Можно изменить позже</div>
-      <div class="err" id="reg-error-2"></div>
-      <button class="auth-primary-btn" id="reg-next-2" onclick="regNext(2)">Далее</button>
-      <button class="switch-btn" onclick="regBack()">‹ Назад</button>
+    <!-- ШАГ 2: ИМЯ -->
+    <div class="auth-card reg-step-card" data-step="2">
+      <div class="auth-logo">
+        <div class="auth-logo-inner">👋</div>
+      </div>
+      <h1 class="auth-title">Как тебя зовут?</h1>
+      <p class="auth-subtitle">Так тебя увидят другие</p>
+
+      <div class="auth-input-group">
+        <input id="reg-displayname" class="auth-input" placeholder=" " maxlength="40" autocomplete="name" />
+        <label class="auth-label" for="reg-displayname">Имя</label>
+        <span class="auth-input-icon">💫</span>
+      </div>
+      <div class="auth-hint">Можно изменить позже в настройках</div>
+
+      <div class="auth-err" id="reg-error-2"></div>
+
+      <button class="auth-btn-primary" id="reg-next-2" onclick="regNext(2)">
+        <span class="btn-text">Далее</span>
+        <span class="btn-arrow">→</span>
+      </button>
+
+      <button class="auth-btn-link" onclick="regBack()">‹ Назад</button>
     </div>
 
-    <!-- Шаг 3: Пароль -->
-    <div class="reg-step" data-step="3" style="display:none; width:100%; flex-direction: column; align-items: center;">
-      <div class="logo">🔐</div>
-      <h1>Придумай пароль</h1>
-      <div class="subtitle">Минимум 8 символов, буквы и цифры</div>
-      <input id="reg-password" type="password" placeholder="Пароль" autocomplete="new-password" oninput="onRegPasswordInput()" />
+    <!-- ШАГ 3: ПАРОЛЬ -->
+    <div class="auth-card reg-step-card" data-step="3">
+      <div class="auth-logo">
+        <div class="auth-logo-inner">🔐</div>
+      </div>
+      <h1 class="auth-title">Придумай пароль</h1>
+      <p class="auth-subtitle">Минимум 8 символов</p>
+
+      <div class="auth-input-group">
+        <input id="reg-password" class="auth-input" type="password" placeholder=" " autocomplete="new-password" oninput="onRegPasswordInput()" />
+        <label class="auth-label" for="reg-password">Пароль</label>
+        <button type="button" class="auth-toggle-password" onclick="togglePassword('reg-password')">👁</button>
+      </div>
+
       <div class="reg-strength">
         <div class="reg-strength-bar" id="reg-strength-bar"></div>
       </div>
-      <div class="reg-hint" id="reg-strength-label">Введи пароль</div>
-      <input id="reg-password2" type="password" placeholder="Повтори пароль" autocomplete="new-password" oninput="onRegPassword2Input()" />
-      <div class="reg-hint" id="reg-password2-hint"></div>
-      <div class="err" id="reg-error-3"></div>
-      <button class="auth-primary-btn" id="reg-submit" onclick="doRegister()" disabled>Создать аккаунт</button>
-      <button class="switch-btn" onclick="regBack()">‹ Назад</button>
+      <div class="auth-hint" id="reg-strength-label">Введи пароль</div>
+
+      <div class="auth-input-group">
+        <input id="reg-password2" class="auth-input" type="password" placeholder=" " autocomplete="new-password" oninput="onRegPassword2Input()" />
+        <label class="auth-label" for="reg-password2">Повтори пароль</label>
+        <button type="button" class="auth-toggle-password" onclick="togglePassword('reg-password2')">👁</button>
+      </div>
+      <div class="auth-hint" id="reg-password2-hint"></div>
+
+      <div class="auth-err" id="reg-error-3"></div>
+
+      <button class="auth-btn-primary auth-btn-success" id="reg-submit" onclick="doRegister()" disabled>
+        <span class="btn-text">Создать аккаунт</span>
+        <span class="btn-spinner" style="display:none;">
+          <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </span>
+      </button>
+
+      <button class="auth-btn-link" onclick="regBack()">‹ Назад</button>
+    </div>
+  </div>
+
+  <!-- БОНУС -->
+  <div class="auth-bonus" id="auth-bonus">
+    <span class="bonus-emoji">🎁</span>
+    <div class="bonus-text">
+      <div class="bonus-title">Бонус новичку</div>
+      <div class="bonus-sub">+10 ⭐ на старте</div>
     </div>
   </div>
 </div>
-
 <!-- ═══ CREATE MENU ═══ -->
 <div class="modal" id="create-menu-modal"><div class="modal-box">
   <h3>Что создать?</h3>
