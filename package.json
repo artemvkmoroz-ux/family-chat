@@ -1,12 +1,10 @@
 {
-  "name": "aurora",
-  "version": "7.0.0",
+  "name": "Aurora Messendger",
+  "version": "8.0.0",
   "description": "Aurora — премиум-мессенджер",
   "main": "server.js",
   "private": true,
-  "engines": {
-    "node": ">=18"
-  },
+  "engines": { "node": ">=18" },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"
