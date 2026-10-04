@@ -1,14 +1,17 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v10.1 — Client (исправлен contactProfileCurrent)
+   🌌 AURORA v10.2 — Client (полная поддержка ✓ 🔨 💀)
    ═══════════════════════════════════════════════════════════ */
 
 // Глобальная переменная для открытого профиля контакта
 var contactProfileCurrent = null;
 
+// 🔧 NEW: текущий выбранный тип значка в badge-modal
+var currentBadgeType = 'verified';
+
 const state = {
-  me: { username: null, avatar: null, verified: false, bio: '', firstName: '', lastName: '', birthday: '', emoji: '', stars: 0, sessionId: null },
+  me: { username: null, avatar: null, verified: false, bio: '', firstName: '', lastName: '', birthday: '', emoji: '', stars: 0, sessionId: null, hammer: false, scam: false },
   contacts: [], groups: [], channels: [], unread: {}, typingUsers: {}, blockedList: [], giftsCatalog: {},
   currentChat: null, currentGroup: null, currentChannel: null, isSavedChat: false,
   activeTab: 'chats', showArchived: false, settings: {},
@@ -110,6 +113,26 @@ function displayNameForUser(username) {
   if (username === state.me.username) return 'Я';
   const c = state.contacts.find(function (c) { return c.name === username; });
   return c && c.displayName ? c.displayName : username;
+}
+
+// 🔧 NEW: Рендер значков (✓ 🔨 💀) — может быть несколько одновременно
+function renderBadges(user) {
+  if (!user) return '';
+  let html = '';
+  if (user.verified) html += '<span class="verified-badge" title="Верифицирован">✓</span>';
+  if (user.hammer) html += '<span class="hammer-badge" title="Модератор">🔨</span>';
+  if (user.scam) html += '<span class="scam-badge" title="Мошенник">💀</span>';
+  return html;
+}
+
+// 🔧 NEW: Рендер значков увеличенного размера (для профиля)
+function renderBadgesBig(user) {
+  if (!user) return '';
+  let html = '';
+  if (user.verified) html += '<span class="verified-badge big" title="Верифицирован">✓</span>';
+  if (user.hammer) html += '<span class="hammer-badge big" title="Модератор">🔨</span>';
+  if (user.scam) html += '<span class="scam-badge big" title="Мошенник">💀</span>';
+  return html;
 }
 
 function saveJson(key, value) {
@@ -532,6 +555,8 @@ function onLoggedIn(res, isAutoLogin) {
   state.me.username = res.username;
   state.me.avatar = res.avatar || null;
   state.me.verified = !!res.verified;
+  state.me.hammer = !!res.hammer;
+  state.me.scam = !!res.scam;
   state.me.bio = res.bio || '';
   state.me.firstName = res.firstName || '';
   state.me.lastName = res.lastName || '';
@@ -609,6 +634,8 @@ async function tryAutoLogin() {
       state.me.username = res.username;
       state.me.avatar = res.avatar || null;
       state.me.verified = !!res.verified;
+      state.me.hammer = !!res.hammer;
+      state.me.scam = !!res.scam;
       state.me.bio = res.bio || '';
       state.me.firstName = res.firstName || '';
       state.me.lastName = res.lastName || '';
@@ -841,7 +868,7 @@ function renderSettings() {
     ? (me.firstName + ' ' + me.lastName).trim()
     : '@' + me.username;
   const emojiStr = me.emoji ? ' ' + me.emoji : '';
-  const tick = me.verified ? '<span class="verified-badge">✓</span>' : '';
+  const tick = renderBadges(me);
   const isAdmin = me.username === 'moroz';
   const avatarStyle = me.avatar ? 'background-image:url(' + me.avatar + ')' : '';
   const avatarContent = me.avatar ? '' : initials(me.username);
@@ -887,7 +914,7 @@ function renderSettings() {
 
   html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.1<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.2<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
@@ -1085,6 +1112,7 @@ function confirmDeleteAccount() {
     location.reload();
   });
 }
+
 // ─── ПРОФИЛЬ ───
 function openProfile() {
   $('profile-username').textContent = '@' + (state.me.username || '');
@@ -1156,11 +1184,7 @@ function updateVerifyButton() {
   if (!btn) return;
   if (state.me.username === 'moroz') {
     btn.style.display = 'block';
-    btn.onclick = function () {
-      $('verify-username').value = '';
-      $('verify-error').textContent = '';
-      openModal('verify-modal');
-    };
+    btn.onclick = function () { openBadgeModal(); };
   } else {
     btn.style.display = 'none';
   }
@@ -1181,15 +1205,72 @@ function updateVerifyChannelButton() {
   }
 }
 
-function doVerify() {
-  const username = $('verify-username').value.trim().toLowerCase();
-  const errEl = $('verify-error');
+// 🔧 NEW: Открыть модалку выдачи значка
+function openBadgeModal() {
+  $('badge-username').value = '';
+  $('badge-error').textContent = '';
+  selectBadgeType('verified');
+  openModal('badge-modal');
+}
+
+// 🔧 NEW: Открыть модалку выдачи значка из профиля контакта
+function openBadgeModalForCurrent() {
+  const u = (contactProfileCurrent && contactProfileCurrent.username) || (state.contactProfileCurrent && state.contactProfileCurrent.username);
+  if (!u) return;
+  closeModal('contact-profile-modal');
+  $('badge-username').value = u;
+  $('badge-error').textContent = '';
+  selectBadgeType('verified');
+  openModal('badge-modal');
+}
+
+// 🔧 NEW: Выбор типа значка в модалке
+function selectBadgeType(type) {
+  currentBadgeType = type;
+  document.querySelectorAll('.badge-option').forEach(function (el) {
+    el.classList.toggle('active', el.dataset.badge === type);
+  });
+  const titles = { verified: '✓ Выдать галочку', hammer: '🔨 Выдать молоток', scam: '💀 Выдать скам' };
+  const titleEl = $('badge-modal-title');
+  if (titleEl) titleEl.textContent = titles[type] || '🏅 Выдать значок';
+  vibrate(10);
+}
+
+// 🔧 NEW: Выдать значок
+function giveBadgeAction() {
+  const username = $('badge-username').value.trim().toLowerCase();
+  const errEl = $('badge-error');
   errEl.textContent = '';
   if (!username) { errEl.textContent = 'Введи ник'; return; }
-  socket.emit('verify', { username: username }, function (res) {
+
+  const events = { verified: 'verify', hammer: 'give hammer', scam: 'give scam' };
+  const event = events[currentBadgeType];
+  if (!event) { errEl.textContent = 'Неизвестный значок'; return; }
+
+  socket.emit(event, { username: username }, function (res) {
     if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
-    closeModal('verify-modal');
-    showToast('✓ Галочка выдана @' + res.username);
+    closeModal('badge-modal');
+    const names = { verified: 'Галочка', hammer: 'Молоток', scam: 'Скам' };
+    showToast('✓ ' + names[currentBadgeType] + ' выдан @' + res.username);
+  });
+}
+
+// 🔧 NEW: Снять значок
+function removeBadgeAction() {
+  const username = $('badge-username').value.trim().toLowerCase();
+  const errEl = $('badge-error');
+  errEl.textContent = '';
+  if (!username) { errEl.textContent = 'Введи ник'; return; }
+
+  const events = { verified: 'unverify', hammer: 'remove hammer', scam: 'remove scam' };
+  const event = events[currentBadgeType];
+  if (!event) { errEl.textContent = 'Неизвестный значок'; return; }
+
+  socket.emit(event, { username: username }, function (res) {
+    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    closeModal('badge-modal');
+    const names = { verified: 'Галочка', hammer: 'Молоток', scam: 'Скам' };
+    showToast('✓ ' + names[currentBadgeType] + ' снят с @' + res.username);
   });
 }
 
@@ -1207,6 +1288,8 @@ function doVerifyChannel() {
 
 socket.on('me updated', function (data) {
   if (data.verified !== undefined) state.me.verified = !!data.verified;
+  if (data.hammer !== undefined) state.me.hammer = !!data.hammer;
+  if (data.scam !== undefined) state.me.scam = !!data.scam;
   if (data.avatar) state.me.avatar = data.avatar;
   if (data.bio !== undefined) state.me.bio = data.bio;
   if (data.firstName !== undefined) state.me.firstName = data.firstName;
@@ -1217,6 +1300,7 @@ socket.on('me updated', function (data) {
   updateMyAvatarBtn();
   renderChatList();
   renderStoriesBar();
+  if (state.activeTab === 'settings') renderSettingsTab();
 });
 
 // ─── КОНТАКТЫ ───
@@ -1253,10 +1337,10 @@ function renderContactsTab() {
     div.className = 'chat-item';
     const avStyle = c.avatar ? 'background-image:url(' + c.avatar + ')' : 'background:var(--accent)';
     const avContent = c.avatar ? '' : initials(c.displayName || c.name);
-    const tick = c.verified ? '<span class="verified-badge">✓</span>' : '';
+    const badges = renderBadges(c);
     const online = c.online ? '<span class="online-dot"></span>' : '';
     div.innerHTML = '<div class="avatar" style="' + avStyle + '">' + avContent + online + '</div>' +
-      '<div class="chat-info"><div class="chat-name">' + escapeHtml(c.displayName || c.name) + tick + '</div>' +
+      '<div class="chat-info"><div class="chat-name">' + escapeHtml(c.displayName || c.name) + badges + '</div>' +
       '<div class="chat-preview">@' + escapeHtml(c.name) + '</div></div>';
     div.onclick = function () { switchTab('chats'); openChat(c.name); };
     box.appendChild(div);
@@ -1271,7 +1355,7 @@ function openContactProfile(username) {
     const box = $('contact-profile-content');
     const avStyle = data.avatar ? 'background-image:url(' + data.avatar + ')' : '';
     const avContent = data.avatar ? '' : initials(username);
-    const tick = data.verified ? '<span class="verified-badge big">✓</span>' : '';
+    const badges = renderBadgesBig(data);
     const contact = state.contacts.find(function (c) { return c.name === username; });
     const displayName = (data.firstName || data.lastName)
       ? ((data.firstName || '') + ' ' + (data.lastName || '')).trim()
@@ -1291,7 +1375,7 @@ function openContactProfile(username) {
     }
     box.innerHTML = '<div class="profile-header">' +
       '<div class="profile-avatar-big" style="' + avStyle + '">' + avContent + '</div>' +
-      '<div class="profile-name">' + escapeHtml(displayName) + emojiStr + tick + '</div>' +
+      '<div class="profile-name">' + escapeHtml(displayName) + emojiStr + ' ' + badges + '</div>' +
       '<div class="profile-nick">@' + escapeHtml(username) + '</div>' +
       '<div class="profile-status ' + (data.online ? 'online' : '') + '">' + (data.online ? 'в сети' : 'не в сети') + '</div>' +
       '</div>' +
@@ -1304,6 +1388,15 @@ function openContactProfile(username) {
       giftBtn.style.display = 'block';
     } else {
       giftBtn.style.display = 'none';
+    }
+    // 🔧 NEW: кнопка управления значками (только для moroz)
+    const badgeBtn = $('give-badge-to-contact-btn');
+    if (badgeBtn) {
+      if (state.me.username === 'moroz' && username !== state.me.username) {
+        badgeBtn.style.display = 'block';
+      } else {
+        badgeBtn.style.display = 'none';
+      }
     }
     openModal('contact-profile-modal');
   });
@@ -1565,7 +1658,7 @@ function renderContactItem(u) {
   const style = u.avatar ? 'background-image:url(' + u.avatar + ')' : 'background:var(--accent)';
   const content = u.avatar ? '' : initials(u.displayName || u.name);
   const badge = unreadCount > 0 ? '<div class="chat-badge">' + unreadCount + '</div>' : '';
-  const tick = u.verified ? '<span class="verified-badge">✓</span>' : '';
+  const badges = renderBadges(u);
   const muteIcon = u.muted ? '<span class="chat-mute-icon">🔕</span>' : '';
   const blockIcon = u.blocked ? '🚫 ' : '';
   const emojiStr = u.emojiStatus ? ' ' + u.emojiStatus : '';
@@ -1575,7 +1668,7 @@ function renderContactItem(u) {
     : (unreadCount > 0 ? 'новое сообщение' : (u.online ? 'в сети' : 'был(а) недавно'));
   div.innerHTML = '<div class="avatar" style="' + style + '">' + content + onlineDot + '</div>' +
     '<div class="chat-info">' +
-      '<div class="chat-name">' + blockIcon + escapeHtml(u.displayName || u.name) + emojiStr + tick + ' ' + muteIcon + '</div>' +
+      '<div class="chat-name">' + blockIcon + escapeHtml(u.displayName || u.name) + emojiStr + badges + ' ' + muteIcon + '</div>' +
       '<div class="chat-preview">' + preview + '</div>' +
     '</div>' +
     '<div class="chat-meta">' + badge + '</div>';
@@ -1596,9 +1689,9 @@ function openChat(name) {
   state.pinnedMessageId = null;
   $('pinned-bar').classList.remove('active');
   const contact = state.contacts.find(function (c) { return c.name === name; });
-  const tick = contact && contact.verified ? '<span class="verified-badge big">✓</span>' : '';
+  const badges = renderBadgesBig(contact || {});
   const displayName = (contact && contact.displayName) || name;
-  $('chat-top-name').innerHTML = escapeHtml(displayName) + tick;
+  $('chat-top-name').innerHTML = escapeHtml(displayName) + ' ' + badges;
   $('chat-top-status').textContent = contact && contact.online ? 'в сети' : 'был(а) недавно';
   $('chat-top-status').classList.remove('typing');
   const av = $('chat-avatar');
@@ -2016,6 +2109,10 @@ function renderMessage(msg) {
   box.scrollTop = box.scrollHeight;
 }
 
+// ═══════════════════════════════════════════════════════════
+// ⚠️ КОНЕЦ ЧАСТИ 1/4
+// Дальше: Часть 2/4 — начнётся с "function scrollToMessage(id)..."
+// ═══════════════════════════════════════════════════════════
 function scrollToMessage(id) {
   const el = document.querySelector('.msg-wrap[data-id="' + id + '"]');
   if (el) {
@@ -2876,10 +2973,11 @@ function openStoryViewers() {
         const c = state.contacts.find(function (x) { return x.name === v.viewer; });
         const displayName = (c && c.displayName) || v.viewer;
         const av = c && c.avatar;
+        const badges = renderBadges(c || {});
         const row = document.createElement('div');
         row.className = 'member-row';
         row.innerHTML = '<div class="member-avatar" style="' + (av ? 'background-image:url(' + av + ')' : 'background:var(--accent)') + '">' + (av ? '' : initials(displayName)) + '</div>' +
-          '<div class="member-name">' + escapeHtml(displayName) +
+          '<div class="member-name">' + escapeHtml(displayName) + ' ' + badges +
           '<div style="font-size:12px;color:var(--text-muted);">' + new Date(v.time).toLocaleString('ru-RU') + '</div></div>';
         box.appendChild(row);
       });
@@ -2906,9 +3004,10 @@ function renderCreateMembers() {
     row.className = 'member-row' + (state.createSelected.has(c.name) ? ' selected' : '');
     const style = c.avatar ? 'background-image:url(' + c.avatar + ')' : 'background:var(--accent)';
     const content = c.avatar ? '' : initials(c.displayName || c.name);
+    const badges = renderBadges(c);
     row.innerHTML = '<div class="member-check">✓</div>' +
       '<div class="member-avatar" style="' + style + '">' + content + '</div>' +
-      '<div class="member-name"><div>' + escapeHtml(c.displayName || c.name) + '</div>' +
+      '<div class="member-name"><div>' + escapeHtml(c.displayName || c.name) + ' ' + badges + '</div>' +
       '<div class="member-nick">@' + escapeHtml(c.name) + '</div></div>';
     row.onclick = function () {
       if (state.createSelected.has(c.name)) state.createSelected.delete(c.name);
@@ -2941,10 +3040,11 @@ function openGroupInfo() {
     const c = state.contacts.find(function (c) { return c.name === u; });
     const displayName = u === state.me.username ? 'Я (@' + state.me.username + ')' : ((c && c.displayName || u) + ' (@' + u + ')');
     const av = c && c.avatar;
+    const badges = renderBadges(c || {});
     const row = document.createElement('div');
     row.className = 'member-row';
     row.innerHTML = '<div class="member-avatar" style="' + (av ? 'background-image:url(' + av + ')' : 'background:var(--accent)') + '">' + (av ? '' : initials(c && c.displayName || u)) + '</div>' +
-      '<div class="member-name">' + escapeHtml(displayName) + '</div>';
+      '<div class="member-name">' + escapeHtml(displayName) + ' ' + badges + '</div>';
     list.appendChild(row);
   });
   const delBtn = $('delete-group-btn');
@@ -2984,9 +3084,10 @@ function openAddMembers() {
       row.className = 'member-row';
       const style = c.avatar ? 'background-image:url(' + c.avatar + ')' : 'background:var(--accent)';
       const content = c.avatar ? '' : initials(c.displayName || c.name);
+      const badges = renderBadges(c);
       row.innerHTML = '<div class="member-check">✓</div>' +
         '<div class="member-avatar" style="' + style + '">' + content + '</div>' +
-        '<div class="member-name"><div>' + escapeHtml(c.displayName || c.name) + '</div>' +
+        '<div class="member-name"><div>' + escapeHtml(c.displayName || c.name) + ' ' + badges + '</div>' +
         '<div class="member-nick">@' + escapeHtml(c.name) + '</div></div>';
       row.onclick = function () {
         if (state.addMembersSelected.has(c.name)) state.addMembersSelected.delete(c.name);
@@ -3026,6 +3127,10 @@ function confirmDeleteGroup() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════
+// ⚠️ КОНЕЦ ЧАСТИ 2/4
+// Дальше: Часть 3/4 — начнётся с "// ─── CHANNELS ───"
+// ═══════════════════════════════════════════════════════════
 // ─── CHANNELS ───
 function openCreateChannelModal() {
   if (!state.canCreateChannel) { alert('Ты уже создал канал. Максимум — один.'); return; }
@@ -3084,7 +3189,15 @@ function renderChannelPost(p) {
   wrap.style.cssText = 'margin-bottom:18px;padding:14px;background:var(--bg-panel);border-radius:var(--radius-md);border:var(--glass-border);';
   let html = '';
   if (p.from_user !== state.me.username) {
-    html += '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px;">📢 ' + escapeHtml(displayNameForUser(p.from_user)) + '</div>';
+    // 🔧 NEW: значки автора поста
+    const authorContact = state.contacts.find(function (c) { return c.name === p.from_user; });
+    const authorBadges = renderBadges(authorContact || {});
+    html += '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px;">📢 ' + escapeHtml(displayNameForUser(p.from_user)) + ' ' + authorBadges + '</div>';
+  } else {
+    const myBadges = renderBadges(state.me);
+    if (myBadges) {
+      html += '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px;">📢 Я ' + myBadges + '</div>';
+    }
   }
   if (p.image) html += '<img src="' + p.image + '" style="max-width:100%;border-radius:var(--radius-md);margin-bottom:8px;display:block;">';
   if (p.text) html += '<div style="font-size:15px;line-height:1.45;margin-bottom:8px;word-wrap:break-word;">' + escapeHtml(p.text) + '</div>';
@@ -3236,7 +3349,10 @@ function loadChannelComments(postId) {
     res.comments.forEach(function (c) {
       const div = document.createElement('div');
       div.style.cssText = 'padding:10px 12px;background:var(--bg-input-inner);border-radius:var(--radius-md);margin-bottom:8px;';
-      div.innerHTML = '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:4px;">' + escapeHtml(displayNameForUser(c.from_user)) + '</div>' +
+      // 🔧 NEW: значки автора комментария
+      const cContact = state.contacts.find(function (x) { return x.name === c.from_user; });
+      const cBadges = renderBadges(cContact || {});
+      div.innerHTML = '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:4px;">' + escapeHtml(displayNameForUser(c.from_user)) + ' ' + cBadges + '</div>' +
         '<div style="font-size:14px;word-wrap:break-word;">' + escapeHtml(c.text || '') + '</div>' +
         '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">' + new Date(c.time).toLocaleString('ru-RU') + '</div>';
       box.appendChild(div);
@@ -3369,6 +3485,7 @@ function chatMenuToggleArchive() {
   if (!key) return;
   socket.emit('toggle archive', { chatKey: key }, function () { closeModal('chat-menu-modal'); });
 }
+
 // ─── STARS / GIFTS / CODES ───
 function openStarsHistory() {
   socket.emit('get stars', function (res) {
@@ -3405,7 +3522,6 @@ function openStarsHistory() {
 
 function openGiftsCatalog(username) {
   if (!username) {
-    // fallback — попробуем из глобальной переменной
     username = (contactProfileCurrent && contactProfileCurrent.username) || (state.contactProfileCurrent && state.contactProfileCurrent.username);
   }
   if (!username) return;
@@ -3661,9 +3777,10 @@ async function startCall(video) {
 }
 
 function showCallScreen(peerName, contact, video, statusText) {
-  const tick = contact && contact.verified ? '<span class="verified-badge big">✓</span>' : '';
+  // 🔧 NEW: значки собеседника в звонке
+  const badges = renderBadgesBig(contact || {});
   const displayName = (contact && contact.displayName) || peerName;
-  $('call-peer-name').innerHTML = escapeHtml(displayName) + tick;
+  $('call-peer-name').innerHTML = escapeHtml(displayName) + ' ' + badges;
   $('call-status').textContent = statusText;
   $('call-screen').classList.add('active');
   const lw = $('local-video-wrap');
@@ -3697,7 +3814,9 @@ socket.on('incoming-call', function (data) {
   state.pendingOffer = data.offer;
   const contact = state.contacts.find(function (c) { return c.name === data.from; });
   const displayName = (contact && contact.displayName) || data.from;
-  $('incoming-name').innerHTML = escapeHtml(displayName) + (contact && contact.verified ? '<span class="verified-badge big" style="margin-left:6px">✓</span>' : '');
+  // 🔧 NEW: значки звонящего
+  const badges = renderBadgesBig(contact || {});
+  $('incoming-name').innerHTML = escapeHtml(displayName) + ' ' + badges;
   $('incoming-type').textContent = data.video ? 'Видеозвонок' : 'Аудиозвонок';
   const av = $('incoming-avatar');
   if (contact && contact.avatar) {
@@ -3819,6 +3938,10 @@ function hangUp() {
   cleanupCall();
 }
 
+// ═══════════════════════════════════════════════════════════
+// ⚠️ КОНЕЦ ЧАСТИ 3/4
+// Дальше: Часть 4/4 — начнётся с "// ─── SOCKET EVENTS — MESSAGES ───"
+// ═══════════════════════════════════════════════════════════
 // ─── SOCKET EVENTS — MESSAGES ───
 socket.on('history', function (data) {
   if (state.galleryWaiting) { fillGallery(data.messages); state.galleryWaiting = false; return; }
@@ -3915,6 +4038,11 @@ socket.on('private message', function (data) {
         self: false, replyData: data.replyData
       });
       clearUnread(data.from);
+      // 🔧 smooth scroll
+      setTimeout(function () {
+        const box = $('messages');
+        if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+      }, 50);
     } else {
       const c = state.contacts.find(function (x) { return x.name === data.from; });
       if (!c || !c.muted) {
@@ -3935,7 +4063,9 @@ socket.on('private message', function (data) {
 });
 
 socket.on('messages read', function () {
-  document.querySelectorAll('.msg.self .check').forEach(function (el) { el.classList.add('read'); });
+  document.querySelectorAll('.msg.self .check').forEach(function (el) {
+    if (!el.classList.contains('read')) el.classList.add('read');
+  });
 });
 
 socket.on('message edited', function (data) {
@@ -3977,6 +4107,11 @@ socket.on('group message', function (data) {
         self: false, senderName: displayNameForUser(data.from), isGroup: true, replyData: data.replyData
       });
       clearUnread('g:' + data.groupId);
+      // 🔧 smooth scroll
+      setTimeout(function () {
+        const box = $('messages');
+        if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+      }, 50);
     } else {
       if (!g || !g.muted) {
         if (state.settings.notif_groups != 0) { playPing(); vibrate(); }
@@ -4121,6 +4256,28 @@ socket.on('account deleted', function () {
   location.reload();
 });
 
+// 🔧 NEW: обновление значка друга в реальном времени
+socket.on('friend updated', function (data) {
+  if (!data || !data.username) return;
+  const c = state.contacts.find(function (x) { return x.name === data.username; });
+  if (c) {
+    if (data.verified !== undefined) c.verified = !!data.verified;
+    if (data.hammer !== undefined) c.hammer = !!data.hammer;
+    if (data.scam !== undefined) c.scam = !!data.scam;
+    if (data.avatar !== undefined) c.avatar = data.avatar;
+    saveJson(STORAGE.CONTACTS_CACHE, state.contacts);
+    renderChatList();
+    if (state.activeTab === 'contacts') renderContactsTab();
+    if (state.currentChat === data.username) {
+      // обновляем шапку чата
+      const badges = renderBadgesBig(c);
+      const displayName = c.displayName || c.name;
+      const nameEl = $('chat-top-name');
+      if (nameEl) nameEl.innerHTML = escapeHtml(displayName) + ' ' + badges;
+    }
+  }
+});
+
 // ─── ИНИЦИАЛИЗАЦИЯ ───
 window.addEventListener('load', function () {
   loadUnread();
@@ -4167,16 +4324,17 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Aurora v10.1 — Smooth UI — загружена');
+console.log('✅ Aurora v10.2 — значки ✓ 🔨 💀 — загружена');
+
 // ═══════════════════════════════════════════════════════════
-// 🎬 TELEGRAM-STYLE ANIMATIONS + STICKERS
+// 🎬 TELEGRAM-STYLE ANIMATIONS
 // ═══════════════════════════════════════════════════════════
 
 // ─── ДВОЙНОЙ ТАП = БЫСТРАЯ РЕАКЦИЯ ❤️ ───
 (function initDoubleTap() {
   let lastTap = 0;
   let lastMsgId = null;
-  
+
   document.addEventListener('click', function (e) {
     const msgEl = e.target.closest('.msg');
     if (!msgEl) return;
@@ -4184,23 +4342,21 @@ console.log('✅ Aurora v10.1 — Smooth UI — загружена');
     if (!wrap) return;
     const msgId = parseInt(wrap.dataset.id, 10);
     const isGroup = wrap.dataset.group === '1';
-    
+
     const t = Date.now();
     if (lastMsgId === msgId && (t - lastTap) < 300) {
-      // Двойной тап
       if (isGroup && state.currentGroup) {
         socket.emit('group react', { groupId: state.currentGroup.id, messageId: msgId, emoji: '❤️' });
       } else {
         socket.emit('react', { messageId: msgId, emoji: '❤️' });
       }
-      // Анимация
       const heart = document.createElement('div');
       heart.className = 'quick-react-heart';
       heart.textContent = '❤️';
       wrap.style.position = 'relative';
       wrap.appendChild(heart);
       setTimeout(function () { if (heart.parentNode) heart.remove(); }, 1000);
-      
+
       vibrate([30, 20, 30]);
       lastMsgId = null;
       lastTap = 0;
@@ -4216,7 +4372,6 @@ console.log('✅ Aurora v10.1 — Smooth UI — загружена');
 var _origRenderMessage = renderMessage;
 renderMessage = function (msg) {
   _origRenderMessage(msg);
-  // Добавляем анимацию "только что отправлено" для self
   if (msg.self) {
     const box = document.getElementById('messages');
     const last = box.lastElementChild;
@@ -4227,129 +4382,82 @@ renderMessage = function (msg) {
   }
 };
 
-// ─── АНИМАЦИЯ ПРОЧТЕНИЯ ───
-var _origMessagesRead = null;
-document.addEventListener('click', function () {
-  // Триггерим анимацию галочек
-}, { passive: true });
-
 // ─── ПРЕВЬЮ СТИКЕРА (долгий тап) ───
 (function initStickerPreview() {
   let pressTimer = null;
   let previewEl = null;
-  
+
+  function showPreview(img) {
+    if (previewEl) previewEl.remove();
+    previewEl = document.createElement('div');
+    previewEl.className = 'sticker-preview';
+
+    let clone;
+    if (img.tagName === 'VIDEO') {
+      clone = document.createElement('video');
+      clone.src = img.src;
+      clone.autoplay = true;
+      clone.loop = true;
+      clone.muted = true;
+      clone.playsInline = true;
+    } else {
+      clone = document.createElement('img');
+      clone.src = img.src;
+    }
+    previewEl.appendChild(clone);
+    document.body.appendChild(previewEl);
+
+    requestAnimationFrame(function () { previewEl.classList.add('active'); });
+    vibrate(20);
+  }
+
+  function hidePreview() {
+    if (previewEl) {
+      previewEl.classList.remove('active');
+      const el = previewEl;
+      previewEl = null;
+      setTimeout(function () {
+        if (el && el.parentNode) el.remove();
+      }, 300);
+    }
+  }
+
   document.addEventListener('touchstart', function (e) {
     const stickerItem = e.target.closest('.sticker-item');
     if (!stickerItem) return;
     const img = stickerItem.querySelector('img, video');
     if (!img) return;
-    
-    pressTimer = setTimeout(function () {
-      // Создаём превью
-      if (previewEl) previewEl.remove();
-      previewEl = document.createElement('div');
-      previewEl.className = 'sticker-preview';
-      
-      let clone;
-      if (img.tagName === 'VIDEO') {
-        clone = document.createElement('video');
-        clone.src = img.src;
-        clone.autoplay = true;
-        clone.loop = true;
-        clone.muted = true;
-        clone.playsInline = true;
-      } else {
-        clone = document.createElement('img');
-        clone.src = img.src;
-      }
-      previewEl.appendChild(clone);
-      document.body.appendChild(previewEl);
-      
-      requestAnimationFrame(function () { previewEl.classList.add('active'); });
-      vibrate(20);
-      
-      // Вибрация
-      if (navigator.vibrate) navigator.vibrate(15);
-    }, 400);
+    pressTimer = setTimeout(function () { showPreview(img); }, 400);
   }, { passive: true });
-  
+
   document.addEventListener('touchend', function () {
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-    if (previewEl) {
-      previewEl.classList.remove('active');
-      setTimeout(function () {
-        if (previewEl && previewEl.parentNode) previewEl.remove();
-        previewEl = null;
-      }, 300);
-    }
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    hidePreview();
   });
-  
+
   document.addEventListener('touchmove', function () {
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-    if (previewEl) {
-      previewEl.classList.remove('active');
-      setTimeout(function () {
-        if (previewEl && previewEl.parentNode) previewEl.remove();
-        previewEl = null;
-      }, 300);
-    }
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    hidePreview();
   });
-  
-  // Десктоп — долгое удержание мыши
+
   document.addEventListener('mousedown', function (e) {
     const stickerItem = e.target.closest('.sticker-item');
     if (!stickerItem) return;
     const img = stickerItem.querySelector('img, video');
     if (!img) return;
-    
-    pressTimer = setTimeout(function () {
-      if (previewEl) previewEl.remove();
-      previewEl = document.createElement('div');
-      previewEl.className = 'sticker-preview';
-      
-      let clone;
-      if (img.tagName === 'VIDEO') {
-        clone = document.createElement('video');
-        clone.src = img.src;
-        clone.autoplay = true;
-        clone.loop = true;
-        clone.muted = true;
-        clone.playsInline = true;
-      } else {
-        clone = document.createElement('img');
-        clone.src = img.src;
-      }
-      previewEl.appendChild(clone);
-      document.body.appendChild(previewEl);
-      requestAnimationFrame(function () { previewEl.classList.add('active'); });
-    }, 400);
+    pressTimer = setTimeout(function () { showPreview(img); }, 400);
   });
-  
+
   document.addEventListener('mouseup', function () {
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    if (previewEl) {
-      previewEl.classList.remove('active');
-      setTimeout(function () {
-        if (previewEl && previewEl.parentNode) previewEl.remove();
-        previewEl = null;
-      }, 300);
-    }
+    hidePreview();
   });
 })();
 
-// ─── БЫСТРАЯ ОТПРАВКА СТИКЕРА ───
-// Переопределяем sendSticker чтобы добавить анимацию
+// ─── ПЛАВНАЯ ОТПРАВКА СТИКЕРА ───
 var _origSendSticker = sendSticker;
 sendSticker = function (url, type) {
   if (!url) return;
-  
-  // Показываем анимацию "полетел"
   const panel = document.getElementById('stickers-panel');
   if (panel) {
     panel.style.transform = 'translateY(20px)';
@@ -4359,11 +4467,10 @@ sendSticker = function (url, type) {
       panel.style.opacity = '';
     }, 200);
   }
-  
   _origSendSticker(url, type);
 };
 
-// ─── ПУЛЬС НА BADGE (если есть непрочитанные) ───
+// ─── BADGE PULSE ───
 function updateBadgePulse() {
   document.querySelectorAll('.chat-badge').forEach(function (badge) {
     if (!badge.classList.contains('pulse')) {
@@ -4372,29 +4479,10 @@ function updateBadgePulse() {
   });
 }
 
-// Следим за изменениями badge
 const badgeObserver = new MutationObserver(function () {
   updateBadgePulse();
 });
 badgeObserver.observe(document.body, { childList: true, subtree: true });
-
-// ─── ПЛАВНЫЙ СКРОЛЛ К НОВЫМ СООБЩЕНИЯМ ───
-function smoothScrollToBottom() {
-  const box = document.getElementById('messages');
-  if (!box) return;
-  box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
-}
-
-// Переопределяем — при получении сообщения прокручиваем плавно
-var _origPrivateMessage = null;
-socket.on('private message', function () {
-  setTimeout(smoothScrollToBottom, 50);
-});
-
-var _origGroupMessage = null;
-socket.on('group message', function () {
-  setTimeout(smoothScrollToBottom, 50);
-});
 
 // ─── ПЛАВНОЕ ПОЯВЛЕНИЕ ПАНЕЛИ СТИКЕРОВ ───
 var _origOpenStickers = openStickersPanel;
@@ -4410,24 +4498,14 @@ openStickersPanel = function () {
   }
 };
 
-// ─── АНИМАЦИЯ ПРИ ПРОЧТЕНИИ ───
-socket.on('messages read', function () {
-  document.querySelectorAll('.msg.self .check').forEach(function (el) {
-    if (!el.classList.contains('read')) {
-      el.classList.add('read');
-    }
-  });
-});
-
 // ─── ВИБРАЦИЯ ПРИ ОТПРАВКЕ ───
 var _origSendMsg = sendMsg;
 sendMsg = function () {
   const input = document.getElementById('msgInput');
   const wasEmpty = !input.value.trim();
   _origSendMsg();
-  if (!wasEmpty) {
-    vibrate(15);
-  }
+  if (!wasEmpty) vibrate(15);
 };
 
 console.log('🎬 Telegram-style animations loaded');
+console.log('✓ Aurora v10.2 — ГОТОВО. Значки: ✓ 🔨 💀 (только moroz)');
