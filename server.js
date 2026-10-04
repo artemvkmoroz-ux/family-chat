@@ -40,16 +40,54 @@ const CONFIG = {
 };
 
 const GIFTS_CATALOG = {
-  cake:    { emoji: '🎂', name: 'Тортик',    price: 5 },
-  rose:    { emoji: '🌹', name: 'Роза',      price: 10 },
-  bear:    { emoji: '🧸', name: 'Мишка',     price: 25 },
-  diamond: { emoji: '💎', name: 'Алмаз',     price: 50 },
-  cup:     { emoji: '🏆', name: 'Кубок',     price: 100 },
-  rocket:  { emoji: '🚀', name: 'Ракета',    price: 200 },
-  crown:   { emoji: '👑', name: 'Корона',    price: 500 },
-  dragon:  { emoji: '🐉', name: 'Дракон',    price: 1000 },
-  ring:    { emoji: '💍', name: 'Кольцо',    price: 2000 },
-  galaxy:  { emoji: '🌌', name: 'Галактика', price: 5000 },
+  // ─── Базовые (5-50) ───
+  cake:      { emoji: '🎂', name: 'Тортик',        price: 5 },
+  rose:      { emoji: '🌹', name: 'Роза',          price: 10 },
+  heart:     { emoji: '❤️', name: 'Сердечко',      price: 10 },
+  star:      { emoji: '⭐', name: 'Звёздочка',     price: 15 },
+  coffee:    { emoji: '☕', name: 'Кофе',          price: 15 },
+  pizza:     { emoji: '🍕', name: 'Пицца',         price: 20 },
+  balloon:   { emoji: '🎈', name: 'Шарик',         price: 20 },
+  icecream:  { emoji: '🍦', name: 'Мороженое',     price: 25 },
+  bear:      { emoji: '🧸', name: 'Мишка',         price: 25 },
+  flower:    { emoji: '💐', name: 'Букет',         price: 30 },
+  pepa:      { emoji: '🐸', name: 'Лягушонок Пепе', price: 30 },
+  cat:       { emoji: '🐱', name: 'Котик',         price: 35 },
+  dog:       { emoji: '🐶', name: 'Пёсик',         price: 35 },
+  beer:      { emoji: '🍺', name: 'Пиво',          price: 40 },
+  candy:     { emoji: '🍬', name: 'Конфетка',      price: 40 },
+  diamond:   { emoji: '💎', name: 'Алмаз',         price: 50 },
+  cherry:    { emoji: '🍒', name: 'Вишенка',       price: 50 },
+  cake_big:  { emoji: '🍰', name: 'Большой торт',  price: 60 },
+
+  // ─── Средние (70-500) ───
+  cup:       { emoji: '🏆', name: 'Кубок',         price: 100 },
+  medal:     { emoji: '🥇', name: 'Медаль',        price: 120 },
+  rainbow:   { emoji: '🌈', name: 'Радуга',        price: 150 },
+  butterfly: { emoji: '🦋', name: 'Бабочка',       price: 180 },
+  candyland: { emoji: '🍭', name: 'Леденец',       price: 200 },
+  rocket:    { emoji: '🚀', name: 'Ракета',        price: 200 },
+  unicorn:   { emoji: '🦄', name: 'Единорог',      price: 250 },
+  flamingo:  { emoji: '🦩', name: 'Фламинго',      price: 300 },
+  star_gold: { emoji: '🌟', name: 'Золотая звезда', price: 350 },
+  crown:     { emoji: '👑', name: 'Корона',        price: 500 },
+  car:       { emoji: '🏎️', name: 'Гоночная машина', price: 500 },
+
+  // ─── Дорогие (700-2000) ───
+  planet:    { emoji: '🪐', name: 'Планета',       price: 700 },
+  firework:  { emoji: '🎆', name: 'Салют',         price: 800 },
+  dragon:    { emoji: '🐉', name: 'Дракон',        price: 1000 },
+  castle:    { emoji: '🏰', name: 'Замок',         price: 1200 },
+  helicopter: { emoji: '🚁', name: 'Вертолёт',     price: 1500 },
+  ring:      { emoji: '💍', name: 'Кольцо',        price: 2000 },
+
+  // ─── Легендарные (3000-10000) ───
+  airplane:  { emoji: '✈️', name: 'Самолёт',       price: 3000 },
+  yacht:     { emoji: '🛥️', name: 'Яхта',          price: 4000 },
+  galaxy:    { emoji: '🌌', name: 'Галактика',     price: 5000 },
+  meteor:    { emoji: '☄️', name: 'Метеорит',      price: 7000 },
+  phoenix:   { emoji: '🔥', name: 'Феникс',        price: 8000 },
+  aurora:    { emoji: '🌠', name: 'Сияние Aurora', price: 10000 },
 };
 
 // ═══════════════════════════════════════════════════════════════
