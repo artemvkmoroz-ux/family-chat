@@ -4168,3 +4168,266 @@ document.addEventListener('keydown', function (e) {
 });
 
 console.log('✅ Aurora v10.1 — Smooth UI — загружена');
+// ═══════════════════════════════════════════════════════════
+// 🎬 TELEGRAM-STYLE ANIMATIONS + STICKERS
+// ═══════════════════════════════════════════════════════════
+
+// ─── ДВОЙНОЙ ТАП = БЫСТРАЯ РЕАКЦИЯ ❤️ ───
+(function initDoubleTap() {
+  let lastTap = 0;
+  let lastMsgId = null;
+  
+  document.addEventListener('click', function (e) {
+    const msgEl = e.target.closest('.msg');
+    if (!msgEl) return;
+    const wrap = msgEl.closest('.msg-wrap');
+    if (!wrap) return;
+    const msgId = parseInt(wrap.dataset.id, 10);
+    const isGroup = wrap.dataset.group === '1';
+    
+    const t = Date.now();
+    if (lastMsgId === msgId && (t - lastTap) < 300) {
+      // Двойной тап
+      if (isGroup && state.currentGroup) {
+        socket.emit('group react', { groupId: state.currentGroup.id, messageId: msgId, emoji: '❤️' });
+      } else {
+        socket.emit('react', { messageId: msgId, emoji: '❤️' });
+      }
+      // Анимация
+      const heart = document.createElement('div');
+      heart.className = 'quick-react-heart';
+      heart.textContent = '❤️';
+      wrap.style.position = 'relative';
+      wrap.appendChild(heart);
+      setTimeout(function () { if (heart.parentNode) heart.remove(); }, 1000);
+      
+      vibrate([30, 20, 30]);
+      lastMsgId = null;
+      lastTap = 0;
+      e.stopPropagation();
+      return;
+    }
+    lastMsgId = msgId;
+    lastTap = t;
+  });
+})();
+
+// ─── АНИМАЦИЯ ОТПРАВКИ СООБЩЕНИЯ ───
+var _origRenderMessage = renderMessage;
+renderMessage = function (msg) {
+  _origRenderMessage(msg);
+  // Добавляем анимацию "только что отправлено" для self
+  if (msg.self) {
+    const box = document.getElementById('messages');
+    const last = box.lastElementChild;
+    if (last && last.dataset.id == msg.id) {
+      last.classList.add('just-sent');
+      setTimeout(function () { last.classList.remove('just-sent'); }, 600);
+    }
+  }
+};
+
+// ─── АНИМАЦИЯ ПРОЧТЕНИЯ ───
+var _origMessagesRead = null;
+document.addEventListener('click', function () {
+  // Триггерим анимацию галочек
+}, { passive: true });
+
+// ─── ПРЕВЬЮ СТИКЕРА (долгий тап) ───
+(function initStickerPreview() {
+  let pressTimer = null;
+  let previewEl = null;
+  
+  document.addEventListener('touchstart', function (e) {
+    const stickerItem = e.target.closest('.sticker-item');
+    if (!stickerItem) return;
+    const img = stickerItem.querySelector('img, video');
+    if (!img) return;
+    
+    pressTimer = setTimeout(function () {
+      // Создаём превью
+      if (previewEl) previewEl.remove();
+      previewEl = document.createElement('div');
+      previewEl.className = 'sticker-preview';
+      
+      let clone;
+      if (img.tagName === 'VIDEO') {
+        clone = document.createElement('video');
+        clone.src = img.src;
+        clone.autoplay = true;
+        clone.loop = true;
+        clone.muted = true;
+        clone.playsInline = true;
+      } else {
+        clone = document.createElement('img');
+        clone.src = img.src;
+      }
+      previewEl.appendChild(clone);
+      document.body.appendChild(previewEl);
+      
+      requestAnimationFrame(function () { previewEl.classList.add('active'); });
+      vibrate(20);
+      
+      // Вибрация
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, 400);
+  }, { passive: true });
+  
+  document.addEventListener('touchend', function () {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    if (previewEl) {
+      previewEl.classList.remove('active');
+      setTimeout(function () {
+        if (previewEl && previewEl.parentNode) previewEl.remove();
+        previewEl = null;
+      }, 300);
+    }
+  });
+  
+  document.addEventListener('touchmove', function () {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    if (previewEl) {
+      previewEl.classList.remove('active');
+      setTimeout(function () {
+        if (previewEl && previewEl.parentNode) previewEl.remove();
+        previewEl = null;
+      }, 300);
+    }
+  });
+  
+  // Десктоп — долгое удержание мыши
+  document.addEventListener('mousedown', function (e) {
+    const stickerItem = e.target.closest('.sticker-item');
+    if (!stickerItem) return;
+    const img = stickerItem.querySelector('img, video');
+    if (!img) return;
+    
+    pressTimer = setTimeout(function () {
+      if (previewEl) previewEl.remove();
+      previewEl = document.createElement('div');
+      previewEl.className = 'sticker-preview';
+      
+      let clone;
+      if (img.tagName === 'VIDEO') {
+        clone = document.createElement('video');
+        clone.src = img.src;
+        clone.autoplay = true;
+        clone.loop = true;
+        clone.muted = true;
+        clone.playsInline = true;
+      } else {
+        clone = document.createElement('img');
+        clone.src = img.src;
+      }
+      previewEl.appendChild(clone);
+      document.body.appendChild(previewEl);
+      requestAnimationFrame(function () { previewEl.classList.add('active'); });
+    }, 400);
+  });
+  
+  document.addEventListener('mouseup', function () {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    if (previewEl) {
+      previewEl.classList.remove('active');
+      setTimeout(function () {
+        if (previewEl && previewEl.parentNode) previewEl.remove();
+        previewEl = null;
+      }, 300);
+    }
+  });
+})();
+
+// ─── БЫСТРАЯ ОТПРАВКА СТИКЕРА ───
+// Переопределяем sendSticker чтобы добавить анимацию
+var _origSendSticker = sendSticker;
+sendSticker = function (url, type) {
+  if (!url) return;
+  
+  // Показываем анимацию "полетел"
+  const panel = document.getElementById('stickers-panel');
+  if (panel) {
+    panel.style.transform = 'translateY(20px)';
+    panel.style.opacity = '0.8';
+    setTimeout(function () {
+      panel.style.transform = '';
+      panel.style.opacity = '';
+    }, 200);
+  }
+  
+  _origSendSticker(url, type);
+};
+
+// ─── ПУЛЬС НА BADGE (если есть непрочитанные) ───
+function updateBadgePulse() {
+  document.querySelectorAll('.chat-badge').forEach(function (badge) {
+    if (!badge.classList.contains('pulse')) {
+      badge.classList.add('pulse');
+    }
+  });
+}
+
+// Следим за изменениями badge
+const badgeObserver = new MutationObserver(function () {
+  updateBadgePulse();
+});
+badgeObserver.observe(document.body, { childList: true, subtree: true });
+
+// ─── ПЛАВНЫЙ СКРОЛЛ К НОВЫМ СООБЩЕНИЯМ ───
+function smoothScrollToBottom() {
+  const box = document.getElementById('messages');
+  if (!box) return;
+  box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+}
+
+// Переопределяем — при получении сообщения прокручиваем плавно
+var _origPrivateMessage = null;
+socket.on('private message', function () {
+  setTimeout(smoothScrollToBottom, 50);
+});
+
+var _origGroupMessage = null;
+socket.on('group message', function () {
+  setTimeout(smoothScrollToBottom, 50);
+});
+
+// ─── ПЛАВНОЕ ПОЯВЛЕНИЕ ПАНЕЛИ СТИКЕРОВ ───
+var _origOpenStickers = openStickersPanel;
+openStickersPanel = function () {
+  _origOpenStickers();
+  const panel = document.getElementById('stickers-panel');
+  if (panel) {
+    panel.style.transform = 'translateY(100%)';
+    requestAnimationFrame(function () {
+      panel.style.transition = 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)';
+      panel.style.transform = 'translateY(0)';
+    });
+  }
+};
+
+// ─── АНИМАЦИЯ ПРИ ПРОЧТЕНИИ ───
+socket.on('messages read', function () {
+  document.querySelectorAll('.msg.self .check').forEach(function (el) {
+    if (!el.classList.contains('read')) {
+      el.classList.add('read');
+    }
+  });
+});
+
+// ─── ВИБРАЦИЯ ПРИ ОТПРАВКЕ ───
+var _origSendMsg = sendMsg;
+sendMsg = function () {
+  const input = document.getElementById('msgInput');
+  const wasEmpty = !input.value.trim();
+  _origSendMsg();
+  if (!wasEmpty) {
+    vibrate(15);
+  }
+};
+
+console.log('🎬 Telegram-style animations loaded');
