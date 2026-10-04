@@ -1,8 +1,9 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v12.0 — Server
+   🌌 AURORA v12.1 — Server
    ✓ Галочка / 🔨 Молоток / 💀 Скам — только для moroz
+   + Broadcast значков в друзья / группы / каналы
    ═══════════════════════════════════════════════════════════ */
 
 const express = require('express');
@@ -159,7 +160,7 @@ app.use('/stickers', express.static(STICKERS_DIR));
 // 📦 БАЗА ДАННЫХ
 // ═══════════════════════════════════════════════════════════
 
-console.log('🚀 Aurora v12.0: старт...');
+console.log('🚀 Aurora v12.1: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? '✓ задан' : '✗ НЕ ЗАДАН');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? '✓ задан' : '✗ НЕ ЗАДАН');
 
@@ -847,6 +848,7 @@ async function isBlockedEither(a, b) {
   if (await isBlocked(b, a)) return true;
   return false;
 }
+
 // ═══════════════════════════════════════════════════════════
 // 👥 ГРУППЫ
 // ═══════════════════════════════════════════════════════════
@@ -881,6 +883,15 @@ async function isGroupMember(groupId, username) {
 async function countUserCreatedGroups(username) {
   const r = await db.execute({ sql: 'SELECT COUNT(*) as cnt FROM groups_table WHERE creator = ?', args: [username] });
   return Number(r.rows[0]?.cnt || 0);
+}
+
+// 🔧 NEW: Получить все группы, в которых состоит юзер (для broadcast значков)
+async function getGroupsUserIsIn(username) {
+  const r = await db.execute({
+    sql: 'SELECT group_id FROM group_members WHERE username = ?',
+    args: [username]
+  });
+  return r.rows.map(row => row.group_id);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -921,6 +932,15 @@ async function getUserChannels(username) {
     args: [username]
   });
   return r.rows;
+}
+
+// 🔧 NEW: Получить все каналы, где юзер создатель или подписчик (для broadcast)
+async function getChannelsUserIsIn(username) {
+  const r = await db.execute({
+    sql: 'SELECT channel_id FROM channel_members WHERE username = ?',
+    args: [username]
+  });
+  return r.rows.map(row => row.channel_id);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1271,6 +1291,44 @@ async function notifyChannelMembers(channelId, event, payload) {
   for (const u of members) findSocketsByUsername(u).forEach(sid => io.to(sid).emit(event, payload));
 }
 
+// 🔧 NEW: Универсальный broadcast изменения значка юзера
+// Обновляет значки у друзей, участников групп и подписчиков каналов
+async function broadcastBadgeChange(username, badgeType, value) {
+  try {
+    const payload = { username };
+    payload[badgeType] = !!value;
+
+    // 1. Друзья
+    await notifyAllFriends(username, 'friend updated', payload).catch(() => {});
+    await refreshForFriends(username).catch(() => {});
+
+    // 2. Участники всех групп, в которых состоит юзер
+    const groupIds = await getGroupsUserIsIn(username);
+    for (const gid of groupIds) {
+      const members = await getGroupMembers(gid);
+      for (const u of members) {
+        if (u === username) continue;
+        findSocketsByUsername(u).forEach(sid => io.to(sid).emit('friend updated', payload));
+      }
+    }
+
+    // 3. Подписчики всех каналов, где юзер состоит (или создатель)
+    const channelIds = await getChannelsUserIsIn(username);
+    for (const cid of channelIds) {
+      const members = await getChannelMembers(cid);
+      for (const u of members) {
+        if (u === username) continue;
+        findSocketsByUsername(u).forEach(sid => io.to(sid).emit('friend updated', payload));
+      }
+    }
+
+    // 4. Сам юзер — обновляем свой профиль
+    findSocketsByUsername(username).forEach(sid => io.to(sid).emit('me updated', payload));
+  } catch (e) {
+    console.error('broadcastBadgeChange:', e);
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 // 👑 ВЫДАЧА ЗНАЧКОВ (только для moroz)
 // ═══════════════════════════════════════════════════════════
@@ -1293,6 +1351,7 @@ async function removeBadge(username, badgeType) {
   await db.execute({ sql: `UPDATE users SET ${column} = 0 WHERE username = ?`, args: [username] });
   return { ok: true };
 }
+
 // ═══════════════════════════════════════════════════════════
 // 🔌 SOCKET.IO
 // ═══════════════════════════════════════════════════════════
@@ -1732,10 +1791,8 @@ io.on('connection', (socket) => {
       const target = await getUser(username);
       if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
       if (target.verified) return cb && cb({ ok: false, error: 'Уже есть галочка' });
-      await db.execute({ sql: 'UPDATE users SET verified = 1 WHERE username = ?', args: [username] });
-      refreshForFriends(username).catch(() => {});
-      notifyAllFriends(username, 'friend updated', { username, verified: true }).catch(() => {});
-      if (username === socket.username) socket.emit('me updated', { verified: true, username });
+      await grantBadge(username, 'verified');
+      await broadcastBadgeChange(username, 'verified', true);
       cb && cb({ ok: true, username });
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
@@ -1744,10 +1801,10 @@ io.on('connection', (socket) => {
     try {
       if (!(await checkAdmin(cb))) return;
       username = String(username || '').trim().toLowerCase();
-      await db.execute({ sql: 'UPDATE users SET verified = 0 WHERE username = ?', args: [username] });
-      refreshForFriends(username).catch(() => {});
-      notifyAllFriends(username, 'friend updated', { username, verified: false }).catch(() => {});
-      if (username === socket.username) socket.emit('me updated', { verified: false, username });
+      const target = await getUser(username);
+      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
+      await removeBadge(username, 'verified');
+      await broadcastBadgeChange(username, 'verified', false);
       cb && cb({ ok: true, username });
     } catch (e) { cb && cb({ ok: false }); }
   });
@@ -1761,10 +1818,8 @@ io.on('connection', (socket) => {
       const target = await getUser(username);
       if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
       if (target.badge_hammer) return cb && cb({ ok: false, error: 'Уже есть молоток' });
-      await db.execute({ sql: 'UPDATE users SET badge_hammer = 1 WHERE username = ?', args: [username] });
-      refreshForFriends(username).catch(() => {});
-      notifyAllFriends(username, 'friend updated', { username, hammer: true }).catch(() => {});
-      if (username === socket.username) socket.emit('me updated', { hammer: true, username });
+      await grantBadge(username, 'hammer');
+      await broadcastBadgeChange(username, 'hammer', true);
       cb && cb({ ok: true, username });
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
@@ -1773,10 +1828,10 @@ io.on('connection', (socket) => {
     try {
       if (!(await checkAdmin(cb))) return;
       username = String(username || '').trim().toLowerCase();
-      await db.execute({ sql: 'UPDATE users SET badge_hammer = 0 WHERE username = ?', args: [username] });
-      refreshForFriends(username).catch(() => {});
-      notifyAllFriends(username, 'friend updated', { username, hammer: false }).catch(() => {});
-      if (username === socket.username) socket.emit('me updated', { hammer: false, username });
+      const target = await getUser(username);
+      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
+      await removeBadge(username, 'hammer');
+      await broadcastBadgeChange(username, 'hammer', false);
       cb && cb({ ok: true, username });
     } catch (e) { cb && cb({ ok: false }); }
   });
@@ -1790,10 +1845,8 @@ io.on('connection', (socket) => {
       const target = await getUser(username);
       if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
       if (target.badge_scam) return cb && cb({ ok: false, error: 'Уже скам' });
-      await db.execute({ sql: 'UPDATE users SET badge_scam = 1 WHERE username = ?', args: [username] });
-      refreshForFriends(username).catch(() => {});
-      notifyAllFriends(username, 'friend updated', { username, scam: true }).catch(() => {});
-      if (username === socket.username) socket.emit('me updated', { scam: true, username });
+      await grantBadge(username, 'scam');
+      await broadcastBadgeChange(username, 'scam', true);
       cb && cb({ ok: true, username });
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
@@ -1802,10 +1855,10 @@ io.on('connection', (socket) => {
     try {
       if (!(await checkAdmin(cb))) return;
       username = String(username || '').trim().toLowerCase();
-      await db.execute({ sql: 'UPDATE users SET badge_scam = 0 WHERE username = ?', args: [username] });
-      refreshForFriends(username).catch(() => {});
-      notifyAllFriends(username, 'friend updated', { username, scam: false }).catch(() => {});
-      if (username === socket.username) socket.emit('me updated', { scam: false, username });
+      const target = await getUser(username);
+      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
+      await removeBadge(username, 'scam');
+      await broadcastBadgeChange(username, 'scam', false);
       cb && cb({ ok: true, username });
     } catch (e) { cb && cb({ ok: false }); }
   });
@@ -1915,7 +1968,8 @@ io.on('connection', (socket) => {
       cb && cb({ ok: false, achievements: [], stats: {} });
     }
   });
-   // ═══════════════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════════════
   // 💬 ЛИЧНЫЕ СООБЩЕНИЯ
   // ═══════════════════════════════════════════════════════════
 
@@ -2664,7 +2718,8 @@ io.on('connection', (socket) => {
       }
     }
   });
-   // ═══════════════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════════════
   // 📸 ИСТОРИИ
   // ═══════════════════════════════════════════════════════════
 
@@ -2936,7 +2991,7 @@ io.on('connection', (socket) => {
       findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', msgPayload));
       socket.emit('private message', { ...msgPayload, self: true });
 
-      const giftPayload = { id: giftId, giftKey, from_user: socket.username, to_user: to, price: gift.price, time: t };
+      const giftPayload = { id: giftId, gift_key: giftKey, from_user: socket.username, to_user: to, price: gift.price, time: t };
       findSocketsByUsername(to).forEach(sid => io.to(sid).emit('gift received', giftPayload));
 
       await incrementStat(socket.username, 'gifts_sent');
@@ -3054,7 +3109,7 @@ initDB()
     setInterval(cleanupOldMessages, 10 * 60 * 1000);
 
     server.listen(CONFIG.PORT, () => {
-      console.log('🌌 Aurora v12.0 запущена на порту ' + CONFIG.PORT);
+      console.log('🌌 Aurora v12.1 запущена на порту ' + CONFIG.PORT);
     });
   })
   .catch(err => {
