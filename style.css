@@ -4326,3 +4326,608 @@ body.light .auth-input:focus {
 .auth-screen .reg-strength:not(.reg-strength-new) {
   /* ничего не делаем — просто на случай если остались старые элементы */
 }
+/* ═══════════════════════════════════════════════════════════
+   🎬 TELEGRAM-STYLE ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── TELEGRAM EASING ─── */
+:root {
+  --tg-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --tg-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --tg-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --tg-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --tg-dur-fast: 120ms;
+  --tg-dur: 220ms;
+  --tg-dur-slow: 320ms;
+  --tg-dur-bounce: 420ms;
+}
+
+/* ─── СООБЩЕНИЯ — ВЫЛЕТАЮТ КАК В ТГ ─── */
+.msg-wrap {
+  animation: tgMessageIn var(--tg-dur-bounce) var(--tg-spring) backwards;
+}
+@keyframes tgMessageIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Сообщение само (self) — вылетает справа */
+.msg-wrap.self {
+  animation: tgMessageInSelf var(--tg-dur-bounce) var(--tg-spring) backwards;
+}
+@keyframes tgMessageInSelf {
+  0% {
+    opacity: 0;
+    transform: translateX(30px) scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(-2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Сообщение от других — вылетает слева */
+.msg-wrap.other {
+  animation: tgMessageInOther var(--tg-dur-bounce) var(--tg-spring) backwards;
+}
+@keyframes tgMessageInOther {
+  0% {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* ─── НАЖАТИЕ НА СООБЩЕНИЕ ─── */
+.msg {
+  transition: transform var(--tg-dur-fast) var(--tg-ease-out),
+              background var(--tg-dur) var(--tg-ease-out),
+              box-shadow var(--tg-dur) var(--tg-ease-out);
+  will-change: transform;
+}
+.msg:active {
+  transform: scale(0.96);
+}
+.msg.self:active {
+  background: linear-gradient(135deg, #6d28d9, #9333ea);
+}
+.msg.other:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Пульс при нажатии */
+.msg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.3), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--tg-dur);
+}
+.msg:active::after {
+  opacity: 1;
+}
+
+/* ─── ДВОЙНОЙ ТАП — БОЛЬШОЕ СЕРДЦЕ ─── */
+.quick-react-heart {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 80px;
+  pointer-events: none;
+  z-index: 100;
+  animation: tgHeartPop 1s var(--tg-spring) forwards;
+  filter: drop-shadow(0 4px 20px rgba(236, 72, 153, 0.8));
+}
+@keyframes tgHeartPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.4);
+  }
+  60% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.2);
+  }
+}
+
+/* ─── СПИСОК ЧАТОВ — STAGGER ─── */
+.chat-item {
+  animation: tgChatItemIn var(--tg-dur-slow) var(--tg-ease-out) backwards;
+}
+@keyframes tgChatItemIn {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.chat-item:nth-child(1) { animation-delay: 0ms; }
+.chat-item:nth-child(2) { animation-delay: 25ms; }
+.chat-item:nth-child(3) { animation-delay: 50ms; }
+.chat-item:nth-child(4) { animation-delay: 75ms; }
+.chat-item:nth-child(5) { animation-delay: 100ms; }
+.chat-item:nth-child(6) { animation-delay: 125ms; }
+.chat-item:nth-child(7) { animation-delay: 150ms; }
+.chat-item:nth-child(8) { animation-delay: 175ms; }
+.chat-item:nth-child(9) { animation-delay: 200ms; }
+.chat-item:nth-child(10) { animation-delay: 225ms; }
+
+/* Плавный hover в списке чатов */
+.chat-item {
+  transition: background var(--tg-dur) var(--tg-ease-out),
+              transform var(--tg-dur-fast) var(--tg-ease-out);
+}
+.chat-item:active {
+  transform: scale(0.98);
+}
+
+/* ─── АВАТАР — ПЛАВНЫЙ HOVER ─── */
+.avatar {
+  transition: transform var(--tg-dur) var(--tg-spring),
+              box-shadow var(--tg-dur) var(--tg-ease-out);
+}
+.chat-item:hover .avatar {
+  transform: scale(1.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── МОДАЛКИ — BOUNCE IN/OUT ─── */
+.modal-box {
+  animation: tgModalIn var(--tg-dur-slow) var(--tg-spring);
+}
+@keyframes tgModalIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(30px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal.active {
+  animation: tgModalBgIn var(--tg-dur) var(--tg-ease-out);
+}
+@keyframes tgModalBgIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ─── КНОПКИ — TELEGRAM RIPPLE ─── */
+.auth-btn-primary,
+.modal-primary,
+.modal-secondary,
+.modal-danger,
+.create-menu-btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--tg-dur-fast) var(--tg-ease-out),
+              box-shadow var(--tg-dur) var(--tg-ease-out),
+              background var(--tg-dur) var(--tg-ease-out);
+  will-change: transform;
+}
+
+.auth-btn-primary:active,
+.modal-primary:active,
+.modal-danger:active {
+  transform: scale(0.96);
+}
+
+.modal-secondary:active,
+.create-menu-btn:active {
+  transform: scale(0.98);
+}
+
+/* ─── BADGE (непрочитанные) — ПРУЖИНКА ─── */
+.chat-badge {
+  animation: tgBadgeIn var(--tg-dur-bounce) var(--tg-spring);
+}
+@keyframes tgBadgeIn {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* Пульс badge */
+.chat-badge.pulse {
+  animation: tgBadgePulse 2s ease-in-out infinite;
+}
+@keyframes tgBadgePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(236, 72, 153, 0);
+  }
+}
+
+/* ─── TYPING-ИНДИКАТОР — 3 ТОЧКИ ─── */
+.typing-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.typing-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.4;
+  animation: tgTypingDot 1.4s var(--tg-ease-in-out) infinite;
+}
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes tgTypingDot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+/* ─── РЕАКЦИИ — ПРУЖИНКА ─── */
+.reaction-chip {
+  animation: tgReactionIn var(--tg-dur-bounce) var(--tg-spring) backwards;
+}
+@keyframes tgReactionIn {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.reaction-chip:active {
+  transform: scale(0.9);
+}
+
+/* Моя реакция — пульс */
+.reaction-chip.mine {
+  animation: tgReactionIn var(--tg-dur-bounce) var(--tg-spring) backwards,
+             tgReactionMine 2s ease-in-out infinite 0.5s;
+}
+@keyframes tgReactionMine {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(168, 85, 247, 0); }
+}
+
+/* ─── ПЕРЕХОДЫ МЕЖДУ ЭКРАНАМИ ─── */
+#chat-screen.active {
+  animation: tgChatScreenIn var(--tg-dur-slow) var(--tg-ease-out);
+}
+@keyframes tgChatScreenIn {
+  from {
+    opacity: 0;
+    transform: translateX(30px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+#settings-screen.active {
+  animation: tgSettingsIn var(--tg-dur-slow) var(--tg-ease-out);
+}
+@keyframes tgSettingsIn {
+  from {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* ─── СВАЙП ОТВЕТА ─── */
+.msg-wrap .swipe-reply-icon {
+  transition: opacity var(--tg-dur-fast) var(--tg-ease-out),
+              transform var(--tg-dur) var(--tg-spring),
+              background var(--tg-dur) var(--tg-ease-out);
+}
+
+/* ─── STORY PROGRESS ─── */
+.story-progress-segment .fill {
+  transition: width 0.1s linear;
+}
+
+/* ─── SCROLL DOWN BUTTON ─── */
+#scroll-down-btn {
+  transition: opacity var(--tg-dur) var(--tg-ease-out),
+              transform var(--tg-dur) var(--tg-spring);
+}
+#scroll-down-btn.show {
+  animation: tgScrollBtnIn var(--tg-dur-bounce) var(--tg-spring);
+}
+@keyframes tgScrollBtnIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.5);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── ТАБЫ (Нижняя навигация) ─── */
+.nav-btn.active .nav-icon {
+  animation: tgNavBounce var(--tg-dur-bounce) var(--tg-spring);
+}
+@keyframes tgNavBounce {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.85); }
+  70% { transform: scale(1.15); }
+  100% { transform: scale(1.08) translateY(-2px); }
+}
+
+/* ─── STICKERS — КАК В TG ─── */
+.sticker-item {
+  transition: transform var(--tg-dur-fast) var(--tg-ease-out),
+              background var(--tg-dur) var(--tg-ease-out);
+}
+.sticker-item:active {
+  transform: scale(0.85);
+}
+
+/* Анимированные стикеры в сообщении */
+.msg .sticker-img {
+  max-width: 150px;
+  max-height: 150px;
+  display: block;
+  margin-bottom: 2px;
+  animation: tgStickerIn var(--tg-dur-bounce) var(--tg-spring);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+}
+@keyframes tgStickerIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-15deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.15) rotate(5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+.msg .sticker-video {
+  max-width: 160px;
+  max-height: 160px;
+  display: block;
+  border-radius: 0;
+  background: transparent;
+  margin-bottom: 2px;
+  animation: tgStickerIn var(--tg-dur-bounce) var(--tg-spring);
+}
+
+/* ─── СТИКЕР-ПАНЕЛЬ ─── */
+#stickers-panel {
+  transition: transform var(--tg-dur-slow) var(--tg-ease-out);
+}
+
+#stickers-panel.active {
+  animation: tgStickerPanelIn var(--tg-dur-slow) var(--tg-ease-out);
+}
+@keyframes tgStickerPanelIn {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* ─── ПРЕВЬЮ СТИКЕРА (при долгом тапе) ─── */
+.sticker-preview {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  background: rgba(20, 12, 38, 0.95);
+  backdrop-filter: blur(24px);
+  border-radius: 24px;
+  padding: 20px;
+  z-index: 9999;
+  opacity: 0;
+  transition: transform var(--tg-dur-slow) var(--tg-spring),
+              opacity var(--tg-dur) var(--tg-ease-out);
+  pointer-events: none;
+  max-width: 60vw;
+  max-height: 60vh;
+}
+.sticker-preview.active {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+.sticker-preview img,
+.sticker-preview video {
+  max-width: 250px;
+  max-height: 250px;
+  display: block;
+}
+
+/* ─── ПЕРЕХОД ЦВЕТА (темы) ─── */
+body {
+  transition: background-color var(--tg-dur-slow) var(--tg-ease-out),
+              color var(--tg-dur-slow) var(--tg-ease-out);
+}
+
+/* ─── УВЕДОМЛЕНИЯ ─── */
+#notif-banner {
+  transition: transform var(--tg-dur-slow) var(--tg-ease-out);
+}
+
+/* ─── АВТОРИЗАЦИЯ ─── */
+.auth-btn-primary {
+  transition: transform var(--tg-dur-fast) var(--tg-ease-out),
+              box-shadow var(--tg-dur) var(--tg-ease-out),
+              background var(--tg-dur) var(--tg-ease-out);
+}
+.auth-btn-primary:active {
+  transform: scale(0.95);
+}
+
+/* ─── РЕДАКЦИЯ — ПЛАВНЫЙ ФОКУС ─── */
+input, textarea {
+  transition: border-color var(--tg-dur) var(--tg-ease-out),
+              background var(--tg-dur) var(--tg-ease-out),
+              box-shadow var(--tg-dur) var(--tg-ease-out);
+}
+
+/* ─── ПЛАВНЫЙ СКРОЛЛ ─── */
+#messages, #chat-list, #settings-content, #stickers-content {
+  scroll-behavior: smooth;
+}
+
+/* ─── СООБЩЕНИЕ "ОТПРАВЛЕНО" ─── */
+.msg.just-sent {
+  animation: tgJustSent var(--tg-dur-bounce) var(--tg-spring);
+}
+@keyframes tgJustSent {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08) translateX(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ─── ПРОЧТЕНИЕ (галочки) ─── */
+.msg .check {
+  transition: color var(--tg-dur) var(--tg-ease-out);
+}
+.msg .check.read {
+  animation: tgCheckRead var(--tg-dur-bounce) var(--tg-spring);
+}
+@keyframes tgCheckRead {
+  0% { transform: scale(1); color: rgba(255,255,255,0.6); }
+  50% { transform: scale(1.3); color: #60d394; }
+  100% { transform: scale(1); color: #60d394; }
+}
+
+/* ─── ОНЛАЙН-СТАТУС ─── */
+.online-dot {
+  animation: tgOnlinePulse 2s ease-in-out infinite;
+}
+@keyframes tgOnlinePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+}
+
+/* ─── ГОЛОСОВЫЕ (волна) ─── */
+.voice-msg.playing .voice-wave span {
+  animation: tgWave 0.8s var(--tg-ease-in-out) infinite alternate;
+}
+@keyframes tgWave {
+  from { transform: scaleY(0.3); }
+  to { transform: scaleY(1.4); }
+}
+
+/* ─── STORY RING ─── */
+.story-ring {
+  transition: transform var(--tg-dur) var(--tg-spring);
+}
+.story-bubble:active .story-ring {
+  transform: scale(0.9);
+}
+
+/* ─── ПЛАВНОЕ ПОЯВЛЕНИЕ ПАНЕЛИ СТИКЕРОВ ─── */
+#stickers-content {
+  animation: tgFadeIn var(--tg-dur) var(--tg-ease-out);
+}
+@keyframes tgFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── МОБИЛЬНАЯ ОПТИМИЗАЦИЯ ─── */
+@media (max-width: 480px) {
+  .msg-wrap {
+    animation-duration: 300ms;
+  }
+  .modal-box {
+    animation-duration: 320ms;
+  }
+  .chat-item {
+    animation-duration: 280ms;
+  }
+}
+
+/* ─── УМЕНЬШЕНИЕ ДВИЖЕНИЯ ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
