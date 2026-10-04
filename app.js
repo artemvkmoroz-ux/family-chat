@@ -1,8 +1,11 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v10.0 — Client
+   🌌 AURORA v10.1 — Client (исправлен contactProfileCurrent)
    ═══════════════════════════════════════════════════════════ */
+
+// Глобальная переменная для открытого профиля контакта
+var contactProfileCurrent = null;
 
 const state = {
   me: { username: null, avatar: null, verified: false, bio: '', firstName: '', lastName: '', birthday: '', emoji: '', stars: 0, sessionId: null },
@@ -12,7 +15,7 @@ const state = {
   authMode: 'login', regStep: 1, regUsernameAvailable: false, regUsernameCheckTimer: null,
   replyToMessage: null, editingMessageId: null, pinnedMessageId: null,
   activeReactionMsgId: null, activeReactionGroupId: null, activeMessage: null,
-  contactProfileCurrent: null, qrFoundUser: null, currentGiftTarget: null,
+  qrFoundUser: null, currentGiftTarget: null,
   currentChannelPostId: null, currentInviteCode: null,
   stickersData: [], stickerRecent: [], stickerCurrentTab: 'recent', stickerSearchQuery: '',
   storiesUsers: [], currentStoryUserIdx: 0, currentStoryIdx: 0, storyTimer: null, storyTimerStart: 0,
@@ -127,7 +130,7 @@ function vibrate(ms) {
   }
 }
 
-// ─── НОВОЕ: показать/скрыть пароль ───
+// ─── TOGGLE PASSWORD ───
 function togglePassword(inputId) {
   const input = $(inputId);
   if (!input) return;
@@ -142,7 +145,7 @@ function togglePassword(inputId) {
   vibrate(10);
 }
 
-// ─── НОВОЕ: спиннер на кнопках ───
+// ─── SPINNER НА КНОПКАХ ───
 function showBtnSpinner(btnId, text) {
   const btn = $(btnId);
   if (!btn) return;
@@ -220,9 +223,21 @@ function closeModal(id) { const m = $(id); if (m) m.classList.remove('active'); 
 
 document.querySelectorAll('.modal').forEach(function (m) {
   m.addEventListener('click', function (e) {
-    if (e.target === m) m.classList.remove('active');
+    if (e.target === m) {
+      m.classList.remove('active');
+      if (m.id === 'contact-profile-modal') {
+        contactProfileCurrent = null;
+        state.contactProfileCurrent = null;
+      }
+    }
   });
 });
+
+function closeContactProfile() {
+  closeModal('contact-profile-modal');
+  contactProfileCurrent = null;
+  state.contactProfileCurrent = null;
+}
 
 // ─── TOAST ───
 function showToast(text) {
@@ -855,7 +870,6 @@ function renderSettings() {
   html += '<div class="settings-section"><div class="settings-section-title">Конфиденциальность</div>';
   html += '<div class="settings-item" onclick="openPasscodeModal()"><div class="si-icon">🔐</div><div class="si-text">Код-пароль</div><div class="si-value">' + (s.passcode ? 'Включён' : 'Выключен') + '</div><div class="si-arrow">›</div></div>';
   html += '<div class="settings-item" onclick="changeLastSeen()"><div class="si-icon">👁</div><div class="si-text">Последнее посещение</div><div class="si-value">' + lastSeenLabel() + '</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="changeAutoDelete()"><div class="si-icon">🗑</div><div class="si-text">Автоудаление</div><div class="si-value">' + autoDeleteLabel() + '</div><div class="si-arrow">›</div></div>';
   html += '<div class="settings-item" onclick="openBlockedList()"><div class="si-icon">🚫</div><div class="si-text">Заблокированные</div><div class="si-value">' + state.blockedList.length + '</div><div class="si-arrow">›</div></div>';
   html += '</div>';
 
@@ -871,18 +885,15 @@ function renderSettings() {
   html += '<div class="settings-item" onclick="openColorPicker(\'accent_color\')"><div class="si-icon">🎯</div><div class="si-text">Акцентный цвет</div><div class="si-value" style="color:' + (s.accent_color || '#a855f7') + ';font-size:20px;">●</div><div class="si-arrow">›</div></div>';
   html += '</div>';
 
-  html += '<div class="settings-section"><div class="settings-section-title">Язык</div><div class="settings-item" onclick="changeLanguage()"><div class="si-icon">🌐</div><div class="si-text">Язык интерфейса</div><div class="si-value">' + (s.language === 'en' ? 'English' : 'Русский') + '</div><div class="si-arrow">›</div></div></div>';
-
   html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.0<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.1<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
 }
 
 function lastSeenLabel() { return { everyone: 'Все', contacts: 'Контакты', nobody: 'Никто' }[state.settings.last_seen_visibility] || 'Все'; }
-function autoDeleteLabel() { return { off: 'Выкл', '24h': '24 часа', '7d': '7 дней', '30d': '30 дней' }[state.settings.auto_delete] || 'Выкл'; }
 function fontLabel() { return { small: 'Маленький', medium: 'Средний', large: 'Большой' }[state.settings.font_size] || 'Средний'; }
 
 function toggleSetting(key) {
@@ -914,30 +925,12 @@ function changeFontSize() {
     if (state.activeTab === 'settings') renderSettingsTab();
   });
 }
-function changeLanguage() {
-  const next = state.settings.language === 'en' ? 'ru' : 'en';
-  socket.emit('update settings', { key: 'language', value: next }, function () {
-    state.settings.language = next;
-    renderSettings();
-    if (state.activeTab === 'settings') renderSettingsTab();
-  });
-}
 function changeLastSeen() {
   const options = ['everyone', 'contacts', 'nobody'];
   const cur = state.settings.last_seen_visibility || 'everyone';
   const next = options[(options.indexOf(cur) + 1) % options.length];
   socket.emit('set last seen visibility', { value: next }, function () {
     state.settings.last_seen_visibility = next;
-    renderSettings();
-    if (state.activeTab === 'settings') renderSettingsTab();
-  });
-}
-function changeAutoDelete() {
-  const options = ['off', '24h', '7d', '30d'];
-  const cur = state.settings.auto_delete || 'off';
-  const next = options[(options.indexOf(cur) + 1) % options.length];
-  socket.emit('update settings', { key: 'auto_delete', value: next }, function () {
-    state.settings.auto_delete = next;
     renderSettings();
     if (state.activeTab === 'settings') renderSettingsTab();
   });
@@ -1274,6 +1267,7 @@ function openContactProfile(username) {
   socket.emit('get profile', { username: username }, function (data) {
     if (!data) return;
     state.contactProfileCurrent = data;
+    contactProfileCurrent = data;
     const box = $('contact-profile-content');
     const avStyle = data.avatar ? 'background-image:url(' + data.avatar + ')' : '';
     const avContent = data.avatar ? '' : initials(username);
@@ -1316,12 +1310,13 @@ function openContactProfile(username) {
 }
 
 function toggleBlockCurrent() {
-  if (!state.contactProfileCurrent) return;
-  const u = state.contactProfileCurrent.username;
-  if (state.contactProfileCurrent.blockedByMe) {
-    socket.emit('unblock user', { username: u }, function () { closeModal('contact-profile-modal'); });
+  if (!contactProfileCurrent && !state.contactProfileCurrent) return;
+  const u = (contactProfileCurrent && contactProfileCurrent.username) || (state.contactProfileCurrent && state.contactProfileCurrent.username);
+  const blockedByMe = (contactProfileCurrent && contactProfileCurrent.blockedByMe) || (state.contactProfileCurrent && state.contactProfileCurrent.blockedByMe);
+  if (blockedByMe) {
+    socket.emit('unblock user', { username: u }, function () { closeContactProfile(); });
   } else {
-    socket.emit('block user', { username: u }, function () { closeModal('contact-profile-modal'); });
+    socket.emit('block user', { username: u }, function () { closeContactProfile(); });
   }
 }
 
@@ -3409,6 +3404,10 @@ function openStarsHistory() {
 }
 
 function openGiftsCatalog(username) {
+  if (!username) {
+    // fallback — попробуем из глобальной переменной
+    username = (contactProfileCurrent && contactProfileCurrent.username) || (state.contactProfileCurrent && state.contactProfileCurrent.username);
+  }
   if (!username) return;
   if (username === state.me.username) { alert('Себе дарить нельзя 🐎'); return; }
   state.currentGiftTarget = username;
@@ -4138,7 +4137,6 @@ window.addEventListener('load', function () {
   state.stickerRecent = loadJson(STORAGE.RECENT_STICKERS, []) || [];
   state.chatWallpapers = loadJson(STORAGE.WALLPAPERS, {}) || {};
 
-  // ?add=username
   const params = new URLSearchParams(window.location.search);
   const addUser = params.get('add');
   if (addUser) {
@@ -4169,4 +4167,4 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Aurora v10.0 — Smooth UI — загружена');
+console.log('✅ Aurora v10.1 — Smooth UI — загружена');
