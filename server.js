@@ -1,8 +1,8 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v11.0 — Server
-   Web Push + Достижения + Системные звонки
+   🌌 AURORA v12.0 — Server
+   ✓ Галочка / 🔨 Молоток / 💀 Скам — только для moroz
    ═══════════════════════════════════════════════════════════ */
 
 const express = require('express');
@@ -13,21 +13,6 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const { Server } = require('socket.io');
 const { createClient } = require('@libsql/client');
-
-let webPush = null;
-try {
-  webPush = require('web-push');
-} catch (e) {
-  console.log('⚠️ web-push не установлен — уведомления отключены');
-}
-
-// ═══════════════════════════════════════════════════════════
-// 🔑 VAPID — ВПИШИ СВОИ КЛЮЧИ!
-// ═══════════════════════════════════════════════════════════
-
-const VAPID_PUBLIC_KEY = 'BMu6qt-loY93evVb-zuYH-XxkRrehRk84b7zUNWp28hWlPTCEFpVoMeJcLmR1ZamPWzE-mLIPSsDEQR4DqnvSpI';   // ← ЗАМЕНИ на свой Public Key
-const VAPID_PRIVATE_KEY = 'aAi_Fmyca0t8HquBgwqoIBczmqfdLdv_4IvkY3DV6zw';   // ← ЗАМЕНИ на свой Private Key
-const VAPID_SUBJECT = 'artemvkmoroz@gmail.com'; // ← ЗАМЕНИ на свой email
 
 // ═══════════════════════════════════════════════════════════
 // ⚙️ КОНФИГ
@@ -54,48 +39,58 @@ const CONFIG = {
   MESSAGE_WINDOW: 10_000,
 };
 
+// ═══════════════════════════════════════════════════════════
+// 🎁 КАТАЛОГ ПОДАРКОВ (Twemoji — работает везде)
+// ═══════════════════════════════════════════════════════════
+
+const TWEMOJI = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/';
+
 const GIFTS_CATALOG = {
-  cake:      { emoji: '🎂', name: 'Тортик',        price: 5,     url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f382.png' },
-  rose:      { emoji: '🌹', name: 'Роза',          price: 10,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f339.png' },
-  heart:     { emoji: '❤️', name: 'Сердечко',      price: 10,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/2764.png' },
-  star:      { emoji: '⭐', name: 'Звёздочка',     price: 15,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/2b50.png' },
-  pizza:     { emoji: '🍕', name: 'Пицца',         price: 20,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f355.png' },
-  balloon:   { emoji: '🎈', name: 'Шарик',         price: 20,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f388.png' },
-  icecream:  { emoji: '🍦', name: 'Мороженое',     price: 25,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f366.png' },
-  bear:      { emoji: '🧸', name: 'Мишка',         price: 25,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f9f8.png' },
-  flower:    { emoji: '💐', name: 'Букет',         price: 30,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f490.png' },
-  pepa:      { emoji: '🐸', name: 'Лягушонок Пепе', price: 30,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f438.png' },
-  cat:       { emoji: '🐱', name: 'Котик',         price: 35,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f431.png' },
-  dog:       { emoji: '🐶', name: 'Пёсик',         price: 35,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f436.png' },
-  beer:      { emoji: '🍺', name: 'Пиво',          price: 40,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f37a.png' },
-  candy:     { emoji: '🍬', name: 'Конфетка',      price: 40,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f36c.png' },
-  diamond:   { emoji: '💎', name: 'Алмаз',         price: 50,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f48e.png' },
-  cherry:    { emoji: '🍒', name: 'Вишенка',       price: 50,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f352.png' },
-  cake_big:  { emoji: '🍰', name: 'Большой торт',  price: 60,    url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f370.png' },
-  cup:       { emoji: '🏆', name: 'Кубок',         price: 100,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f3c6.png' },
-  medal:     { emoji: '🥇', name: 'Медаль',        price: 120,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f947.png' },
-  rainbow:   { emoji: '🌈', name: 'Радуга',        price: 150,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f308.png' },
-  butterfly: { emoji: '🦋', name: 'Бабочка',       price: 180,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f98b.png' },
-  candyland: { emoji: '🍭', name: 'Леденец',       price: 200,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f36d.png' },
-  rocket:    { emoji: '🚀', name: 'Ракета',        price: 200,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f680.png' },
-  unicorn:   { emoji: '🦄', name: 'Единорог',      price: 250,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f984.png' },
-  flamingo:  { emoji: '🦩', name: 'Фламинго',      price: 300,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f9a9.png' },
-  star_gold: { emoji: '🌟', name: 'Золотая звезда', price: 350,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f31f.png' },
-  crown:     { emoji: '👑', name: 'Корона',        price: 500,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f451.png' },
-  car:       { emoji: '🏎️', name: 'Гоночная машина', price: 500, url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f3ce.png' },
-  planet:    { emoji: '🪐', name: 'Планета',       price: 700,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1fa90.png' },
-  firework:  { emoji: '🎆', name: 'Салют',         price: 800,   url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f386.png' },
-  dragon:    { emoji: '🐉', name: 'Дракон',        price: 1000,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f409.png' },
-  castle:    { emoji: '🏰', name: 'Замок',         price: 1200,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f3f0.png' },
-  helicopter: { emoji: '🚁', name: 'Вертолёт',     price: 1500,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f681.png' },
-  ring:      { emoji: '💍', name: 'Кольцо',        price: 2000,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f48d.png' },
-  airplane:  { emoji: '✈️', name: 'Самолёт',       price: 3000,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/2708.png' },
-  yacht:     { emoji: '🛥️', name: 'Яхта',          price: 4000,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f6a2.png' },
-  galaxy:    { emoji: '🌌', name: 'Галактика',     price: 5000,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f30c.png' },
-  meteor:    { emoji: '☄️', name: 'Метеорит',      price: 7000,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/2604.png' },
-  phoenix:   { emoji: '🔥', name: 'Феникс',        price: 8000,  url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f525.png' },
-  aurora:    { emoji: '🌠', name: 'Сияние Aurora', price: 10000, url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f320.png' },
+  cake:      { emoji: '🎂', name: 'Тортик',          price: 5,     url: TWEMOJI + '1f382.png' },
+  rose:      { emoji: '🌹', name: 'Роза',            price: 10,    url: TWEMOJI + '1f339.png' },
+  heart:     { emoji: '❤️', name: 'Сердечко',        price: 10,    url: TWEMOJI + '2764.png' },
+  star:      { emoji: '⭐', name: 'Звёздочка',       price: 15,    url: TWEMOJI + '2b50.png' },
+  pizza:     { emoji: '🍕', name: 'Пицца',           price: 20,    url: TWEMOJI + '1f355.png' },
+  balloon:   { emoji: '🎈', name: 'Шарик',           price: 20,    url: TWEMOJI + '1f388.png' },
+  icecream:  { emoji: '🍦', name: 'Мороженое',       price: 25,    url: TWEMOJI + '1f366.png' },
+  bear:      { emoji: '🧸', name: 'Мишка',           price: 25,    url: TWEMOJI + '1f9f8.png' },
+  flower:    { emoji: '💐', name: 'Букет',           price: 30,    url: TWEMOJI + '1f490.png' },
+  pepa:      { emoji: '🐸', name: 'Лягушонок Пепе',  price: 30,    url: TWEMOJI + '1f438.png' },
+  cat:       { emoji: '🐱', name: 'Котик',           price: 35,    url: TWEMOJI + '1f431.png' },
+  dog:       { emoji: '🐶', name: 'Пёсик',           price: 35,    url: TWEMOJI + '1f436.png' },
+  beer:      { emoji: '🍺', name: 'Пиво',            price: 40,    url: TWEMOJI + '1f37a.png' },
+  candy:     { emoji: '🍬', name: 'Конфетка',        price: 40,    url: TWEMOJI + '1f36c.png' },
+  diamond:   { emoji: '💎', name: 'Алмаз',           price: 50,    url: TWEMOJI + '1f48e.png' },
+  cherry:    { emoji: '🍒', name: 'Вишенка',         price: 50,    url: TWEMOJI + '1f352.png' },
+  cake_big:  { emoji: '🍰', name: 'Большой торт',    price: 60,    url: TWEMOJI + '1f370.png' },
+  cup:       { emoji: '🏆', name: 'Кубок',           price: 100,   url: TWEMOJI + '1f3c6.png' },
+  medal:     { emoji: '🥇', name: 'Медаль',          price: 120,   url: TWEMOJI + '1f947.png' },
+  rainbow:   { emoji: '🌈', name: 'Радуга',          price: 150,   url: TWEMOJI + '1f308.png' },
+  butterfly: { emoji: '🦋', name: 'Бабочка',         price: 180,   url: TWEMOJI + '1f98b.png' },
+  candyland: { emoji: '🍭', name: 'Леденец',         price: 200,   url: TWEMOJI + '1f36d.png' },
+  rocket:    { emoji: '🚀', name: 'Ракета',          price: 200,   url: TWEMOJI + '1f680.png' },
+  unicorn:   { emoji: '🦄', name: 'Единорог',        price: 250,   url: TWEMOJI + '1f984.png' },
+  flamingo:  { emoji: '🦩', name: 'Фламинго',        price: 300,   url: TWEMOJI + '1f9a9.png' },
+  star_gold: { emoji: '🌟', name: 'Золотая звезда',  price: 350,   url: TWEMOJI + '1f31f.png' },
+  crown:     { emoji: '👑', name: 'Корона',          price: 500,   url: TWEMOJI + '1f451.png' },
+  car:       { emoji: '🏎️', name: 'Гоночная машина', price: 500,   url: TWEMOJI + '1f3ce.png' },
+  planet:    { emoji: '🪐', name: 'Планета',         price: 700,   url: TWEMOJI + '1fa90.png' },
+  firework:  { emoji: '🎆', name: 'Салют',           price: 800,   url: TWEMOJI + '1f386.png' },
+  dragon:    { emoji: '🐉', name: 'Дракон',          price: 1000,  url: TWEMOJI + '1f409.png' },
+  castle:    { emoji: '🏰', name: 'Замок',           price: 1200,  url: TWEMOJI + '1f3f0.png' },
+  helicopter:{ emoji: '🚁', name: 'Вертолёт',        price: 1500,  url: TWEMOJI + '1f681.png' },
+  ring:      { emoji: '💍', name: 'Кольцо',          price: 2000,  url: TWEMOJI + '1f48d.png' },
+  airplane:  { emoji: '✈️', name: 'Самолёт',         price: 3000,  url: TWEMOJI + '2708.png' },
+  yacht:     { emoji: '🛥️', name: 'Яхта',            price: 4000,  url: TWEMOJI + '1f6a2.png' },
+  galaxy:    { emoji: '🌌', name: 'Галактика',       price: 5000,  url: TWEMOJI + '1f30c.png' },
+  meteor:    { emoji: '☄️', name: 'Метеорит',        price: 7000,  url: TWEMOJI + '2604.png' },
+  phoenix:   { emoji: '🔥', name: 'Феникс',          price: 8000,  url: TWEMOJI + '1f525.png' },
+  aurora:    { emoji: '🌠', name: 'Сияние Aurora',   price: 10000, url: TWEMOJI + '1f320.png' },
 };
+
+// ═══════════════════════════════════════════════════════════
+// 🏆 КАТАЛОГ ДОСТИЖЕНИЙ
+// ═══════════════════════════════════════════════════════════
 
 const ACHIEVEMENTS_CATALOG = {
   first_message:    { emoji: '💬', name: 'Первое слово',       desc: 'Отправь первое сообщение',       target: 1,     stat: 'messages_sent' },
@@ -164,7 +159,7 @@ app.use('/stickers', express.static(STICKERS_DIR));
 // 📦 БАЗА ДАННЫХ
 // ═══════════════════════════════════════════════════════════
 
-console.log('🚀 Aurora v11.0: старт...');
+console.log('🚀 Aurora v12.0: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? '✓ задан' : '✗ НЕ ЗАДАН');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? '✓ задан' : '✗ НЕ ЗАДАН');
 
@@ -172,18 +167,6 @@ const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
-
-// ─── VAPID ───
-if (webPush && VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  try {
-    webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-    console.log('🔔 Web Push: VAPID настроен ✓');
-  } catch (e) {
-    console.error('🔔 Web Push: ошибка VAPID:', e.message);
-  }
-} else {
-  console.log('🔔 Web Push: НЕ НАСТРОЕН');
-}
 
 // ═══════════════════════════════════════════════════════════
 // 🗄️ ИНИЦИАЛИЗАЦИЯ СХЕМЫ
@@ -193,11 +176,14 @@ async function initDB() {
   console.log('📦 Инициализация базы...');
   const start = Date.now();
 
+  // USERS
   await db.execute(`CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,
     password TEXT NOT NULL,
     avatar TEXT,
     verified INTEGER DEFAULT 0,
+    badge_hammer INTEGER DEFAULT 0,
+    badge_scam INTEGER DEFAULT 0,
     bio TEXT,
     first_name TEXT,
     last_name TEXT,
@@ -213,7 +199,10 @@ async function initDB() {
   await db.execute(`ALTER TABLE users ADD COLUMN birthday TEXT`).catch(() => {});
   await db.execute(`ALTER TABLE users ADD COLUMN emoji_status TEXT`).catch(() => {});
   await db.execute(`ALTER TABLE users ADD COLUMN last_seen_visibility TEXT DEFAULT 'everyone'`).catch(() => {});
+  await db.execute(`ALTER TABLE users ADD COLUMN badge_hammer INTEGER DEFAULT 0`).catch(() => {});
+  await db.execute(`ALTER TABLE users ADD COLUMN badge_scam INTEGER DEFAULT 0`).catch(() => {});
 
+  // SETTINGS
   await db.execute(`CREATE TABLE IF NOT EXISTS user_settings (
     username TEXT PRIMARY KEY,
     theme TEXT DEFAULT 'dark',
@@ -234,6 +223,7 @@ async function initDB() {
     last_seen_visibility TEXT DEFAULT 'everyone'
   )`);
 
+  // SESSIONS
   await db.execute(`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,
@@ -245,6 +235,7 @@ async function initDB() {
   )`);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(username, last_active DESC)`).catch(() => {});
 
+  // CONTACTS
   await db.execute(`CREATE TABLE IF NOT EXISTS contacts (
     owner TEXT NOT NULL,
     contact TEXT NOT NULL,
@@ -253,6 +244,7 @@ async function initDB() {
     PRIMARY KEY (owner, contact)
   )`);
 
+  // MESSAGES
   await db.execute(`CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     from_user TEXT NOT NULL,
@@ -277,6 +269,7 @@ async function initDB() {
   await db.execute(`ALTER TABLE messages ADD COLUMN system_type TEXT`).catch(() => {});
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(from_user, to_user, time)`).catch(() => {});
 
+  // GROUPS
   await db.execute(`CREATE TABLE IF NOT EXISTS groups_table (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -314,6 +307,7 @@ async function initDB() {
   await db.execute(`ALTER TABLE group_messages ADD COLUMN system INTEGER DEFAULT 0`).catch(() => {});
   await db.execute(`ALTER TABLE group_messages ADD COLUMN system_type TEXT`).catch(() => {});
 
+  // CHAT SETTINGS
   await db.execute(`CREATE TABLE IF NOT EXISTS chat_settings (
     owner TEXT NOT NULL,
     chat_key TEXT NOT NULL,
@@ -322,6 +316,7 @@ async function initDB() {
     PRIMARY KEY (owner, chat_key)
   )`);
 
+  // BLOCKS
   await db.execute(`CREATE TABLE IF NOT EXISTS blocks (
     blocker TEXT NOT NULL,
     blocked TEXT NOT NULL,
@@ -329,6 +324,7 @@ async function initDB() {
     PRIMARY KEY (blocker, blocked)
   )`);
 
+  // STORIES
   await db.execute(`CREATE TABLE IF NOT EXISTS stories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL,
@@ -344,6 +340,7 @@ async function initDB() {
     PRIMARY KEY (story_id, viewer)
   )`);
 
+  // STICKERS
   await db.execute(`CREATE TABLE IF NOT EXISTS stickers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL,
@@ -353,6 +350,7 @@ async function initDB() {
     time INTEGER NOT NULL
   )`);
 
+  // GIFT CODES
   await db.execute(`CREATE TABLE IF NOT EXISTS gift_codes (
     code TEXT PRIMARY KEY,
     created_by TEXT NOT NULL,
@@ -361,6 +359,7 @@ async function initDB() {
     time INTEGER NOT NULL
   )`);
 
+  // CHANNELS
   await db.execute(`CREATE TABLE IF NOT EXISTS channels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     slug TEXT UNIQUE NOT NULL,
@@ -408,6 +407,7 @@ async function initDB() {
     created_by TEXT NOT NULL
   )`);
 
+  // STARS
   await db.execute(`CREATE TABLE IF NOT EXISTS stars_transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL,
@@ -417,6 +417,7 @@ async function initDB() {
     time INTEGER NOT NULL
   )`);
 
+  // GIFTS
   await db.execute(`CREATE TABLE IF NOT EXISTS gifts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     gift_key TEXT NOT NULL,
@@ -429,6 +430,7 @@ async function initDB() {
     sold_price INTEGER
   )`);
 
+  // ACHIEVEMENTS
   await db.execute(`CREATE TABLE IF NOT EXISTS achievements (
     username TEXT NOT NULL,
     achievement_key TEXT NOT NULL,
@@ -436,6 +438,7 @@ async function initDB() {
     PRIMARY KEY (username, achievement_key)
   )`);
 
+  // USER_STATS
   await db.execute(`CREATE TABLE IF NOT EXISTS user_stats (
     username TEXT PRIMARY KEY,
     messages_sent INTEGER DEFAULT 0,
@@ -460,17 +463,6 @@ async function initDB() {
     deleted_messages INTEGER DEFAULT 0
   )`);
 
-  await db.execute(`CREATE TABLE IF NOT EXISTS push_subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL,
-    endpoint TEXT NOT NULL UNIQUE,
-    p256dh TEXT NOT NULL,
-    auth TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    last_used INTEGER
-  )`);
-  await db.execute(`CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(username)`).catch(() => {});
-
   console.log(`✅ Схема БД готова за ${Date.now() - start}мс`);
 }
 
@@ -487,7 +479,7 @@ async function getUser(username) {
 
 async function getContactInfo(username) {
   const r = await db.execute({
-    sql: 'SELECT username, avatar, verified, bio, first_name, last_name, emoji_status, last_seen_visibility FROM users WHERE username = ?',
+    sql: 'SELECT username, avatar, verified, badge_hammer, badge_scam, bio, first_name, last_name, emoji_status, last_seen_visibility FROM users WHERE username = ?',
     args: [username]
   });
   return r.rows[0] || null;
@@ -604,57 +596,135 @@ async function createCallSystemMessage(fromUser, toUser, type, duration) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 🔔 WEB PUSH
+// 🏆 СТАТИСТИКА + ДОСТИЖЕНИЯ
 // ═══════════════════════════════════════════════════════════
 
-async function savePushSubscription(username, subscription) {
+async function getUserStats(username) {
+  let r = await db.execute({ sql: 'SELECT * FROM user_stats WHERE username = ?', args: [username] });
+  if (r.rows.length === 0) {
+    await db.execute({ sql: 'INSERT INTO user_stats (username) VALUES (?)', args: [username] });
+    r = await db.execute({ sql: 'SELECT * FROM user_stats WHERE username = ?', args: [username] });
+  }
+  return r.rows[0] || {};
+}
+
+async function incrementStat(username, statName, amount) {
+  amount = amount || 1;
+  const allowed = [
+    'messages_sent', 'calls_made', 'calls_received', 'calls_missed', 'calls_duration',
+    'gifts_sent', 'gifts_received', 'stories_posted', 'groups_created',
+    'channels_created', 'friends_added', 'stickers_sent', 'voice_sent',
+    'circles_sent', 'photos_sent', 'reactions_given', 'edited_messages', 'deleted_messages'
+  ];
+  if (allowed.indexOf(statName) === -1) return;
   try {
-    if (!subscription || !subscription.endpoint) return;
-    const keys = subscription.keys || {};
+    await db.execute({ sql: 'INSERT OR IGNORE INTO user_stats (username) VALUES (?)', args: [username] });
     await db.execute({
-      sql: `INSERT OR REPLACE INTO push_subscriptions 
-            (username, endpoint, p256dh, auth, created_at, last_used) 
-            VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [username, subscription.endpoint, keys.p256dh || '', keys.auth || '', now(), now()]
+      sql: `UPDATE user_stats SET ${statName} = COALESCE(${statName}, 0) + ? WHERE username = ?`,
+      args: [amount, username]
     });
-  } catch (e) { console.error('savePushSubscription:', e); }
+    await checkAchievements(username, statName);
+  } catch (e) { console.error('incrementStat:', e); }
 }
 
-async function removePushSubscription(endpoint) {
+async function checkAchievements(username, statName) {
   try {
-    await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE endpoint = ?', args: [endpoint] });
-  } catch (e) { console.error('removePushSubscription:', e); }
-}
+    const stats = await getUserStats(username);
+    const currentValue = Number(stats[statName] || 0);
 
-async function sendPushToUser(username, payload) {
-  if (!webPush || !VAPID_PUBLIC_KEY) return;
-  try {
-    const r = await db.execute({ sql: 'SELECT * FROM push_subscriptions WHERE username = ?', args: [username] });
-    if (r.rows.length === 0) return;
+    for (const [key, ach] of Object.entries(ACHIEVEMENTS_CATALOG)) {
+      if (ach.stat !== statName) continue;
+      if (currentValue < ach.target) continue;
 
-    const payloadStr = JSON.stringify(payload);
+      const existing = await db.execute({
+        sql: 'SELECT 1 FROM achievements WHERE username = ? AND achievement_key = ?',
+        args: [username, key]
+      });
+      if (existing.rows.length > 0) continue;
 
-    for (const sub of r.rows) {
-      const subscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
-      try {
-        await webPush.sendNotification(subscription, payloadStr, { TTL: 60 * 60, urgency: 'normal' });
-        db.execute({
-          sql: 'UPDATE push_subscriptions SET last_used = ? WHERE endpoint = ?',
-          args: [now(), sub.endpoint]
-        }).catch(() => {});
-      } catch (err) {
-        if (err.statusCode === 404 || err.statusCode === 410) {
-          await removePushSubscription(sub.endpoint);
-        } else {
-          console.error('sendPushToUser error:', err.message);
-        }
-      }
+      await db.execute({
+        sql: 'INSERT INTO achievements (username, achievement_key, unlocked_at) VALUES (?, ?, ?)',
+        args: [username, key, now()]
+      });
+
+      findSocketsByUsername(username).forEach(sid => {
+        io.to(sid).emit('achievement unlocked', {
+          key, emoji: ach.emoji, name: ach.name, desc: ach.desc
+        });
+      });
+
+      await addStars(username, 5, 'achievement:' + key, null);
     }
-  } catch (e) { console.error('sendPushToUser:', e); }
+  } catch (e) { console.error('checkAchievements:', e); }
 }
+
+async function getUserAchievements(username) {
+  const r = await db.execute({
+    sql: 'SELECT achievement_key, unlocked_at FROM achievements WHERE username = ?',
+    args: [username]
+  });
+  const unlocked = {};
+  r.rows.forEach(row => { unlocked[row.achievement_key] = row.unlocked_at; });
+  const stats = await getUserStats(username);
+  return { unlocked, stats };
+}
+
+async function updateDayStreak(username) {
+  try {
+    const stats = await getUserStats(username);
+    const today = new Date().toISOString().slice(0, 10);
+    if (stats.last_active_day === today) return;
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    let newStreak = 1;
+    if (stats.last_active_day === yesterday) {
+      newStreak = Number(stats.days_active || 0) + 1;
+    }
+    await db.execute({
+      sql: 'UPDATE user_stats SET days_active = ?, last_active_day = ? WHERE username = ?',
+      args: [newStreak, today, username]
+    });
+    await checkAchievements(username, 'days_active');
+  } catch (e) { console.error('updateDayStreak:', e); }
+}
+
 // ═══════════════════════════════════════════════════════════
-// 💾 SETTINGS / SESSIONS / CONTACTS
+// ⭐ ЗВЁЗДЫ / 🎁 ПОДАРКИ
 // ═══════════════════════════════════════════════════════════
+
+async function getStars(username) {
+  if (username === CONFIG.ADMIN_USERNAME) return 999999;
+  const r = await db.execute({ sql: 'SELECT stars FROM user_settings WHERE username = ?', args: [username] });
+  return Number(r.rows[0]?.stars || 0);
+}
+
+async function addStars(username, amount, reason, fromUser) {
+  if (username === CONFIG.ADMIN_USERNAME) return;
+  const s = await getSettings(username);
+  const newStars = Math.max(0, Number(s.stars || 0) + amount);
+  await db.execute({ sql: 'UPDATE user_settings SET stars = ? WHERE username = ?', args: [newStars, username] });
+  cacheInvalidate(settingsCache, username);
+  await db.execute({
+    sql: 'INSERT INTO stars_transactions (username, amount, reason, from_user, time) VALUES (?, ?, ?, ?, ?)',
+    args: [username, amount, reason, fromUser || null, now()]
+  });
+}
+
+async function getGiftsOfUser(username) {
+  const r = await db.execute({
+    sql: 'SELECT * FROM gifts WHERE to_user = ? AND sold = 0 ORDER BY time DESC',
+    args: [username]
+  });
+  return r.rows;
+}
+
+async function countGiftsToday(fromUser) {
+  const since = now() - 24 * 60 * 60 * 1000;
+  const r = await db.execute({
+    sql: 'SELECT COUNT(*) as c FROM gifts WHERE from_user = ? AND time > ?',
+    args: [fromUser, since]
+  });
+  return Number(r.rows[0]?.c || 0);
+}
 
 async function getSettings(username) {
   const cached = cacheGet(settingsCache, username);
@@ -665,6 +735,10 @@ async function getSettings(username) {
   cacheSet(settingsCache, username, result);
   return result;
 }
+
+// ═══════════════════════════════════════════════════════════
+// 💾 SESSIONS / CONTACTS
+// ═══════════════════════════════════════════════════════════
 
 async function createSession(username, device, ip) {
   const id = generateSessionId();
@@ -709,7 +783,7 @@ async function getUserSessions(username) {
 async function cleanupExpiredSessions() {
   try {
     await db.execute({ sql: 'DELETE FROM sessions WHERE expires_at IS NOT NULL AND expires_at < ?', args: [now()] });
-  } catch (e) { console.error('cleanupExpiredSessions:', e); }
+  } catch (e) {}
 }
 
 async function getContactsOf(username) {
@@ -758,166 +832,23 @@ async function enrichHistoryWithReplies(rows, isGroup) {
     let replyData = null;
     if (m.reply_to && repliesMap[m.reply_to]) {
       const r = repliesMap[m.reply_to];
-      replyData = {
-        id: r.id, from: r.from_user, text: r.text,
-        image: !!r.image, voice: !!r.voice, deleted: !!r.deleted
-      };
+      replyData = { id: r.id, from: r.from_user, text: r.text, image: !!r.image, voice: !!r.voice, deleted: !!r.deleted };
     }
     return { ...m, reactions: safeParseReactions(m.reactions), replyData };
   });
 }
 
 async function isBlocked(blocker, blocked) {
-  const r = await db.execute({
-    sql: 'SELECT 1 FROM blocks WHERE blocker = ? AND blocked = ?',
-    args: [blocker, blocked]
-  });
+  const r = await db.execute({ sql: 'SELECT 1 FROM blocks WHERE blocker = ? AND blocked = ?', args: [blocker, blocked] });
   return r.rows.length > 0;
 }
-
 async function isBlockedEither(a, b) {
   if (await isBlocked(a, b)) return true;
   if (await isBlocked(b, a)) return true;
   return false;
 }
-
 // ═══════════════════════════════════════════════════════════
-// ⭐ STARS / 🎁 GIFTS
-// ═══════════════════════════════════════════════════════════
-
-async function getStars(username) {
-  if (username === CONFIG.ADMIN_USERNAME) return 999999;
-  const r = await db.execute({ sql: 'SELECT stars FROM user_settings WHERE username = ?', args: [username] });
-  return Number(r.rows[0]?.stars || 0);
-}
-
-async function addStars(username, amount, reason, fromUser) {
-  if (username === CONFIG.ADMIN_USERNAME) return;
-  const s = await getSettings(username);
-  const newStars = Math.max(0, Number(s.stars || 0) + amount);
-  await db.execute({ sql: 'UPDATE user_settings SET stars = ? WHERE username = ?', args: [newStars, username] });
-  cacheInvalidate(settingsCache, username);
-  await db.execute({
-    sql: 'INSERT INTO stars_transactions (username, amount, reason, from_user, time) VALUES (?, ?, ?, ?, ?)',
-    args: [username, amount, reason, fromUser || null, now()]
-  });
-}
-
-async function getGiftsOfUser(username) {
-  const r = await db.execute({
-    sql: 'SELECT * FROM gifts WHERE to_user = ? AND sold = 0 ORDER BY time DESC',
-    args: [username]
-  });
-  return r.rows;
-}
-
-async function countGiftsToday(fromUser) {
-  const since = now() - 24 * 60 * 60 * 1000;
-  const r = await db.execute({
-    sql: 'SELECT COUNT(*) as c FROM gifts WHERE from_user = ? AND time > ?',
-    args: [fromUser, since]
-  });
-  return Number(r.rows[0]?.c || 0);
-}
-
-// ═══════════════════════════════════════════════════════════
-// 🏆 ДОСТИЖЕНИЯ
-// ═══════════════════════════════════════════════════════════
-
-async function getUserStats(username) {
-  let r = await db.execute({ sql: 'SELECT * FROM user_stats WHERE username = ?', args: [username] });
-  if (r.rows.length === 0) {
-    await db.execute({ sql: 'INSERT INTO user_stats (username) VALUES (?)', args: [username] });
-    r = await db.execute({ sql: 'SELECT * FROM user_stats WHERE username = ?', args: [username] });
-  }
-  return r.rows[0] || {};
-}
-
-async function incrementStat(username, statName, amount) {
-  amount = amount || 1;
-  const allowed = [
-    'messages_sent', 'calls_made', 'calls_received', 'calls_missed', 'calls_duration',
-    'gifts_sent', 'gifts_received', 'stories_posted', 'groups_created',
-    'channels_created', 'friends_added', 'stickers_sent', 'voice_sent',
-    'circles_sent', 'photos_sent', 'reactions_given', 'edited_messages', 'deleted_messages'
-  ];
-  if (allowed.indexOf(statName) === -1) return;
-  try {
-    await db.execute({ sql: 'INSERT OR IGNORE INTO user_stats (username) VALUES (?)', args: [username] });
-    await db.execute({
-      sql: `UPDATE user_stats SET ${statName} = COALESCE(${statName}, 0) + ? WHERE username = ?`,
-      args: [amount, username]
-    });
-    await checkAchievements(username, statName);
-  } catch (e) {
-    console.error('incrementStat error:', e);
-  }
-}
-
-async function checkAchievements(username, statName) {
-  try {
-    const stats = await getUserStats(username);
-    const currentValue = Number(stats[statName] || 0);
-
-    for (const [key, ach] of Object.entries(ACHIEVEMENTS_CATALOG)) {
-      if (ach.stat !== statName) continue;
-      if (currentValue < ach.target) continue;
-
-      const existing = await db.execute({
-        sql: 'SELECT 1 FROM achievements WHERE username = ? AND achievement_key = ?',
-        args: [username, key]
-      });
-      if (existing.rows.length > 0) continue;
-
-      await db.execute({
-        sql: 'INSERT INTO achievements (username, achievement_key, unlocked_at) VALUES (?, ?, ?)',
-        args: [username, key, now()]
-      });
-
-      findSocketsByUsername(username).forEach(sid => {
-        io.to(sid).emit('achievement unlocked', {
-          key, emoji: ach.emoji, name: ach.name, desc: ach.desc
-        });
-      });
-
-      await addStars(username, 5, 'achievement:' + key, null);
-    }
-  } catch (e) {
-    console.error('checkAchievements error:', e);
-  }
-}
-
-async function getUserAchievements(username) {
-  const r = await db.execute({
-    sql: 'SELECT achievement_key, unlocked_at FROM achievements WHERE username = ?',
-    args: [username]
-  });
-  const unlocked = {};
-  r.rows.forEach(row => { unlocked[row.achievement_key] = row.unlocked_at; });
-  const stats = await getUserStats(username);
-  return { unlocked, stats };
-}
-
-async function updateDayStreak(username) {
-  try {
-    const stats = await getUserStats(username);
-    const today = new Date().toISOString().slice(0, 10);
-    if (stats.last_active_day === today) return;
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    let newStreak = 1;
-    if (stats.last_active_day === yesterday) {
-      newStreak = Number(stats.days_active || 0) + 1;
-    }
-    await db.execute({
-      sql: 'UPDATE user_stats SET days_active = ?, last_active_day = ? WHERE username = ?',
-      args: [newStreak, today, username]
-    });
-    await checkAchievements(username, 'days_active');
-  } catch (e) { console.error('updateDayStreak:', e); }
-}
-
-// ═══════════════════════════════════════════════════════════
-// 👥 ГРУППЫ / 📢 КАНАЛЫ
+// 👥 ГРУППЫ
 // ═══════════════════════════════════════════════════════════
 
 async function getGroupById(id) {
@@ -951,6 +882,10 @@ async function countUserCreatedGroups(username) {
   const r = await db.execute({ sql: 'SELECT COUNT(*) as cnt FROM groups_table WHERE creator = ?', args: [username] });
   return Number(r.rows[0]?.cnt || 0);
 }
+
+// ═══════════════════════════════════════════════════════════
+// 📢 КАНАЛЫ
+// ═══════════════════════════════════════════════════════════
 
 async function getChannelById(id) {
   const r = await db.execute({ sql: 'SELECT * FROM channels WHERE id = ?', args: [id] });
@@ -988,6 +923,10 @@ async function getUserChannels(username) {
   return r.rows;
 }
 
+// ═══════════════════════════════════════════════════════════
+// 💬 CHAT SETTINGS
+// ═══════════════════════════════════════════════════════════
+
 async function getChatSettings(owner, chatKey) {
   const r = await db.execute({
     sql: 'SELECT * FROM chat_settings WHERE owner = ? AND chat_key = ?',
@@ -1010,7 +949,7 @@ async function setChatSetting(owner, chatKey, field, value) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 📸 STORIES / 🖼 STICKERS
+// 📸 STORIES
 // ═══════════════════════════════════════════════════════════
 
 async function getActiveStories(viewer) {
@@ -1076,6 +1015,10 @@ async function deleteStory(storyId, username) {
   return { ok: true };
 }
 
+// ═══════════════════════════════════════════════════════════
+// 🖼 STICKERS
+// ═══════════════════════════════════════════════════════════
+
 async function getUserStickers(username) {
   const r = await db.execute({ sql: 'SELECT * FROM stickers WHERE username = ? ORDER BY time DESC', args: [username] });
   return r.rows;
@@ -1118,7 +1061,7 @@ async function cleanupExpiredStories() {
     }
     await db.execute({ sql: 'DELETE FROM stories WHERE expires_at < ?', args: [t] });
     await db.execute({ sql: 'DELETE FROM story_views WHERE story_id NOT IN (SELECT id FROM stories)' }).catch(() => {});
-  } catch (e) { console.error('cleanupExpiredStories:', e); }
+  } catch (e) {}
 }
 
 async function cleanupExpiredInvites() {
@@ -1152,11 +1095,11 @@ async function cleanupOldMessages() {
     await cleanupExpiredStories();
     await cleanupExpiredInvites();
     await cleanupExpiredSessions();
-  } catch (e) { console.error('cleanupOldMessages:', e); }
+  } catch (e) {}
 }
 
 // ═══════════════════════════════════════════════════════════
-// 📡 ОТПРАВКА СПИСКОВ
+// 📡 ОТПРАВКА СПИСКОВ КЛИЕНТУ
 // ═══════════════════════════════════════════════════════════
 
 async function sendContactsTo(username) {
@@ -1173,7 +1116,7 @@ async function sendContactsTo(username) {
   const ph = names.map(() => '?').join(',');
 
   const usersR = await db.execute({
-    sql: `SELECT username, avatar, verified, first_name, last_name, emoji_status, last_seen_visibility 
+    sql: `SELECT username, avatar, verified, badge_hammer, badge_scam, first_name, last_name, emoji_status, last_seen_visibility 
           FROM users WHERE username IN (${ph})`,
     args: names
   });
@@ -1204,6 +1147,8 @@ async function sendContactsTo(username) {
       displayName: row.display_name || row.contact,
       avatar: info ? info.avatar : null,
       verified: info ? !!info.verified : false,
+      hammer: info ? !!info.badge_hammer : false,
+      scam: info ? !!info.badge_scam : false,
       firstName: info ? info.first_name : null,
       lastName: info ? info.last_name : null,
       emojiStatus: info ? info.emoji_status : null,
@@ -1225,7 +1170,7 @@ async function sendGroupsTo(username) {
   const createdCount = await countUserCreatedGroups(username);
 
   if (groups.length === 0) {
-    sockets.forEach(sid => io.to(sid).emit('groups', [], { canCreate: createdCount < 1, createdCount }));
+    sockets.forEach(sid => io.to(sid).emit('groups', [], { canCreate: true, createdCount }));
     return;
   }
 
@@ -1262,7 +1207,7 @@ async function sendGroupsTo(username) {
     };
   });
 
-  sockets.forEach(sid => io.to(sid).emit('groups', list, { canCreate: createdCount < 1, createdCount }));
+  sockets.forEach(sid => io.to(sid).emit('groups', list, { canCreate: true, createdCount }));
 }
 
 async function sendChannelsTo(username) {
@@ -1273,7 +1218,7 @@ async function sendChannelsTo(username) {
   const createdCount = await countUserCreatedChannels(username);
 
   if (channels.length === 0) {
-    sockets.forEach(sid => io.to(sid).emit('channels', [], { canCreate: createdCount < 1, createdCount }));
+    sockets.forEach(sid => io.to(sid).emit('channels', [], { canCreate: true, createdCount }));
     return;
   }
 
@@ -1299,7 +1244,7 @@ async function sendChannelsTo(username) {
     };
   });
 
-  sockets.forEach(sid => io.to(sid).emit('channels', list, { canCreate: createdCount < 1, createdCount }));
+  sockets.forEach(sid => io.to(sid).emit('channels', list, { canCreate: true, createdCount }));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1324,6 +1269,29 @@ async function notifyGroupMembers(groupId, event, payload) {
 async function notifyChannelMembers(channelId, event, payload) {
   const members = await getChannelMembers(channelId);
   for (const u of members) findSocketsByUsername(u).forEach(sid => io.to(sid).emit(event, payload));
+}
+
+// ═══════════════════════════════════════════════════════════
+// 👑 ВЫДАЧА ЗНАЧКОВ (только для moroz)
+// ═══════════════════════════════════════════════════════════
+
+async function grantBadge(username, badgeType) {
+  // badgeType: 'verified' | 'hammer' | 'scam'
+  const column = badgeType === 'verified' ? 'verified' :
+                 badgeType === 'hammer' ? 'badge_hammer' :
+                 badgeType === 'scam' ? 'badge_scam' : null;
+  if (!column) return { ok: false, error: 'Неизвестный значок' };
+  await db.execute({ sql: `UPDATE users SET ${column} = 1 WHERE username = ?`, args: [username] });
+  return { ok: true };
+}
+
+async function removeBadge(username, badgeType) {
+  const column = badgeType === 'verified' ? 'verified' :
+                 badgeType === 'hammer' ? 'badge_hammer' :
+                 badgeType === 'scam' ? 'badge_scam' : null;
+  if (!column) return { ok: false, error: 'Неизвестный значок' };
+  await db.execute({ sql: `UPDATE users SET ${column} = 0 WHERE username = ?`, args: [username] });
+  return { ok: true };
 }
 // ═══════════════════════════════════════════════════════════
 // 🔌 SOCKET.IO
@@ -1375,8 +1343,8 @@ io.on('connection', (socket) => {
       const t = now();
 
       await db.execute({
-        sql: `INSERT INTO users (username, password, avatar, verified, bio, first_name, last_name, birthday, emoji_status, last_seen_visibility, phone, registered_at) 
-              VALUES (?, ?, NULL, 0, NULL, ?, NULL, NULL, NULL, 'everyone', NULL, ?)`,
+        sql: `INSERT INTO users (username, password, avatar, verified, badge_hammer, badge_scam, bio, first_name, last_name, birthday, emoji_status, last_seen_visibility, phone, registered_at) 
+              VALUES (?, ?, NULL, 0, 0, 0, NULL, ?, NULL, NULL, NULL, 'everyone', NULL, ?)`,
         args: [username, hash, displayName || null, t]
       });
 
@@ -1394,8 +1362,8 @@ io.on('connection', (socket) => {
 
       cb && cb({
         ok: true, bonus: 10, sessionId, username,
-        avatar: user.avatar, verified: false, bio: user.bio,
-        firstName: user.first_name, stars
+        avatar: user.avatar, verified: false, hammer: false, scam: false,
+        bio: user.bio, firstName: user.first_name, stars
       });
 
       getSettings(username).then(s => socket.emit('settings', s)).catch(() => {});
@@ -1432,8 +1400,8 @@ io.on('connection', (socket) => {
 
       cb && cb({
         ok: true, avatar: user.avatar, username: session.username,
-        verified: !!user.verified, bio: user.bio,
-        firstName: user.first_name, lastName: user.last_name,
+        verified: !!user.verified, hammer: !!user.badge_hammer, scam: !!user.badge_scam,
+        bio: user.bio, firstName: user.first_name, lastName: user.last_name,
         birthday: user.birthday, emojiStatus: user.emoji_status,
         sessionId, stars
       });
@@ -1483,8 +1451,8 @@ io.on('connection', (socket) => {
 
       cb && cb({
         ok: true, avatar: user.avatar, username,
-        verified: !!user.verified, bio: user.bio,
-        firstName: user.first_name, lastName: user.last_name,
+        verified: !!user.verified, hammer: !!user.badge_hammer, scam: !!user.badge_scam,
+        bio: user.bio, firstName: user.first_name, lastName: user.last_name,
         birthday: user.birthday, emojiStatus: user.emoji_status,
         sessionId: sessId, stars
       });
@@ -1528,7 +1496,7 @@ io.on('connection', (socket) => {
 
       if (updates.length === 0) return cb && cb({ ok: true });
       args.push(socket.username);
-      await db.execute({ sql: 'UPDATE users SET ' + updates.join(', ') + ' WHERE username = ?', args });
+      await db.execute({ sql: `UPDATE users SET ${updates.join(', ')} WHERE username = ?`, args });
 
       refreshForFriends(socket.username).catch(() => {});
       notifyAllFriends(socket.username, 'friend updated', { username: socket.username }).catch(() => {});
@@ -1537,7 +1505,8 @@ io.on('connection', (socket) => {
       socket.emit('me updated', {
         firstName: user.first_name, lastName: user.last_name, bio: user.bio,
         birthday: user.birthday, emojiStatus: user.emoji_status,
-        avatar: user.avatar, verified: !!user.verified
+        avatar: user.avatar, verified: !!user.verified,
+        hammer: !!user.badge_hammer, scam: !!user.badge_scam
       });
       cb && cb({ ok: true });
     } catch (e) {
@@ -1560,7 +1529,7 @@ io.on('connection', (socket) => {
         'auto_delete', 'profile_color', 'chat_wallpaper', 'premium'
       ];
       if (!allowed.includes(key)) return cb && cb({ ok: false });
-      await db.execute({ sql: 'UPDATE user_settings SET ' + key + ' = ? WHERE username = ?', args: [value, socket.username] });
+      await db.execute({ sql: `UPDATE user_settings SET ${key} = ? WHERE username = ?`, args: [value, socket.username] });
       cacheInvalidate(settingsCache, socket.username);
       socket.emit('settings', await getSettings(socket.username));
       cb && cb({ ok: true });
@@ -1637,7 +1606,8 @@ io.on('connection', (socket) => {
     const lastSeenVisible = info.last_seen_visibility !== 'nobody';
     const gifts = await getGiftsOfUser(username);
     cb && cb({
-      username: info.username, avatar: info.avatar, verified: !!info.verified,
+      username: info.username, avatar: info.avatar,
+      verified: !!info.verified, hammer: !!info.badge_hammer, scam: !!info.badge_scam,
       bio: info.bio, firstName: info.first_name, lastName: info.last_name,
       emojiStatus: info.emoji_status,
       online: lastSeenVisible && isOnline(username),
@@ -1651,7 +1621,8 @@ io.on('connection', (socket) => {
     if (!info) return cb && cb(null);
     const gifts = await getGiftsOfUser(username);
     cb && cb({
-      username: info.username, avatar: info.avatar, verified: !!info.verified,
+      username: info.username, avatar: info.avatar,
+      verified: !!info.verified, hammer: !!info.badge_hammer, scam: !!info.badge_scam,
       bio: info.bio, firstName: info.first_name, lastName: info.last_name,
       emojiStatus: info.emoji_status, gifts
     });
@@ -1719,6 +1690,155 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
+  // ─── АРХИВ / MUTE ───
+  socket.on('toggle archive', async ({ chatKey }, cb) => {
+    if (!socket.username) return;
+    const settings = await getChatSettings(socket.username, chatKey);
+    const newVal = settings.archived ? 0 : 1;
+    await setChatSetting(socket.username, chatKey, 'archived', newVal);
+    sendContactsTo(socket.username).catch(() => {});
+    sendGroupsTo(socket.username).catch(() => {});
+    cb && cb({ ok: true, archived: !!newVal });
+  });
+
+  socket.on('toggle mute', async ({ chatKey }, cb) => {
+    if (!socket.username) return;
+    const settings = await getChatSettings(socket.username, chatKey);
+    const newVal = settings.muted ? 0 : 1;
+    await setChatSetting(socket.username, chatKey, 'muted', newVal);
+    sendContactsTo(socket.username).catch(() => {});
+    sendGroupsTo(socket.username).catch(() => {});
+    cb && cb({ ok: true, muted: !!newVal });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // 👑 ЗНАЧКИ: ГАЛОЧКА / МОЛОТОК / СКАМ (ТОЛЬКО МОРОЗ)
+  // ═══════════════════════════════════════════════════════════
+
+  async function checkAdmin(cb) {
+    if (!socket.username || socket.username !== CONFIG.ADMIN_USERNAME) {
+      cb && cb({ ok: false, error: 'Только ' + CONFIG.ADMIN_USERNAME });
+      return false;
+    }
+    return true;
+  }
+
+  // Галочка
+  socket.on('verify', async ({ username }, cb) => {
+    try {
+      if (!(await checkAdmin(cb))) return;
+      username = String(username || '').trim().toLowerCase();
+      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
+      const target = await getUser(username);
+      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
+      if (target.verified) return cb && cb({ ok: false, error: 'Уже есть галочка' });
+      await db.execute({ sql: 'UPDATE users SET verified = 1 WHERE username = ?', args: [username] });
+      refreshForFriends(username).catch(() => {});
+      notifyAllFriends(username, 'friend updated', { username, verified: true }).catch(() => {});
+      if (username === socket.username) socket.emit('me updated', { verified: true, username });
+      cb && cb({ ok: true, username });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('unverify', async ({ username }, cb) => {
+    try {
+      if (!(await checkAdmin(cb))) return;
+      username = String(username || '').trim().toLowerCase();
+      await db.execute({ sql: 'UPDATE users SET verified = 0 WHERE username = ?', args: [username] });
+      refreshForFriends(username).catch(() => {});
+      notifyAllFriends(username, 'friend updated', { username, verified: false }).catch(() => {});
+      if (username === socket.username) socket.emit('me updated', { verified: false, username });
+      cb && cb({ ok: true, username });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  // Молоток
+  socket.on('give hammer', async ({ username }, cb) => {
+    try {
+      if (!(await checkAdmin(cb))) return;
+      username = String(username || '').trim().toLowerCase();
+      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
+      const target = await getUser(username);
+      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
+      if (target.badge_hammer) return cb && cb({ ok: false, error: 'Уже есть молоток' });
+      await db.execute({ sql: 'UPDATE users SET badge_hammer = 1 WHERE username = ?', args: [username] });
+      refreshForFriends(username).catch(() => {});
+      notifyAllFriends(username, 'friend updated', { username, hammer: true }).catch(() => {});
+      if (username === socket.username) socket.emit('me updated', { hammer: true, username });
+      cb && cb({ ok: true, username });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('remove hammer', async ({ username }, cb) => {
+    try {
+      if (!(await checkAdmin(cb))) return;
+      username = String(username || '').trim().toLowerCase();
+      await db.execute({ sql: 'UPDATE users SET badge_hammer = 0 WHERE username = ?', args: [username] });
+      refreshForFriends(username).catch(() => {});
+      notifyAllFriends(username, 'friend updated', { username, hammer: false }).catch(() => {});
+      if (username === socket.username) socket.emit('me updated', { hammer: false, username });
+      cb && cb({ ok: true, username });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  // Скам
+  socket.on('give scam', async ({ username }, cb) => {
+    try {
+      if (!(await checkAdmin(cb))) return;
+      username = String(username || '').trim().toLowerCase();
+      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
+      const target = await getUser(username);
+      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
+      if (target.badge_scam) return cb && cb({ ok: false, error: 'Уже скам' });
+      await db.execute({ sql: 'UPDATE users SET badge_scam = 1 WHERE username = ?', args: [username] });
+      refreshForFriends(username).catch(() => {});
+      notifyAllFriends(username, 'friend updated', { username, scam: true }).catch(() => {});
+      if (username === socket.username) socket.emit('me updated', { scam: true, username });
+      cb && cb({ ok: true, username });
+    } catch (e) { console.error(e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('remove scam', async ({ username }, cb) => {
+    try {
+      if (!(await checkAdmin(cb))) return;
+      username = String(username || '').trim().toLowerCase();
+      await db.execute({ sql: 'UPDATE users SET badge_scam = 0 WHERE username = ?', args: [username] });
+      refreshForFriends(username).catch(() => {});
+      notifyAllFriends(username, 'friend updated', { username, scam: false }).catch(() => {});
+      if (username === socket.username) socket.emit('me updated', { scam: false, username });
+      cb && cb({ ok: true, username });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  // Галочка каналу (тоже только мороз)
+  socket.on('verify channel', async ({ slug }, cb) => {
+    try {
+      if (!(await checkAdmin(cb))) return;
+      slug = String(slug || '').trim().toLowerCase().replace(/^@/, '');
+      if (!slug) return cb && cb({ ok: false, error: 'Введи ID канала' });
+      const ch = await getChannelBySlug(slug);
+      if (!ch) return cb && cb({ ok: false, error: 'Канал не найден' });
+      if (ch.verified) return cb && cb({ ok: false, error: 'Уже верифицирован' });
+      await db.execute({ sql: 'UPDATE channels SET verified = 1 WHERE id = ?', args: [ch.id] });
+      const members = await getChannelMembers(ch.id);
+      for (const u of members) sendChannelsTo(u).catch(() => {});
+      cb && cb({ ok: true, slug });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  socket.on('unverify channel', async ({ slug }, cb) => {
+    try {
+      if (!(await checkAdmin(cb))) return;
+      slug = String(slug || '').trim().toLowerCase().replace(/^@/, '');
+      const ch = await getChannelBySlug(slug);
+      if (!ch) return cb && cb({ ok: false, error: 'Канал не найден' });
+      await db.execute({ sql: 'UPDATE channels SET verified = 0 WHERE id = ?', args: [ch.id] });
+      const members = await getChannelMembers(ch.id);
+      for (const u of members) sendChannelsTo(u).catch(() => {});
+      cb && cb({ ok: true });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
   // ─── УДАЛЕНИЕ АККАУНТА ───
   socket.on('delete account', async ({ password }, cb) => {
     try {
@@ -1739,7 +1859,6 @@ io.on('connection', (socket) => {
       await db.execute({ sql: 'DELETE FROM sessions WHERE username = ?', args: [me] });
       await db.execute({ sql: 'DELETE FROM achievements WHERE username = ?', args: [me] });
       await db.execute({ sql: 'DELETE FROM user_stats WHERE username = ?', args: [me] });
-      await db.execute({ sql: 'DELETE FROM push_subscriptions WHERE username = ?', args: [me] });
 
       const myStories = await db.execute({ sql: 'SELECT id, image FROM stories WHERE username = ?', args: [me] });
       for (const s of myStories.rows) {
@@ -1778,27 +1897,6 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
-  // ─── АРХИВ / MUTE ───
-  socket.on('toggle archive', async ({ chatKey }, cb) => {
-    if (!socket.username) return;
-    const settings = await getChatSettings(socket.username, chatKey);
-    const newVal = settings.archived ? 0 : 1;
-    await setChatSetting(socket.username, chatKey, 'archived', newVal);
-    sendContactsTo(socket.username).catch(() => {});
-    sendGroupsTo(socket.username).catch(() => {});
-    cb && cb({ ok: true, archived: !!newVal });
-  });
-
-  socket.on('toggle mute', async ({ chatKey }, cb) => {
-    if (!socket.username) return;
-    const settings = await getChatSettings(socket.username, chatKey);
-    const newVal = settings.muted ? 0 : 1;
-    await setChatSetting(socket.username, chatKey, 'muted', newVal);
-    sendContactsTo(socket.username).catch(() => {});
-    sendGroupsTo(socket.username).catch(() => {});
-    cb && cb({ ok: true, muted: !!newVal });
-  });
-
   // ─── ДОСТИЖЕНИЯ ───
   socket.on('get achievements', async (cb) => {
     try {
@@ -1817,32 +1915,7 @@ io.on('connection', (socket) => {
       cb && cb({ ok: false, achievements: [], stats: {} });
     }
   });
-
-  // ─── PUSH ───
-  socket.on('push subscribe', async ({ subscription }, cb) => {
-    try {
-      if (!socket.username) return cb && cb({ ok: false });
-      if (!subscription || !subscription.endpoint) return cb && cb({ ok: false });
-      await savePushSubscription(socket.username, subscription);
-      cb && cb({ ok: true });
-    } catch (e) {
-      console.error('push subscribe:', e);
-      cb && cb({ ok: false });
-    }
-  });
-
-  socket.on('push unsubscribe', async ({ endpoint }, cb) => {
-    try {
-      if (!socket.username || !endpoint) return cb && cb({ ok: false });
-      await removePushSubscription(endpoint);
-      cb && cb({ ok: true });
-    } catch (e) { cb && cb({ ok: false }); }
-  });
-
-  socket.on('get vapid key', (cb) => {
-    cb && cb({ key: VAPID_PUBLIC_KEY });
-  });
-    // ═══════════════════════════════════════════════════════════
+   // ═══════════════════════════════════════════════════════════
   // 💬 ЛИЧНЫЕ СООБЩЕНИЯ
   // ═══════════════════════════════════════════════════════════
 
@@ -1852,9 +1925,7 @@ io.on('connection', (socket) => {
       const rows = await getHistory(socket.username, withUser);
       const messages = await enrichHistoryWithReplies(rows, false);
       socket.emit('history', { withUser, messages });
-    } catch (e) {
-      console.error('load history:', e);
-    }
+    } catch (e) { console.error('load history:', e); }
   });
 
   socket.on('load saved history', async () => {
@@ -1871,17 +1942,13 @@ io.on('connection', (socket) => {
         replyData: null
       }));
       socket.emit('saved history', { messages });
-    } catch (e) {
-      console.error('load saved history:', e);
-    }
+    } catch (e) { console.error('load saved history:', e); }
   });
 
   socket.on('save to saved', async ({ originalMessageId, isGroup }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
-      const origMsg = isGroup
-        ? await getGroupMessageById(originalMessageId)
-        : await getMessageById(originalMessageId);
+      const origMsg = isGroup ? await getGroupMessageById(originalMessageId) : await getMessageById(originalMessageId);
       if (!origMsg) return cb && cb({ ok: false, error: 'Сообщение не найдено' });
 
       const me = socket.username;
@@ -1891,17 +1958,7 @@ io.on('connection', (socket) => {
         sql: `INSERT INTO messages 
               (from_user, to_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, sticker, time) 
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', NULL, 0, 0, ?, ?)`,
-        args: [
-          me, me,
-          origMsg.text || null,
-          origMsg.image || null,
-          origMsg.voice || null,
-          origMsg.voice_duration || null,
-          origMsg.video_circle || null,
-          origMsg.video_duration || null,
-          origMsg.sticker || null,
-          t
-        ]
+        args: [me, me, origMsg.text || null, origMsg.image || null, origMsg.voice || null, origMsg.voice_duration || null, origMsg.video_circle || null, origMsg.video_duration || null, origMsg.sticker || null, t]
       });
       const msgId = Number(result.lastInsertRowid);
       const newMsg = await getMessageById(msgId);
@@ -1916,10 +1973,7 @@ io.on('connection', (socket) => {
         });
       }
       cb && cb({ ok: true });
-    } catch (e) {
-      console.error('save to saved:', e);
-      cb && cb({ ok: false });
-    }
+    } catch (e) { console.error('save to saved:', e); cb && cb({ ok: false }); }
   });
 
   socket.on('private message', async ({ to, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo, sticker }) => {
@@ -1928,18 +1982,10 @@ io.on('connection', (socket) => {
     if (!rateLimit('pm:' + socket.username, CONFIG.MAX_MESSAGE_BURST, CONFIG.MESSAGE_WINDOW)) {
       return socket.emit('message blocked', { reason: 'Слишком часто. Подожди немного.' });
     }
-    if (text && text.length > CONFIG.MAX_TEXT) {
-      return socket.emit('message blocked', { reason: 'Слишком длинное сообщение' });
-    }
-    if (image && !validImage(image)) {
-      return socket.emit('message blocked', { reason: 'Недопустимое изображение' });
-    }
-    if (voice && !validVoice(voice)) {
-      return socket.emit('message blocked', { reason: 'Недопустимое голосовое' });
-    }
-    if (videoCircle && !validVideo(videoCircle)) {
-      return socket.emit('message blocked', { reason: 'Недопустимый кружок' });
-    }
+    if (text && text.length > CONFIG.MAX_TEXT) return socket.emit('message blocked', { reason: 'Слишком длинное сообщение' });
+    if (image && !validImage(image)) return socket.emit('message blocked', { reason: 'Недопустимое изображение' });
+    if (voice && !validVoice(voice)) return socket.emit('message blocked', { reason: 'Недопустимое голосовое' });
+    if (videoCircle && !validVideo(videoCircle)) return socket.emit('message blocked', { reason: 'Недопустимый кружок' });
     if (!text && !image && !voice && !videoCircle && !sticker) return;
 
     if (await isBlockedEither(socket.username, to)) {
@@ -1954,25 +2000,14 @@ io.on('connection', (socket) => {
         sql: `INSERT INTO messages 
               (from_user, to_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, sticker, time) 
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?, ?)`,
-        args: [
-          from, to,
-          text || null, image || null,
-          voice || null, voiceDuration || null,
-          videoCircle || null, videoDuration || null,
-          replyTo || null, sticker || null, t
-        ]
+        args: [from, to, text || null, image || null, voice || null, voiceDuration || null, videoCircle || null, videoDuration || null, replyTo || null, sticker || null, t]
       });
       const msgId = Number(result.lastInsertRowid);
 
       let replyData = null;
       if (replyTo) {
         const r = await getMessageById(replyTo);
-        if (r) {
-          replyData = {
-            id: r.id, from: r.from_user, text: r.text,
-            image: !!r.image, voice: !!r.voice, deleted: !!r.deleted
-          };
-        }
+        if (r) replyData = { id: r.id, from: r.from_user, text: r.text, image: !!r.image, voice: !!r.voice, deleted: !!r.deleted };
       }
 
       const payload = {
@@ -1985,34 +2020,12 @@ io.on('connection', (socket) => {
       findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
       socket.emit('private message', { ...payload, self: true });
 
-      // Статистика
       await incrementStat(from, 'messages_sent');
       if (image) await incrementStat(from, 'photos_sent');
       if (voice) await incrementStat(from, 'voice_sent');
       if (videoCircle) await incrementStat(from, 'circles_sent');
       if (sticker) await incrementStat(from, 'stickers_sent');
-
-      // 🔔 PUSH-УВЕДОМЛЕНИЕ
-      try {
-        const senderInfo = await getUser(from);
-        const senderName = (senderInfo && senderInfo.first_name) || from;
-        let preview = text || 'Новое сообщение';
-        if (sticker) preview = '🐱 Стикер';
-        else if (image) preview = '📷 Фото';
-        else if (voice) preview = '🎤 Голосовое';
-        else if (videoCircle) preview = '🎥 Кружок';
-
-        sendPushToUser(to, {
-          title: senderName,
-          body: preview,
-          icon: '/icon-192.png',
-          tag: 'chat-' + from,
-          data: { url: '/' }
-        }).catch(() => {});
-      } catch (e) {}
-    } catch (e) {
-      console.error('private message:', e);
-    }
+    } catch (e) { console.error('private message:', e); }
   });
 
   socket.on('edit message', async ({ messageId, text, isGroup }, cb) => {
@@ -2103,10 +2116,7 @@ io.on('connection', (socket) => {
         if (reactions[emoji].length === 0) delete reactions[emoji];
       }
 
-      await db.execute({
-        sql: 'UPDATE messages SET reactions = ? WHERE id = ?',
-        args: [JSON.stringify(reactions), messageId]
-      });
+      await db.execute({ sql: 'UPDATE messages SET reactions = ? WHERE id = ?', args: [JSON.stringify(reactions), messageId] });
 
       const payload = { messageId, reactions, from: msg.from_user, to: msg.to_user };
       const targets = new Set([msg.from_user, msg.to_user]);
@@ -2123,12 +2133,8 @@ io.on('connection', (socket) => {
   socket.on('create group', async ({ name, members }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
-      const createdCount = await countUserCreatedGroups(socket.username);
-      if (createdCount >= 1) return cb && cb({ ok: false, error: 'Ты уже создал группу. Максимум — одна.' });
-
       name = String(name || '').trim().slice(0, 60);
       if (!name) return cb && cb({ ok: false, error: 'Введи название' });
-
       members = Array.isArray(members) ? members : [];
       const t = now();
 
@@ -2157,10 +2163,7 @@ io.on('connection', (socket) => {
       for (const u of allMembers) sendGroupsTo(u).catch(() => {});
       await incrementStat(socket.username, 'groups_created');
       cb && cb({ ok: true, groupId });
-    } catch (e) {
-      console.error('create group:', e);
-      cb && cb({ ok: false });
-    }
+    } catch (e) { console.error('create group:', e); cb && cb({ ok: false }); }
   });
 
   socket.on('add group members', async ({ groupId, members }, cb) => {
@@ -2260,13 +2263,7 @@ io.on('connection', (socket) => {
         sql: `INSERT INTO group_messages 
               (group_id, from_user, text, image, voice, voice_duration, video_circle, video_duration, reactions, reply_to, edited, deleted, sticker, time) 
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, 0, 0, ?, ?)`,
-        args: [
-          groupId, from,
-          text || null, image || null,
-          voice || null, voiceDuration || null,
-          videoCircle || null, videoDuration || null,
-          replyTo || null, sticker || null, t
-        ]
+        args: [groupId, from, text || null, image || null, voice || null, voiceDuration || null, videoCircle || null, videoDuration || null, replyTo || null, sticker || null, t]
       });
       const msgId = Number(result.lastInsertRowid);
 
@@ -2286,34 +2283,11 @@ io.on('connection', (socket) => {
       notifyGroupMembers(groupId, 'group message', payload).catch(() => {});
       socket.emit('group message', { ...payload, self: true });
 
-      // Статистика
       await incrementStat(from, 'messages_sent');
       if (image) await incrementStat(from, 'photos_sent');
       if (voice) await incrementStat(from, 'voice_sent');
       if (videoCircle) await incrementStat(from, 'circles_sent');
       if (sticker) await incrementStat(from, 'stickers_sent');
-
-      // 🔔 PUSH группе
-      try {
-        const groupInfo = await getGroupById(groupId);
-        const senderInfo = await getUser(from);
-        const senderName = (senderInfo && senderInfo.first_name) || from;
-        const members = await getGroupMembers(groupId);
-        let preview = text || 'Новое сообщение';
-        if (sticker) preview = '🐱 Стикер';
-        else if (image) preview = '📷 Фото';
-
-        for (const member of members) {
-          if (member === from) continue;
-          sendPushToUser(member, {
-            title: (groupInfo && groupInfo.name) || 'Группа',
-            body: senderName + ': ' + preview,
-            icon: '/icon-192.png',
-            tag: 'group-' + groupId,
-            data: { url: '/' }
-          }).catch(() => {});
-        }
-      } catch (e) {}
     } catch (e) { console.error('group message:', e); }
   });
 
@@ -2389,8 +2363,6 @@ io.on('connection', (socket) => {
   socket.on('create channel', async ({ slug, name, description }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
-      const createdCount = await countUserCreatedChannels(socket.username);
-      if (createdCount >= 1) return cb && cb({ ok: false, error: 'Ты уже создал канал. Максимум — один.' });
 
       slug = String(slug || '').trim().toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_]/g, '');
       if (!slug || slug.length < 3) return cb && cb({ ok: false, error: 'ID канала минимум 3 символа' });
@@ -2416,7 +2388,7 @@ io.on('connection', (socket) => {
       sendChannelsTo(socket.username).catch(() => {});
       await incrementStat(socket.username, 'channels_created');
       cb && cb({ ok: true, channelId, slug });
-    } catch (e) { cb && cb({ ok: false }); }
+    } catch (e) { console.error('create channel:', e); cb && cb({ ok: false }); }
   });
 
   socket.on('delete channel', async ({ channelId }, cb) => {
@@ -2643,67 +2615,7 @@ io.on('connection', (socket) => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // ✓ ГАЛОЧКИ (АДМИН)
-  // ═══════════════════════════════════════════════════════════
-
-  socket.on('verify', async ({ username }, cb) => {
-    try {
-      if (!socket.username || socket.username !== CONFIG.ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только ' + CONFIG.ADMIN_USERNAME });
-      username = String(username || '').trim().toLowerCase();
-      if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
-      const target = await getUser(username);
-      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      if (target.verified) return cb && cb({ ok: false, error: 'У него уже есть галочка' });
-      await db.execute({ sql: 'UPDATE users SET verified = 1 WHERE username = ?', args: [username] });
-      refreshForFriends(username).catch(() => {});
-      notifyAllFriends(username, 'friend updated', { username, verified: true }).catch(() => {});
-      if (username === socket.username) socket.emit('me updated', { verified: true, username });
-      cb && cb({ ok: true, username });
-    } catch (e) { cb && cb({ ok: false }); }
-  });
-
-  socket.on('unverify', async ({ username }, cb) => {
-    try {
-      if (!socket.username || socket.username !== CONFIG.ADMIN_USERNAME) return cb && cb({ ok: false });
-      username = String(username || '').trim().toLowerCase();
-      await db.execute({ sql: 'UPDATE users SET verified = 0 WHERE username = ?', args: [username] });
-      refreshForFriends(username).catch(() => {});
-      notifyAllFriends(username, 'friend updated', { username, verified: false }).catch(() => {});
-      if (username === socket.username) socket.emit('me updated', { verified: false, username });
-      cb && cb({ ok: true, username });
-    } catch (e) { cb && cb({ ok: false }); }
-  });
-
-  socket.on('verify channel', async ({ slug }, cb) => {
-    try {
-      if (!socket.username || socket.username !== CONFIG.ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только ' + CONFIG.ADMIN_USERNAME });
-      slug = String(slug || '').trim().toLowerCase().replace(/^@/, '');
-      if (!slug) return cb && cb({ ok: false, error: 'Введи ID канала' });
-      const ch = await getChannelBySlug(slug);
-      if (!ch) return cb && cb({ ok: false, error: 'Канал не найден' });
-      if (ch.verified) return cb && cb({ ok: false, error: 'Уже верифицирован' });
-      await db.execute({ sql: 'UPDATE channels SET verified = 1 WHERE id = ?', args: [ch.id] });
-      const members = await getChannelMembers(ch.id);
-      for (const u of members) sendChannelsTo(u).catch(() => {});
-      cb && cb({ ok: true, slug });
-    } catch (e) { cb && cb({ ok: false }); }
-  });
-
-  socket.on('unverify channel', async ({ slug }, cb) => {
-    try {
-      if (!socket.username || socket.username !== CONFIG.ADMIN_USERNAME) return cb && cb({ ok: false });
-      slug = String(slug || '').trim().toLowerCase().replace(/^@/, '');
-      const ch = await getChannelBySlug(slug);
-      if (!ch) return cb && cb({ ok: false, error: 'Канал не найден' });
-      await db.execute({ sql: 'UPDATE channels SET verified = 0 WHERE id = ?', args: [ch.id] });
-      const members = await getChannelMembers(ch.id);
-      for (const u of members) sendChannelsTo(u).catch(() => {});
-      cb && cb({ ok: true });
-    } catch (e) { cb && cb({ ok: false }); }
-  });
-
-  // ═══════════════════════════════════════════════════════════
-  // 📞 ЗВОНКИ (WebRTC signaling + системные сообщения)
+  // 📞 ЗВОНКИ (WebRTC + системные сообщения)
   // ═══════════════════════════════════════════════════════════
 
   socket.on('call-user', async ({ to, offer, video }) => {
@@ -2715,18 +2627,14 @@ io.on('connection', (socket) => {
     const from = socket.username;
     const toSockets = findSocketsByUsername(to);
 
-    // 📞 Создаём системное сообщение "Исходящий звонок" для обоих
     await createCallSystemMessage(from, to, 'outgoing');
 
     if (toSockets.length > 0) {
       toSockets.forEach(sid => io.to(sid).emit('incoming-call', { from, offer, video }));
     } else {
-      // Пользователь не в сети — превращаем в пропущенный
       await incrementStat(from, 'calls_made');
       await incrementStat(to, 'calls_missed');
       socket.emit('call-failed', { reason: 'Пользователь не в сети' });
-
-      // Меняем "Исходящий" на "Пропущенный" для from и to
       await createCallSystemMessage(from, to, 'missed');
     }
   });
@@ -2734,7 +2642,6 @@ io.on('connection', (socket) => {
   socket.on('answer-call', async ({ to, answer }) => {
     if (!socket.username) return;
     findSocketsByUsername(to).forEach(sid => io.to(sid).emit('call-answered', { answer }));
-    // Считаем для обоих, что звонок принят
     await incrementStat(to, 'calls_made');
     await incrementStat(socket.username, 'calls_received');
   });
@@ -2748,19 +2655,16 @@ io.on('connection', (socket) => {
     if (!socket.username) return;
     findSocketsByUsername(to).forEach(sid => io.to(sid).emit('call-ended'));
 
-    // 📞 Создаём системное сообщение о завершении
     if (socket.username && to) {
       const dur = Number(duration) || 0;
       await createCallSystemMessage(socket.username, to, 'ended', dur);
-
-      // Статистика
       if (dur > 0) {
         await incrementStat(socket.username, 'calls_duration', dur);
         await incrementStat(to, 'calls_duration', dur);
       }
     }
   });
-    // ═══════════════════════════════════════════════════════════
+   // ═══════════════════════════════════════════════════════════
   // 📸 ИСТОРИИ
   // ═══════════════════════════════════════════════════════════
 
@@ -2810,10 +2714,7 @@ io.on('connection', (socket) => {
 
       await incrementStat(socket.username, 'stories_posted');
       cb && cb({ ok: true, id: storyId, image: imagePath });
-    } catch (e) {
-      console.error('post story:', e);
-      cb && cb({ ok: false });
-    }
+    } catch (e) { console.error('post story:', e); cb && cb({ ok: false }); }
   });
 
   socket.on('delete story', async ({ storyId }, cb) => {
@@ -2892,10 +2793,7 @@ io.on('connection', (socket) => {
 
       const id = await addSticker(socket.username, url, type, emoji || null);
       cb && cb({ ok: true, id, url, type });
-    } catch (e) {
-      console.error('add sticker:', e);
-      cb && cb({ ok: false });
-    }
+    } catch (e) { console.error('add sticker:', e); cb && cb({ ok: false }); }
   });
 
   socket.on('delete sticker', async ({ id }, cb) => {
@@ -2947,28 +2845,11 @@ io.on('connection', (socket) => {
         findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
         socket.emit('private message', { ...payload, self: true });
         await incrementStat(from, 'stickers_sent');
-
-        // Push
-        try {
-          const senderInfo = await getUser(from);
-          const senderName = (senderInfo && senderInfo.first_name) || from;
-          sendPushToUser(to, {
-            title: senderName,
-            body: '🐱 Стикер',
-            icon: '/icon-192.png',
-            tag: 'chat-' + from,
-            data: { url: '/' }
-          }).catch(() => {});
-        } catch (e) {}
-
         cb && cb({ ok: true, id: msgId });
       } else {
         cb && cb({ ok: false });
       }
-    } catch (e) {
-      console.error('send sticker:', e);
-      cb && cb({ ok: false });
-    }
+    } catch (e) { console.error('send sticker:', e); cb && cb({ ok: false }); }
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -3062,24 +2943,8 @@ io.on('connection', (socket) => {
       await incrementStat(to, 'gifts_received');
       socket.emit('stars updated', { stars: await getStars(socket.username) });
 
-      // Push
-      try {
-        const senderInfo = await getUser(socket.username);
-        const senderName = (senderInfo && senderInfo.first_name) || socket.username;
-        sendPushToUser(to, {
-          title: senderName,
-          body: '🎁 ' + gift.emoji + ' ' + gift.name + '!',
-          icon: '/icon-192.png',
-          tag: 'gift-' + socket.username,
-          data: { url: '/' }
-        }).catch(() => {});
-      } catch (e) {}
-
       cb && cb({ ok: true, id: giftId });
-    } catch (e) {
-      console.error('send gift:', e);
-      cb && cb({ ok: false });
-    }
+    } catch (e) { console.error('send gift:', e); cb && cb({ ok: false }); }
   });
 
   socket.on('sell gift', async ({ giftId }, cb) => {
@@ -3169,7 +3034,6 @@ io.on('connection', (socket) => {
     if (u) {
       sendContactsTo(u).catch(() => {});
       refreshForFriends(u).catch(() => {});
-
       Object.values(onlineUsers).forEach(other => {
         findSocketsByUsername(other).forEach(sid => io.to(sid).emit('typing', { from: u, isTyping: false }));
       });
@@ -3190,7 +3054,7 @@ initDB()
     setInterval(cleanupOldMessages, 10 * 60 * 1000);
 
     server.listen(CONFIG.PORT, () => {
-      console.log('🌌 Aurora v11.0 запущена на порту ' + CONFIG.PORT);
+      console.log('🌌 Aurora v12.0 запущена на порту ' + CONFIG.PORT);
     });
   })
   .catch(err => {
