@@ -217,6 +217,7 @@
     </div>
   </div>
 </div>
+
 <!-- ═══ CREATE MENU ═══ -->
 <div class="modal" id="create-menu-modal"><div class="modal-box">
   <h3>Что создать?</h3>
@@ -246,21 +247,43 @@
   <label>Эмодзи-статус</label><input id="my-emoji" placeholder="😎" maxlength="4" />
   <button class="modal-primary" onclick="saveProfile()">💾 Сохранить</button>
   <button class="modal-primary" onclick="document.getElementById('avatarFile').click()">📷 Сменить фото</button>
-  <button class="modal-primary" id="verify-btn" onclick="openModal('verify-modal')" style="display:none;">✓ Выдать галочку</button>
+  <button class="modal-primary" id="verify-btn" onclick="openBadgeModal()" style="display:none;">🏅 Выдать значок</button>
   <button class="modal-primary" id="verify-channel-btn" onclick="openModal('verify-channel-modal')" style="display:none;">✓ Выдать галочку каналу</button>
   <button class="modal-secondary" onclick="closeModal('profile-modal')">Закрыть</button>
 </div></div>
 
-<!-- ═══ VERIFY MODALS ═══ -->
-<div class="modal" id="verify-modal"><div class="modal-box">
-  <h3>✓ Выдать галочку</h3>
-  <div class="modal-desc">Введи ник того, кому хочешь дать галочку</div>
-  <input id="verify-username" type="text" placeholder="Ник" autocapitalize="none" />
-  <div class="modal-error" id="verify-error"></div>
-  <button class="modal-primary" onclick="doVerify()">Выдать</button>
-  <button class="modal-secondary" onclick="closeModal('verify-modal')">Отмена</button>
+<!-- ═══ BADGE MODAL (универсальная для ✓ 🔨 💀) ═══ -->
+<div class="modal" id="badge-modal"><div class="modal-box">
+  <h3 id="badge-modal-title">🏅 Выдать значок</h3>
+  <div class="modal-desc">Введи ник того, кому хочешь дать значок</div>
+  <input id="badge-username" type="text" placeholder="Ник" autocapitalize="none" />
+
+  <div class="modal-desc" style="margin-top:10px;">Выбери значок</div>
+  <div class="badge-picker" id="badge-picker">
+    <button class="badge-option active" data-badge="verified" onclick="selectBadgeType('verified')">
+      <span class="badge-icon-verified">✓</span>
+      <span class="badge-label">Галочка</span>
+    </button>
+    <button class="badge-option" data-badge="hammer" onclick="selectBadgeType('hammer')">
+      <span class="badge-icon-hammer">🔨</span>
+      <span class="badge-label">Молоток</span>
+    </button>
+    <button class="badge-option" data-badge="scam" onclick="selectBadgeType('scam')">
+      <span class="badge-icon-scam">💀</span>
+      <span class="badge-label">Скам</span>
+    </button>
+  </div>
+
+  <div class="badge-actions">
+    <button class="modal-primary" onclick="giveBadgeAction()">Выдать</button>
+    <button class="modal-danger" onclick="removeBadgeAction()">Снять</button>
+  </div>
+
+  <div class="modal-error" id="badge-error"></div>
+  <button class="modal-secondary" onclick="closeModal('badge-modal')">Отмена</button>
 </div></div>
 
+<!-- ═══ VERIFY CHANNEL MODAL (галочка каналу) ═══ -->
 <div class="modal" id="verify-channel-modal"><div class="modal-box">
   <h3>✓ Выдать галочку каналу</h3>
   <div class="modal-desc">Введи ID канала</div>
@@ -284,6 +307,7 @@
 <div class="modal" id="contact-profile-modal"><div class="modal-box">
   <div id="contact-profile-content"></div>
   <button class="modal-primary" id="gift-to-contact-btn" onclick="openGiftsCatalog(contactProfileCurrent?.username)" style="display:none;">🎁 Подарить подарок</button>
+  <button class="modal-primary" id="give-badge-to-contact-btn" onclick="openBadgeModalForCurrent()" style="display:none;">🏅 Управление значками</button>
   <div style="display:flex;gap:10px;">
     <button class="modal-secondary" style="flex:1;" onclick="closeModal('contact-profile-modal')">Закрыть</button>
     <button class="modal-danger" style="flex:1;" id="block-action-btn" onclick="toggleBlockCurrent()">🚫 Блок</button>
@@ -673,7 +697,7 @@
     <div id="stickers-tabs">
       <button class="sticker-tab active" data-tab="recent" onclick="switchStickerTab('recent')">🕐 Недавние</button>
       <button class="sticker-tab" data-tab="my" onclick="switchStickerTab('my')">🐱 Мои</button>
-      <button class="sticker-tab" data-tab="gif" onclick="switchStickerTab('gif')">🎬 GIF</button>
+      <button class="sticker-tab" data-tab="gif" onclick="switchStickerTab('gif')">🎬 GIF</inbutton>
     </div>
     <div id="stickers-search-wrap">
       <input id="stickers-search" placeholder="Поиск..." oninput="onStickerSearch()" />
@@ -758,7 +782,7 @@
 <div id="incoming-screen">
   <div>
     <div class="from-label">Входящий звонок</div>
-    <div class="from-name" id="incoming-name">—</div>
+    <div class="from-name" id="coming-name">—</div>
     <div class="type" id="incoming-type">Видеозвонок</div>
   </div>
   <div class="avatar-big" id="incoming-avatar"></div>
