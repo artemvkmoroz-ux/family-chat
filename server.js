@@ -55,17 +55,17 @@ const CONFIG = {
 };
 
 const GIFTS_CATALOG = {
-  cake:      { emoji: '🎂', name: 'Тортик',        price: 5,     url: 'https://nft.fragment.com/gift/homemadecake-1.medium.jpg' },
-  rose:      { emoji: '🌹', name: 'Роза',          price: 10,    url: 'https://nft.fragment.com/gift/eternalrose-11118.medium.jpg' },
+  cake:      { emoji: '🎂', name: 'Тортик',        price: 15,     url: 'https://nft.fragment.com/gift/homemadecake-1.medium.jpg' },
+  rose:      { emoji: '🌹', name: 'Роза',          price: 20,    url: 'https://nft.fragment.com/gift/eternalrose-11118.medium.jpg' },
   heart:     { emoji: '❤️', name: 'Сердечко',      price: 10,    url: 'https://nft.fragment.com/gift/heartlocket-1.medium.jpg' },
   star:      { emoji: '⭐', name: 'Звёздочка',     price: 15,    url: 'https://nft.fragment.com/gift/hangingstar-1.medium.jpg' },
   pizza:     { emoji: '🍕', name: 'Пицца',         price: 20,    url: 'https://nft.fragment.com/gift/pizza-1.medium.jpg' },
-  balloon:   { emoji: '🎈', name: 'Шарик',         price: 20,    url: 'https://nft.fragment.com/gift/bigyear-1.medium.jpg' },
+  balloon:   { emoji: '🎈', name: 'Шарик',         price: 40,    url: 'https://nft.fragment.com/gift/bigyear-1.medium.jpg' },
   icecream:  { emoji: '🍦', name: 'Мороженое',     price: 25,    url: 'https://nft.fragment.com/gift/icecream-1.medium.jpg' },
-  bear:      { emoji: '🧸', name: 'Мишка',         price: 25,    url: 'https://nft.fragment.com/gift/toybear-14456.medium.jpg' },
-  flower:    { emoji: '💐', name: 'Букет',         price: 30,    url: 'https://nft.fragment.com/gift/lushbouquet-1.medium.jpg' },
-  pepa:      { emoji: '🐸', name: 'Лягушонок Пепе', price: 30,   url: 'https://nft.fragment.com/gift/plushpepe-834.medium.jpg' },
-  cat:       { emoji: '🐱', name: 'Котик',         price: 35,    url: 'https://nft.fragment.com/gift/scaredcat-1.medium.jpg' },
+  bear:      { emoji: '🧸', name: 'Мишка',         price: 50,    url: 'https://nft.fragment.com/gift/toybear-14456.medium.jpg' },
+  flower:    { emoji: '💐', name: 'Букет',         price: 60,    url: 'https://nft.fragment.com/gift/lushbouquet-1.medium.jpg' },
+  pepa:      { emoji: '🐸', name: 'Лягушонок Пепе', price: 2000,   url: 'https://nft.fragment.com/gift/plushpepe-834.medium.jpg' },
+  cat:       { emoji: '🐱', name: 'Котик',         price: 100,    url: 'https://nft.fragment.com/gift/scaredcat-1.medium.jpg' },
 };
 
 const ACHIEVEMENTS_CATALOG = {
