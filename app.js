@@ -1,9 +1,7 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v10.4 — Client (плашка "Долго грузимся" убрана)
-   ✓ Галочка / 🔨 Молоток / 💀 Скам
-   ✓ Фикс подарков
+   🌌 AURORA v10.5 — Client (ФИКС добавления контактов)
    ═══════════════════════════════════════════════════════════ */
 
 var contactProfileCurrent = null;
@@ -563,12 +561,8 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && p && document.activeElement === p) tryPasscode();
 });
 
-// 🔧 УБРАНО: плашка «Долго грузимся» полностью отключена
-function startBootTimeout() {
-  // пусто
-}
+function startBootTimeout() {}
 
-// 🔧 УБРАНО: ссылка на boot-timeout убрана
 function forceShowLogin() {
   localStorage.removeItem(STORAGE.SESSION);
   $('app').classList.remove('active');
@@ -820,7 +814,6 @@ function renderSettingsTab() {
     box.innerHTML = orig.innerHTML;
   }
 }
-
 function renderSettings() {
   const box = $('settings-content');
   if (!box) return;
@@ -876,7 +869,7 @@ function renderSettings() {
 
   html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.4<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.5<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
@@ -1255,20 +1248,114 @@ socket.on('me updated', function (data) {
   if (state.activeTab === 'settings') renderSettingsTab();
 });
 
+// ═══════════════════════════════════════════════════════════
+// 🔧 ФИКС ДОБАВЛЕНИЯ КОНТАКТОВ
+// ═══════════════════════════════════════════════════════════
+
+// Открыть модалку добавления контакта с автофокусом
+function openAddContactModal() {
+  $('add-display-name').value = '';
+  $('add-username').value = '';
+  $('add-error').textContent = '';
+  // Визуально убираем старые ошибки
+  $('add-display-name').classList.remove('input-error');
+  $('add-username').classList.remove('input-error');
+  openModal('add-modal');
+  setTimeout(function () {
+    const el = $('add-display-name');
+    if (el) el.focus();
+  }, 150);
+}
+
+// 🔧 ФИКС: добавление контакта с проверкой и принудительным обновлением
 function doAddContact() {
-  const displayName = $('add-display-name').value.trim();
-  const username = $('add-username').value.trim().toLowerCase();
+  const nameInput = $('add-display-name');
+  const userInput = $('add-username');
   const errEl = $('add-error');
+
+  const displayName = nameInput.value.trim();
+  const username = userInput.value.trim().toLowerCase();
+
   errEl.textContent = '';
+  nameInput.classList.remove('input-error');
+  userInput.classList.remove('input-error');
+
+  // Валидация на клиенте
+  if (!displayName) {
+    errEl.textContent = '⚠️ Введи имя';
+    nameInput.classList.add('input-error');
+    nameInput.focus();
+    vibrate([30, 20, 30]);
+    return;
+  }
+  if (!username) {
+    errEl.textContent = '⚠️ Введи ник';
+    userInput.classList.add('input-error');
+    userInput.focus();
+    vibrate([30, 20, 30]);
+    return;
+  }
+  if (username.length < 3) {
+    errEl.textContent = '⚠️ Ник минимум 3 символа';
+    userInput.classList.add('input-error');
+    userInput.focus();
+    vibrate([30, 20, 30]);
+    return;
+  }
+  if (username === state.me.username) {
+    errEl.textContent = '⚠️ Это твой ник';
+    userInput.classList.add('input-error');
+    vibrate([30, 20, 30]);
+    return;
+  }
+
+  // Показываем индикатор загрузки
+  errEl.innerHTML = '<span style="color:var(--accent);">⏳ Добавляю…</span>';
+
   socket.emit('add contact', { username: username, displayName: displayName }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
-    $('add-display-name').value = '';
-    $('add-username').value = '';
+    if (!res || !res.ok) {
+      errEl.textContent = '❌ ' + ((res && res.error) || 'Ошибка');
+      vibrate([30, 20, 30]);
+      return;
+    }
+
+    // ✅ УСПЕХ
+    nameInput.value = '';
+    userInput.value = '';
+    errEl.textContent = '';
+
     closeModal('add-modal');
-    showToast('✓ Контакт добавлен');
+    showToast('✓ ' + displayName + ' добавлен');
+
+    // 🔧 ФИКС: принудительно запрашиваем обновлённый список контактов
+    // (на случай если сервер не успел прислать автоматически)
+    setTimeout(function () {
+      socket.emit('get contacts', function (list) {
+        if (list && Array.isArray(list)) {
+          state.contacts = list;
+          saveJson(STORAGE.CONTACTS_CACHE, state.contacts);
+          renderChatList();
+          if (state.activeTab === 'contacts') renderContactsTab();
+        }
+      });
+    }, 500);
+
+    vibrate([50, 30, 50]);
   });
 }
 
+// Enter в полях добавления контакта
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && $('add-modal').classList.contains('active')) {
+    const active = document.activeElement;
+    if (active && (active.id === 'add-display-name' || active.id === 'add-username')) {
+      e.preventDefault();
+      doAddContact();
+    }
+  }
+});
+
+// Открыть список контактов с кнопкой обновления
 function renderContactsTab() {
   const box = $('contacts-list');
   if (!box) return;
@@ -1280,7 +1367,7 @@ function renderContactsTab() {
   });
   box.innerHTML = '';
   if (list.length === 0) {
-    box.innerHTML = '<div class="tab-empty"><div class="big">👥</div>' + (q ? 'Ничего не найдено' : 'Пока нет контактов') + '</div>';
+    box.innerHTML = '<div class="tab-empty"><div class="big">👥</div>' + (q ? 'Ничего не найдено' : 'Пока нет контактов') + '<br><br><button style="background:var(--accent);color:#fff;border:none;padding:12px 24px;border-radius:var(--radius-md);font-weight:600;" onclick="openAddContactModal()">➕ Добавить контакт</button></div>';
     return;
   }
   list.forEach(function (c) {
@@ -1791,7 +1878,6 @@ function bumpScrollDownBadge() {
     btn.classList.add('show');
   }
 }
-
 function bindSwipeReply(msgDiv, wrap, msg) {
   if (msg.deleted) return;
   const icon = document.createElement('div');
@@ -3447,10 +3533,7 @@ function openGiftsCatalog(username) {
                (contactProfileCurrent && contactProfileCurrent.username) ||
                (state.contactProfileCurrent && state.contactProfileCurrent.username);
   }
-  if (!username) {
-    showToast('⚠️ Не удалось определить получателя');
-    return;
-  }
+  if (!username) { showToast('⚠️ Не удалось определить получателя'); return; }
   if (username === state.me.username) { showToast('Себе дарить нельзя 🐎'); return; }
 
   state.currentGiftTarget = username;
@@ -3496,11 +3579,9 @@ function openGiftsCatalog(username) {
 function sendGift(giftKey) {
   const gift = state.giftsCatalog[giftKey];
   if (!gift) { showToast('⚠️ Подарок не найден'); return; }
-
   const to = state.currentGiftTarget;
   if (!to) { showToast('⚠️ Не выбран получатель'); return; }
   if (to === state.me.username) { showToast('Себе дарить нельзя 🐎'); return; }
-
   if (!confirm('Подарить ' + gift.emoji + ' ' + gift.name + ' за ' + gift.price + ' ⭐?')) return;
 
   const errEl = $('gifts-catalog-error');
@@ -4273,7 +4354,7 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Aurora v10.4 — значки ✓ 🔨 💀 + фикс подарков + без "Долго грузимся" — загружена');
+console.log('✅ Aurora v10.5 — значки ✓ 🔨 💀 + фикс подарков + фикс контактов + без "Долго грузимся" — загружена');
 
 (function initDoubleTap() {
   let lastTap = 0;
@@ -4362,4 +4443,4 @@ sendMsg = function () {
 };
 
 console.log('🎬 Telegram-style animations loaded');
-console.log('✓ Aurora v10.4 — ГОТОВО');
+console.log('✓ Aurora v10.5 — ГОТОВО');
