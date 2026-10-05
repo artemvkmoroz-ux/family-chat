@@ -1,11 +1,11 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 azerta v12.3 — Server
-   ✓ Галочка / 🔨 Молоток / 💀 Скам — только для moroz
-   ✓ Broadcast значков
-   ✓ Фикс подарков
-   ✓ NEW: get contacts (мгновенное обновление после добавления)
+   🌌 AZERTA v12.6 — Server
+   ✓ Описание к подаркам
+   ✓ Закреплённые чаты
+   ✓ Упоминания @ник
+   ✓ Очистка истории
    ═══════════════════════════════════════════════════════════ */
 
 const express = require('express');
@@ -80,7 +80,7 @@ const GIFTS_CATALOG = {
   galaxy:    { emoji: '🌌', name: 'Галактика',       price: 5000,  url: TWEMOJI + '1f30c.png' },
   meteor:    { emoji: '☄️', name: 'Метеорит',        price: 7000,  url: TWEMOJI + '2604.png' },
   phoenix:   { emoji: '🔥', name: 'Феникс',          price: 8000,  url: TWEMOJI + '1f525.png' },
-  azerta:    { emoji: '🌠', name: 'Сияние azerta',   price: 10000, url: TWEMOJI + '1f320.png' },
+  azerta:    { emoji: '🌠', name: 'Сияние Azerta',   price: 10000, url: TWEMOJI + '1f320.png' },
 };
 
 const ACHIEVEMENTS_CATALOG = {
@@ -109,7 +109,7 @@ const ACHIEVEMENTS_CATALOG = {
   first_group:      { emoji: '👨‍👩‍👧', name: 'Организатор',    desc: 'Создай первую группу',           target: 1,     stat: 'groups_created' },
   first_channel:    { emoji: '📢', name: 'Вещатель',           desc: 'Создай первый канал',            target: 1,     stat: 'channels_created' },
   days_7:           { emoji: '🔥', name: 'Неделя подряд',      desc: 'Заходи 7 дней подряд',           target: 7,     stat: 'days_active' },
-  days_30:          { emoji: '💫', name: 'Месяц с azerta',     desc: 'Заходи 30 дней подряд',          target: 30,    stat: 'days_active' },
+  days_30:          { emoji: '💫', name: 'Месяц с Azerta',     desc: 'Заходи 30 дней подряд',          target: 30,    stat: 'days_active' },
   days_365:         { emoji: '🏆', name: 'Год верности',       desc: 'Заходи 365 дней подряд',         target: 365,   stat: 'days_active' },
   first_voice:      { emoji: '🎤', name: 'Голос',              desc: 'Отправь первое голосовое',       target: 1,     stat: 'voice_sent' },
   voice_100:        { emoji: '🎙', name: 'Подкастер',          desc: 'Отправь 100 голосовых',          target: 100,   stat: 'voice_sent' },
@@ -142,7 +142,7 @@ for (const dir of [STORIES_DIR, STICKERS_DIR]) {
 app.use('/stories', express.static(STORIES_DIR));
 app.use('/stickers', express.static(STICKERS_DIR));
 
-console.log('🚀 azerta v12.3: старт...');
+console.log('🚀 Azerta v12.6: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? '✓ задан' : '✗ НЕ ЗАДАН');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? '✓ задан' : '✗ НЕ ЗАДАН');
 
@@ -185,7 +185,7 @@ async function initDB() {
     theme TEXT DEFAULT 'dark',
     language TEXT DEFAULT 'ru',
     font_size TEXT DEFAULT 'medium',
-    accent_color TEXT DEFAULT '#a855f7',
+    accent_color TEXT DEFAULT '#8b7fff',
     animations INTEGER DEFAULT 1,
     sound INTEGER DEFAULT 1,
     vibration INTEGER DEFAULT 1,
@@ -193,9 +193,8 @@ async function initDB() {
     notif_groups INTEGER DEFAULT 1,
     auto_delete TEXT DEFAULT 'off',
     passcode TEXT,
-    profile_color TEXT DEFAULT '#a855f7',
+    profile_color TEXT DEFAULT '#8b7fff',
     chat_wallpaper TEXT DEFAULT '',
-    premium INTEGER DEFAULT 1,
     stars INTEGER DEFAULT 0,
     last_seen_visibility TEXT DEFAULT 'everyone'
   )`);
@@ -285,8 +284,12 @@ async function initDB() {
     chat_key TEXT NOT NULL,
     archived INTEGER DEFAULT 0,
     muted INTEGER DEFAULT 0,
+    pinned INTEGER DEFAULT 0,
+    pin_order INTEGER DEFAULT 0,
     PRIMARY KEY (owner, chat_key)
   )`);
+  await db.execute(`ALTER TABLE chat_settings ADD COLUMN pinned INTEGER DEFAULT 0`).catch(() => {});
+  await db.execute(`ALTER TABLE chat_settings ADD COLUMN pin_order INTEGER DEFAULT 0`).catch(() => {});
 
   await db.execute(`CREATE TABLE IF NOT EXISTS blocks (
     blocker TEXT NOT NULL,
@@ -392,8 +395,10 @@ async function initDB() {
     time INTEGER NOT NULL,
     sold INTEGER DEFAULT 0,
     sold_at INTEGER,
-    sold_price INTEGER
+    sold_price INTEGER,
+    gift_message TEXT
   )`);
+  await db.execute(`ALTER TABLE gifts ADD COLUMN gift_message TEXT`).catch(() => {});
 
   await db.execute(`CREATE TABLE IF NOT EXISTS achievements (
     username TEXT NOT NULL,
@@ -470,6 +475,23 @@ function validStickerData(s) {
 }
 
 function generateSessionId() { return crypto.randomBytes(32).toString('hex'); }
+
+// 👥 Извлечение упоминаний @ник
+function extractMentions(text) {
+  if (!text) return [];
+  const matches = text.match(/@([a-z0-9_]{3,20})/gi);
+  if (!matches) return [];
+  const seen = new Set();
+  const result = [];
+  matches.forEach(function (m) {
+    const u = m.slice(1).toLowerCase();
+    if (!seen.has(u)) {
+      seen.add(u);
+      result.push(u);
+    }
+  });
+  return result;
+}
 
 const rateBuckets = new Map();
 function rateLimit(key, max, windowMs) {
@@ -868,14 +890,14 @@ async function getChatSettings(owner, chatKey) {
     sql: 'SELECT * FROM chat_settings WHERE owner = ? AND chat_key = ?',
     args: [owner, chatKey]
   });
-  return r.rows[0] || { archived: 0, muted: 0 };
+  return r.rows[0] || { archived: 0, muted: 0, pinned: 0, pin_order: 0 };
 }
 async function setChatSetting(owner, chatKey, field, value) {
-  const FIELD_MAP = { archived: 'archived', muted: 'muted' };
+  const FIELD_MAP = { archived: 'archived', muted: 'muted', pinned: 'pinned', pin_order: 'pin_order' };
   const col = FIELD_MAP[field];
   if (!col) throw new Error('Invalid field');
   await db.execute({
-    sql: 'INSERT OR IGNORE INTO chat_settings (owner, chat_key, archived, muted) VALUES (?, ?, 0, 0)',
+    sql: 'INSERT OR IGNORE INTO chat_settings (owner, chat_key, archived, muted, pinned, pin_order) VALUES (?, ?, 0, 0, 0, 0)',
     args: [owner, chatKey]
   });
   await db.execute({
@@ -1044,7 +1066,7 @@ async function sendContactsTo(username) {
   usersR.rows.forEach(u => { usersMap[u.username] = u; });
 
   const settingsR = await db.execute({
-    sql: `SELECT chat_key, archived, muted FROM chat_settings 
+    sql: `SELECT chat_key, archived, muted, pinned, pin_order FROM chat_settings 
           WHERE owner = ? AND chat_key IN (${ph})`,
     args: [username, ...names]
   });
@@ -1059,7 +1081,7 @@ async function sendContactsTo(username) {
 
   const list = contactRows.map(row => {
     const info = usersMap[row.contact];
-    const settings = settingsMap[row.contact] || { archived: 0, muted: 0 };
+    const settings = settingsMap[row.contact] || { archived: 0, muted: 0, pinned: 0, pin_order: 0 };
     let lastSeenVisible = true;
     if (info && info.last_seen_visibility === 'nobody') lastSeenVisible = false;
     return {
@@ -1075,6 +1097,8 @@ async function sendContactsTo(username) {
       online: lastSeenVisible ? isOnline(row.contact) : false,
       archived: !!settings.archived,
       muted: !!settings.muted,
+      pinned: !!settings.pinned,
+      pinOrder: Number(settings.pin_order) || 0,
       blocked: blockedSet.has(row.contact)
     };
   });
@@ -1110,7 +1134,7 @@ async function sendGroupsTo(username) {
   const chatKeys = groupIds.map(id => 'g:' + id);
   const kph = chatKeys.map(() => '?').join(',');
   const settingsR = await db.execute({
-    sql: `SELECT chat_key, archived, muted FROM chat_settings WHERE owner = ? AND chat_key IN (${kph})`,
+    sql: `SELECT chat_key, archived, muted, pinned, pin_order FROM chat_settings WHERE owner = ? AND chat_key IN (${kph})`,
     args: [username, ...chatKeys]
   });
   const settingsMap = {};
@@ -1118,12 +1142,13 @@ async function sendGroupsTo(username) {
 
   const list = groups.map(g => {
     const members = membersMap[g.id] || [];
-    const settings = settingsMap['g:' + g.id] || { archived: 0, muted: 0 };
+    const settings = settingsMap['g:' + g.id] || { archived: 0, muted: 0, pinned: 0, pin_order: 0 };
     return {
       id: g.id, name: g.name, avatar: g.avatar, creator: g.creator,
       description: g.description, pinnedMessageId: g.pinned_message_id,
       members, memberCount: members.length,
-      archived: !!settings.archived, muted: !!settings.muted
+      archived: !!settings.archived, muted: !!settings.muted,
+      pinned: !!settings.pinned, pinOrder: Number(settings.pin_order) || 0
     };
   });
 
@@ -1160,7 +1185,8 @@ async function sendChannelsTo(username) {
     return {
       id: c.id, slug: c.slug, name: c.name, description: c.description,
       avatar: c.avatar, creator: c.creator, verified: !!c.verified,
-      members, memberCount: members.length
+      members, memberCount: members.length,
+      pinned: false, pinOrder: 0
     };
   });
 
@@ -1185,6 +1211,33 @@ async function notifyGroupMembers(groupId, event, payload) {
 async function notifyChannelMembers(channelId, event, payload) {
   const members = await getChannelMembers(channelId);
   for (const u of members) findSocketsByUsername(u).forEach(sid => io.to(sid).emit(event, payload));
+}
+
+// 👥 Уведомить упомянутых
+async function notifyMentions(text, fromUser, groupId, groupName) {
+  const mentions = extractMentions(text);
+  if (mentions.length === 0) return;
+
+  for (const u of mentions) {
+    if (u === fromUser) continue;
+    const targetUser = await getUser(u);
+    if (!targetUser) continue;
+
+    if (groupId) {
+      const isMember = await isGroupMember(groupId, u);
+      if (!isMember) continue;
+    }
+
+    findSocketsByUsername(u).forEach(sid => {
+      io.to(sid).emit('mentioned', {
+        from: fromUser,
+        text: text,
+        groupId: groupId || null,
+        groupName: groupName || null,
+        time: now()
+      });
+    });
+  }
 }
 
 async function broadcastBadgeChange(username, badgeType, value) {
@@ -1236,6 +1289,10 @@ async function removeBadge(username, badgeType) {
   await db.execute({ sql: `UPDATE users SET ${column} = 0 WHERE username = ?`, args: [username] });
   return { ok: true };
 }
+
+// ═══════════════════════════════════════════════════════════
+// 🔌 SOCKET.IO
+// ═══════════════════════════════════════════════════════════
 
 io.on('connection', (socket) => {
   console.log('🔗 Подключился:', socket.id);
@@ -1459,7 +1516,7 @@ io.on('connection', (socket) => {
       const allowed = [
         'theme', 'language', 'font_size', 'accent_color', 'animations',
         'sound', 'vibration', 'notif_private', 'notif_groups',
-        'auto_delete', 'profile_color', 'chat_wallpaper', 'premium'
+        'auto_delete', 'profile_color', 'chat_wallpaper'
       ];
       if (!allowed.includes(key)) return cb && cb({ ok: false });
       await db.execute({ sql: `UPDATE user_settings SET ${key} = ? WHERE username = ?`, args: [value, socket.username] });
@@ -1501,9 +1558,6 @@ io.on('connection', (socket) => {
     cb && cb(!!s.passcode);
   });
 
-  // ═══════════════════════════════════════════════════════════
-  // 🔧 NEW: GET CONTACTS — для мгновенного обновления после добавления
-  // ═══════════════════════════════════════════════════════════
   socket.on('get contacts', async (cb) => {
     try {
       if (!socket.username) return cb && cb([]);
@@ -1522,7 +1576,7 @@ io.on('connection', (socket) => {
       usersR.rows.forEach(u => { usersMap[u.username] = u; });
 
       const settingsR = await db.execute({
-        sql: `SELECT chat_key, archived, muted FROM chat_settings 
+        sql: `SELECT chat_key, archived, muted, pinned, pin_order FROM chat_settings 
               WHERE owner = ? AND chat_key IN (${ph})`,
         args: [socket.username, ...names]
       });
@@ -1537,7 +1591,7 @@ io.on('connection', (socket) => {
 
       const list = contactRows.map(row => {
         const info = usersMap[row.contact];
-        const settings = settingsMap[row.contact] || { archived: 0, muted: 0 };
+        const settings = settingsMap[row.contact] || { archived: 0, muted: 0, pinned: 0, pin_order: 0 };
         let lastSeenVisible = true;
         if (info && info.last_seen_visibility === 'nobody') lastSeenVisible = false;
         return {
@@ -1553,6 +1607,8 @@ io.on('connection', (socket) => {
           online: lastSeenVisible ? isOnline(row.contact) : false,
           archived: !!settings.archived,
           muted: !!settings.muted,
+          pinned: !!settings.pinned,
+          pinOrder: Number(settings.pin_order) || 0,
           blocked: blockedSet.has(row.contact)
         };
       });
@@ -1580,43 +1636,7 @@ io.on('connection', (socket) => {
       });
       await incrementStat(socket.username, 'friends_added');
       sendContactsTo(socket.username).catch(() => {});
-
-      // 🔧 NEW: сразу возвращаем обновлённый список
-      try {
-        const contactRows = await getContactsOf(socket.username);
-        const names = contactRows.map(r => r.contact);
-        const ph = names.map(() => '?').join(',');
-        const usersR = await db.execute({
-          sql: `SELECT username, avatar, verified, badge_hammer, badge_scam, first_name, last_name, emoji_status, last_seen_visibility 
-                FROM users WHERE username IN (${ph})`,
-          args: names
-        });
-        const usersMap = {};
-        usersR.rows.forEach(u => { usersMap[u.username] = u; });
-        const list = contactRows.map(row => {
-          const info = usersMap[row.contact];
-          let lastSeenVisible = true;
-          if (info && info.last_seen_visibility === 'nobody') lastSeenVisible = false;
-          return {
-            name: row.contact,
-            displayName: row.display_name || row.contact,
-            avatar: info ? info.avatar : null,
-            verified: info ? !!info.verified : false,
-            hammer: info ? !!info.badge_hammer : false,
-            scam: info ? !!info.badge_scam : false,
-            firstName: info ? info.first_name : null,
-            lastName: info ? info.last_name : null,
-            emojiStatus: info ? info.emoji_status : null,
-            online: lastSeenVisible ? isOnline(row.contact) : false,
-            archived: false,
-            muted: false,
-            blocked: false
-          };
-        });
-        cb && cb({ ok: true, contacts: list });
-      } catch (e) {
-        cb && cb({ ok: true });
-      }
+      cb && cb({ ok: true });
     } catch (e) { 
       console.error('add contact:', e);
       cb && cb({ ok: false, error: 'Ошибка сервера' }); 
@@ -1739,6 +1759,51 @@ io.on('connection', (socket) => {
     sendContactsTo(socket.username).catch(() => {});
     sendGroupsTo(socket.username).catch(() => {});
     cb && cb({ ok: true, muted: !!newVal });
+  });
+
+  // 📌 Закрепить/открепить чат
+  socket.on('toggle pin', async ({ chatKey }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const settings = await getChatSettings(socket.username, chatKey);
+      const newVal = settings.pinned ? 0 : 1;
+      const newOrder = newVal ? now() : 0;
+      await setChatSetting(socket.username, chatKey, 'pinned', newVal);
+      await setChatSetting(socket.username, chatKey, 'pin_order', newOrder);
+      sendContactsTo(socket.username).catch(() => {});
+      sendGroupsTo(socket.username).catch(() => {});
+      cb && cb({ ok: true, pinned: !!newVal });
+    } catch (e) {
+      console.error('toggle pin:', e);
+      cb && cb({ ok: false });
+    }
+  });
+
+  // 🗑 Очистить историю
+  socket.on('clear history', async ({ withUser }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      if (!withUser) return cb && cb({ ok: false, error: 'Не указан чат' });
+
+      const me = socket.username;
+
+      await db.execute({
+        sql: `DELETE FROM messages 
+              WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)`,
+        args: [me, withUser, withUser, me]
+      });
+
+      findSocketsByUsername(withUser).forEach(sid => {
+        io.to(sid).emit('history cleared', { by: me });
+      });
+
+      socket.emit('history cleared', { by: me, withUser: withUser });
+
+      cb && cb({ ok: true });
+    } catch (e) {
+      console.error('clear history:', e);
+      cb && cb({ ok: false, error: 'Ошибка сервера' });
+    }
   });
 
   async function checkAdmin(cb) {
@@ -1929,8 +1994,7 @@ io.on('connection', (socket) => {
       cb && cb({ ok: false, achievements: [], stats: {} });
     }
   });
-
-  socket.on('load history', async ({ withUser }) => {
+     socket.on('load history', async ({ withUser }) => {
     if (!socket.username) return;
     try {
       const rows = await getHistory(socket.username, withUser);
@@ -2030,6 +2094,11 @@ io.on('connection', (socket) => {
 
       findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
       socket.emit('private message', { ...payload, self: true });
+
+      // 👥 Упоминания в личных чатах
+      if (text) {
+        await notifyMentions(text, from, null, null).catch(() => {});
+      }
 
       await incrementStat(from, 'messages_sent');
       if (image) await incrementStat(from, 'photos_sent');
@@ -2289,6 +2358,12 @@ io.on('connection', (socket) => {
 
       notifyGroupMembers(groupId, 'group message', payload).catch(() => {});
       socket.emit('group message', { ...payload, self: true });
+
+      // 👥 Упоминания в группе
+      if (text) {
+        const group = await getGroupById(groupId);
+        await notifyMentions(text, from, groupId, group ? group.name : 'Группа').catch(() => {});
+      }
 
       await incrementStat(from, 'messages_sent');
       if (image) await incrementStat(from, 'photos_sent');
@@ -2869,7 +2944,7 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true, gifts });
   });
 
-  socket.on('send gift', async ({ to, giftKey }, cb) => {
+  socket.on('send gift', async ({ to, giftKey, message }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
       const gift = GIFTS_CATALOG[giftKey];
@@ -2898,14 +2973,21 @@ io.on('connection', (socket) => {
 
       await addStars(socket.username, -gift.price, 'gift_sent:' + to, null);
 
+      // 🎁 Описание к подарку
+      const giftMsg = message ? String(message).slice(0, 200).trim() : null;
+
       const r = await db.execute({
-        sql: 'INSERT INTO gifts (gift_key, from_user, to_user, price, time) VALUES (?, ?, ?, ?, ?)',
-        args: [giftKey, socket.username, to, gift.price, now()]
+        sql: 'INSERT INTO gifts (gift_key, from_user, to_user, price, time, gift_message) VALUES (?, ?, ?, ?, ?, ?)',
+        args: [giftKey, socket.username, to, gift.price, now(), giftMsg]
       });
       const giftId = Number(r.lastInsertRowid);
 
       const t = now();
-      const msgText = '🎁 Подарок: ' + gift.emoji + ' ' + gift.name;
+      let msgText = '🎁 Подарок: ' + gift.emoji + ' ' + gift.name;
+      if (giftMsg) {
+        msgText += '\n💬 ' + giftMsg;
+      }
+
       const msgResult = await db.execute({
         sql: `INSERT INTO messages (from_user, to_user, text, reactions, reply_to, edited, deleted, time) 
               VALUES (?, ?, ?, '{}', NULL, 0, 0, ?)`,
@@ -2929,7 +3011,8 @@ io.on('connection', (socket) => {
         from: socket.username,
         to_user: to,
         price: gift.price,
-        time: t
+        time: t,
+        gift_message: giftMsg
       };
       findSocketsByUsername(to).forEach(sid => io.to(sid).emit('gift received', giftPayload));
 
@@ -2973,7 +3056,7 @@ io.on('connection', (socket) => {
         return cb && cb({ ok: false, error: 'Только ' + CONFIG.ADMIN_USERNAME });
       }
       const rand = () => Math.random().toString(36).slice(2, 6).toUpperCase();
-      const code = 'azerta-' + rand() + '-' + rand();
+      const code = 'AZERTA-' + rand() + '-' + rand();
       await db.execute({
         sql: 'INSERT INTO gift_codes (code, created_by, time) VALUES (?, ?, ?)',
         args: [code, socket.username, now()]
@@ -3039,7 +3122,7 @@ initDB()
     setInterval(cleanupOldMessages, 10 * 60 * 1000);
 
     server.listen(CONFIG.PORT, () => {
-      console.log('🌌 azerta v12.3 запущена на порту ' + CONFIG.PORT);
+      console.log('🌌 Azerta v12.6 запущена на порту ' + CONFIG.PORT);
     });
   })
   .catch(err => {
