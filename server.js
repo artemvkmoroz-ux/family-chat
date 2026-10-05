@@ -1,9 +1,11 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v12.2 — Server
+   🌌 AURORA v12.3 — Server
    ✓ Галочка / 🔨 Молоток / 💀 Скам — только для moroz
-   + Broadcast значков + фикс подарков
+   ✓ Broadcast значков
+   ✓ Фикс подарков
+   ✓ NEW: get contacts (мгновенное обновление после добавления)
    ═══════════════════════════════════════════════════════════ */
 
 const express = require('express');
@@ -140,7 +142,7 @@ for (const dir of [STORIES_DIR, STICKERS_DIR]) {
 app.use('/stories', express.static(STORIES_DIR));
 app.use('/stickers', express.static(STICKERS_DIR));
 
-console.log('🚀 Aurora v12.2: старт...');
+console.log('🚀 Aurora v12.3: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? '✓ задан' : '✗ НЕ ЗАДАН');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? '✓ задан' : '✗ НЕ ЗАДАН');
 
@@ -1499,9 +1501,72 @@ io.on('connection', (socket) => {
     cb && cb(!!s.passcode);
   });
 
+  // ═══════════════════════════════════════════════════════════
+  // 🔧 NEW: GET CONTACTS — для мгновенного обновления после добавления
+  // ═══════════════════════════════════════════════════════════
+  socket.on('get contacts', async (cb) => {
+    try {
+      if (!socket.username) return cb && cb([]);
+      const contactRows = await getContactsOf(socket.username);
+      if (contactRows.length === 0) return cb && cb([]);
+
+      const names = contactRows.map(r => r.contact);
+      const ph = names.map(() => '?').join(',');
+
+      const usersR = await db.execute({
+        sql: `SELECT username, avatar, verified, badge_hammer, badge_scam, first_name, last_name, emoji_status, last_seen_visibility 
+              FROM users WHERE username IN (${ph})`,
+        args: names
+      });
+      const usersMap = {};
+      usersR.rows.forEach(u => { usersMap[u.username] = u; });
+
+      const settingsR = await db.execute({
+        sql: `SELECT chat_key, archived, muted FROM chat_settings 
+              WHERE owner = ? AND chat_key IN (${ph})`,
+        args: [socket.username, ...names]
+      });
+      const settingsMap = {};
+      settingsR.rows.forEach(s => { settingsMap[s.chat_key] = s; });
+
+      const blocksR = await db.execute({
+        sql: `SELECT blocked FROM blocks WHERE blocker = ? AND blocked IN (${ph})`,
+        args: [socket.username, ...names]
+      });
+      const blockedSet = new Set(blocksR.rows.map(r => r.blocked));
+
+      const list = contactRows.map(row => {
+        const info = usersMap[row.contact];
+        const settings = settingsMap[row.contact] || { archived: 0, muted: 0 };
+        let lastSeenVisible = true;
+        if (info && info.last_seen_visibility === 'nobody') lastSeenVisible = false;
+        return {
+          name: row.contact,
+          displayName: row.display_name || row.contact,
+          avatar: info ? info.avatar : null,
+          verified: info ? !!info.verified : false,
+          hammer: info ? !!info.badge_hammer : false,
+          scam: info ? !!info.badge_scam : false,
+          firstName: info ? info.first_name : null,
+          lastName: info ? info.last_name : null,
+          emojiStatus: info ? info.emoji_status : null,
+          online: lastSeenVisible ? isOnline(row.contact) : false,
+          archived: !!settings.archived,
+          muted: !!settings.muted,
+          blocked: blockedSet.has(row.contact)
+        };
+      });
+
+      cb && cb(list);
+    } catch (e) {
+      console.error('get contacts:', e);
+      cb && cb([]);
+    }
+  });
+
   socket.on('add contact', async ({ username, displayName }, cb) => {
     try {
-      if (!socket.username) return cb && cb({ ok: false });
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
       username = String(username || '').trim().toLowerCase();
       displayName = String(displayName || '').trim();
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
@@ -1515,8 +1580,47 @@ io.on('connection', (socket) => {
       });
       await incrementStat(socket.username, 'friends_added');
       sendContactsTo(socket.username).catch(() => {});
-      cb && cb({ ok: true });
-    } catch (e) { cb && cb({ ok: false }); }
+
+      // 🔧 NEW: сразу возвращаем обновлённый список
+      try {
+        const contactRows = await getContactsOf(socket.username);
+        const names = contactRows.map(r => r.contact);
+        const ph = names.map(() => '?').join(',');
+        const usersR = await db.execute({
+          sql: `SELECT username, avatar, verified, badge_hammer, badge_scam, first_name, last_name, emoji_status, last_seen_visibility 
+                FROM users WHERE username IN (${ph})`,
+          args: names
+        });
+        const usersMap = {};
+        usersR.rows.forEach(u => { usersMap[u.username] = u; });
+        const list = contactRows.map(row => {
+          const info = usersMap[row.contact];
+          let lastSeenVisible = true;
+          if (info && info.last_seen_visibility === 'nobody') lastSeenVisible = false;
+          return {
+            name: row.contact,
+            displayName: row.display_name || row.contact,
+            avatar: info ? info.avatar : null,
+            verified: info ? !!info.verified : false,
+            hammer: info ? !!info.badge_hammer : false,
+            scam: info ? !!info.badge_scam : false,
+            firstName: info ? info.first_name : null,
+            lastName: info ? info.last_name : null,
+            emojiStatus: info ? info.emoji_status : null,
+            online: lastSeenVisible ? isOnline(row.contact) : false,
+            archived: false,
+            muted: false,
+            blocked: false
+          };
+        });
+        cb && cb({ ok: true, contacts: list });
+      } catch (e) {
+        cb && cb({ ok: true });
+      }
+    } catch (e) { 
+      console.error('add contact:', e);
+      cb && cb({ ok: false, error: 'Ошибка сервера' }); 
+    }
   });
 
   socket.on('remove contact', async ({ username }, cb) => {
@@ -2765,7 +2869,6 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true, gifts });
   });
 
-  // 🔧 FIX: ИСПРАВЛЕННЫЙ send gift
   socket.on('send gift', async ({ to, giftKey }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
@@ -2936,7 +3039,7 @@ initDB()
     setInterval(cleanupOldMessages, 10 * 60 * 1000);
 
     server.listen(CONFIG.PORT, () => {
-      console.log('🌌 Aurora v12.2 запущена на порту ' + CONFIG.PORT);
+      console.log('🌌 Aurora v12.3 запущена на порту ' + CONFIG.PORT);
     });
   })
   .catch(err => {
