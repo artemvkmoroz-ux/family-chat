@@ -1,15 +1,15 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 azerta v10.6 — Client
-   ✓ ФИКС: "Не авторизован" при добавлении контакта
-   ✓ ФИКС: auto-login при истёкшей сессии
-   ✓ ФИКС: принудительный показ авторизации
+   🌌 AZERTA v11.0 — Client (Clean Design, без премиума)
+   ✓ Убран премиум
+   ✓ Новый дизайн (плавный)
+   ✓ Улучшенные обои чата
    ═══════════════════════════════════════════════════════════ */
 
 var contactProfileCurrent = null;
 var currentBadgeType = 'verified';
-var isLoggedInOnServer = false; // 🔧 NEW: флаг серверной авторизации
+var isLoggedInOnServer = false;
 
 const state = {
   me: { username: null, avatar: null, verified: false, bio: '', firstName: '', lastName: '', birthday: '', emoji: '', stars: 0, sessionId: null, hammer: false, scam: false },
@@ -40,10 +40,10 @@ const state = {
 };
 
 const STORAGE = {
-  SESSION: 'azerta-session', UNREAD: 'azerta-unread',
-  CONTACTS_CACHE: 'azerta-contacts-cache', GROUPS_CACHE: 'azerta-groups-cache',
-  RECENT_STICKERS: 'azerta-recent-stickers', SETTINGS: 'azerta-settings-cache',
-  WALLPAPERS: 'azerta-wallpapers',
+  SESSION: 'aurora-session', UNREAD: 'aurora-unread',
+  CONTACTS_CACHE: 'aurora-contacts-cache', GROUPS_CACHE: 'aurora-groups-cache',
+  RECENT_STICKERS: 'aurora-recent-stickers', SETTINGS: 'aurora-settings-cache',
+  WALLPAPERS: 'aurora-wallpapers',
 };
 
 const STORY_DURATION = 5000;
@@ -209,7 +209,7 @@ setTimeout(hideSplash, 2000);
 setTimeout(hideSplash, 3000);
 
 function showErrorScreen(text) {
-  console.error('❌ azerta error:', text);
+  console.error('❌ Azerta error:', text);
   const screen = $('error-screen');
   const textEl = $('error-text');
   if (screen && textEl) {
@@ -249,10 +249,10 @@ function closeContactProfile() {
 }
 
 function showToast(text) {
-  let toast = $('azerta-toast');
+  let toast = $('aurora-toast');
   if (!toast) {
     toast = document.createElement('div');
-    toast.id = 'azerta-toast';
+    toast.id = 'aurora-toast';
     document.body.appendChild(toast);
   }
   toast.textContent = text;
@@ -276,7 +276,7 @@ function hideConnStatus() {
 
 function playLoginTransition(username, firstName, isAutoLogin) {
   state.isLoggedIn = true;
-  isLoggedInOnServer = true; // 🔧 NEW
+  isLoggedInOnServer = true;
   const authEl = $('auth');
   const appEl = $('app');
   const flashEl = $('welcome-flash');
@@ -311,7 +311,7 @@ function playLoginTransition(username, firstName, isAutoLogin) {
     const nameEl = toastEl.querySelector('.wt-name');
     const subEl = toastEl.querySelector('.wt-sub');
     if (nameEl) nameEl.textContent = 'Привет, ' + displayName + '!';
-    if (subEl) subEl.textContent = 'С возвращением в azerta';
+    if (subEl) subEl.textContent = 'С возвращением в Azerta';
     if (emoji) {
       const emojis = ['👋', '🌌', '✨', '🚀', '💫'];
       emoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
@@ -332,15 +332,12 @@ function playLoginTransition(username, firstName, isAutoLogin) {
   }, 200);
 }
 
-// 🔧 NEW: принудительно показать экран входа
 function forceShowAuth(message) {
   console.warn('🔒 Принудительный выход:', message || '');
   isLoggedInOnServer = false;
   state.isLoggedIn = false;
   state.me.username = null;
   state.me.sessionId = null;
-  // НЕ удаляем session из localStorage — вдруг она рабочая
-  // Но чистим кэши
   const appEl = $('app'); if (appEl) appEl.classList.remove('active');
   const chatEl = $('chat-screen'); if (chatEl) chatEl.classList.remove('active');
   const authEl = $('auth'); if (authEl) {
@@ -476,10 +473,10 @@ function onRegPasswordInput() {
   if (/[a-z]/.test(p) && /[A-Z]/.test(p)) score++;
   if (/[0-9]/.test(p)) score++;
   if (/[^a-zA-Z0-9]/.test(p)) score++;
-  if (p.length < 8) { bar.classList.add('weak'); label.textContent = 'Слишком короткий (мин. 8)'; label.style.color = '#ef4444'; }
-  else if (score <= 2) { bar.classList.add('weak'); label.textContent = 'Слабый — добавь цифры или заглавные'; label.style.color = '#ef4444'; }
+  if (p.length < 8) { bar.classList.add('weak'); label.textContent = 'Слишком короткий (мин. 8)'; label.style.color = '#f87171'; }
+  else if (score <= 2) { bar.classList.add('weak'); label.textContent = 'Слабый — добавь цифры или заглавные'; label.style.color = '#f87171'; }
   else if (score === 3) { bar.classList.add('medium'); label.textContent = 'Средний'; label.style.color = '#fbbf24'; }
-  else { bar.classList.add('strong'); label.textContent = 'Сильный 💪'; label.style.color = '#22c55e'; }
+  else { bar.classList.add('strong'); label.textContent = 'Сильный 💪'; label.style.color = '#4ade80'; }
   onRegPassword2Input();
 }
 
@@ -606,7 +603,6 @@ async function tryAutoLogin() {
     const timeoutId = setTimeout(function () {
       if (resolved) return;
       resolved = true;
-      console.log('⏱ Auto-login timeout');
       resolve(false);
     }, 6000);
     socket.emit('login with session', { sessionId: creds.sessionId }, function (res) {
@@ -614,9 +610,7 @@ async function tryAutoLogin() {
       resolved = true;
       clearTimeout(timeoutId);
       if (!res || !res.ok) {
-        console.log('❌ Auto-login failed:', res && res.error);
         localStorage.removeItem(STORAGE.SESSION);
-        // 🔧 ФИКС: принудительно показываем экран входа
         forceShowAuth('Сессия истекла — войди заново');
         resolve(false);
         return;
@@ -651,13 +645,12 @@ async function tryAutoLogin() {
 }
 
 socket.on('connect', async function () {
-  setConnStatus('reconnecting', 'azerta: проверяю связь…');
+  setConnStatus('reconnecting', 'Azerta: проверяю связь…');
   setTimeout(hideConnStatus, 2000);
   state.reconnectAttempts = 0;
   if (autoLoginDone) return;
   const ok = await tryAutoLogin();
   if (!ok) {
-    // 🔧 ФИКС: убеждаемся, что приложение закрыто, а авторизация открыта
     $('app').classList.remove('active');
     $('auth').classList.add('active');
     state.isLoggedIn = false;
@@ -667,23 +660,23 @@ socket.on('connect', async function () {
 });
 
 socket.on('disconnect', function () {
-  setConnStatus('offline', 'azerta: связь потеряна 😴');
+  setConnStatus('offline', 'Azerta: связь потеряна 😴');
 });
 
 socket.on('connect_error', function () {
   state.reconnectAttempts++;
   const msgs = [
-    'azerta: пробую ещё раз… 🔄',
-    'azerta: интернет уснул 💤',
-    'azerta: слабый интернет 😔',
-    'azerta: сервер далеко 🌍',
-    'azerta: ещё чуть-чуть… 🐢'
+    'Azerta: пробую ещё раз… 🔄',
+    'Azerta: интернет уснул 💤',
+    'Azerta: слабый интернет 😔',
+    'Azerta: сервер далеко 🌍',
+    'Azerta: ещё чуть-чуть… 🐢'
   ];
   setConnStatus('reconnecting', msgs[Math.min(state.reconnectAttempts - 1, msgs.length - 1)]);
 });
 
 socket.io.on('reconnect', function () {
-  setConnStatus('connected', 'azerta: снова с тобой ✨');
+  setConnStatus('connected', 'Azerta: снова с тобой ✨');
   state.reconnectAttempts = 0;
   setTimeout(hideConnStatus, 2500);
   if (state.isLoggedIn) loadStories();
@@ -705,7 +698,7 @@ async function enableNotifications() {
     const perm = await Notification.requestPermission();
     if (perm === 'granted') {
       state.notificationsAllowed = true;
-      new Notification('azerta', { body: 'Уведомления включены! 🎉' });
+      new Notification('Azerta', { body: 'Уведомления включены! 🎉' });
     }
   } catch (e) {}
 }
@@ -742,7 +735,7 @@ function updateTitle() {
     if (!state.titleFlashInterval) {
       let on = true;
       state.titleFlashInterval = setInterval(function () {
-        document.title = on ? '(' + total + ') azerta' : 'azerta';
+        document.title = on ? '(' + total + ') Azerta' : 'Azerta';
         on = !on;
       }, 1000);
     }
@@ -751,7 +744,7 @@ function updateTitle() {
       clearInterval(state.titleFlashInterval);
       state.titleFlashInterval = null;
     }
-    document.title = 'azerta';
+    document.title = 'Azerta';
   }
   const navBadge = $('nav-badge-chats');
   if (navBadge) {
@@ -764,14 +757,13 @@ function updateTitle() {
   }
 }
 
+// 🚫 ПРЕМИУМ УБРАН — applyLocalSettings больше не применяет premium
 function applyLocalSettings() {
   const s = state.settings;
   if (s.theme === 'light') document.body.classList.add('light');
   else document.body.classList.remove('light');
   if (s.animations === 0 || s.animations === '0') document.body.classList.add('no-anim');
   else document.body.classList.remove('no-anim');
-  if (s.premium === 0 || s.premium === '0') document.body.classList.remove('premium');
-  else document.body.classList.add('premium');
   const sizes = { small: '13px', medium: '15px', large: '17px' };
   document.documentElement.style.setProperty('--font-size', sizes[s.font_size] || '15px');
   if (s.accent_color) document.documentElement.style.setProperty('--accent', s.accent_color);
@@ -794,7 +786,7 @@ socket.on('stars updated', function (data) {
   if (state.activeTab === 'settings') renderSettingsTab();
 });
 
-const TAB_TITLES = { chats: 'azerta', calls: 'Звонки', contacts: 'Контакты', settings: 'Настройки' };
+const TAB_TITLES = { chats: 'Azerta', calls: 'Звонки', contacts: 'Контакты', settings: 'Настройки' };
 
 function switchTab(tab) {
   state.activeTab = tab;
@@ -804,7 +796,7 @@ function switchTab(tab) {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
   const h2 = document.querySelector('#main-header h2');
-  if (h2) h2.textContent = TAB_TITLES[tab] || 'azerta';
+  if (h2) h2.textContent = TAB_TITLES[tab] || 'Azerta';
   document.querySelectorAll('.app-tab').forEach(function (t) { t.classList.remove('active'); });
   if (tab === 'chats') {
     const sw = $('search-wrap');
@@ -871,10 +863,9 @@ function renderSettings() {
 
   html += '<div class="settings-section"><div class="settings-section-title">Мой QR-код</div><div class="settings-item" onclick="showMyQr()"><div class="si-icon">📱</div><div class="si-text">Показать QR-код</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div class="settings-section"><div class="settings-section-title">Подарки и премиум</div>';
+  html += '<div class="settings-section"><div class="settings-section-title">Подарки</div>';
   html += '<div class="settings-item" onclick="openMyGifts()"><div class="si-icon">🎁</div><div class="si-text">Мои подарки</div><div class="si-arrow">›</div></div>';
   html += '<div class="settings-item" onclick="openGiftModal()"><div class="si-icon">💳</div><div class="si-text">Активировать премиум по коду</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="toggleSetting(\'premium\')"><div class="si-icon">✨</div><div class="si-text">Премиум-дизайн</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ' + (s.premium != 0 ? 'checked' : '') + ' onchange="toggleSetting(\'premium\')" /><span class="slider"></span></label></div>';
   if (isAdmin) html += '<div class="settings-item" onclick="openGiftAdminModal()"><div class="si-icon">🔑</div><div class="si-text">Управление кодами</div><div class="si-arrow">›</div></div>';
   html += '</div>';
 
@@ -900,12 +891,12 @@ function renderSettings() {
   html += '<div class="settings-section"><div class="settings-section-title">Оформление</div>';
   html += '<div class="settings-item" onclick="changeTheme()"><div class="si-icon">🎨</div><div class="si-text">Тема</div><div class="si-value">' + (s.theme === 'light' ? 'Светлая' : 'Тёмная') + '</div><div class="si-arrow">›</div></div>';
   html += '<div class="settings-item" onclick="changeFontSize()"><div class="si-icon">📏</div><div class="si-text">Размер текста</div><div class="si-value">' + fontLabel() + '</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="openColorPicker(\'accent_color\')"><div class="si-icon">🎯</div><div class="si-text">Акцентный цвет</div><div class="si-value" style="color:' + (s.accent_color || '#a855f7') + ';font-size:20px;">●</div><div class="si-arrow">›</div></div>';
+  html += '<div class="settings-item" onclick="openColorPicker(\'accent_color\')"><div class="si-icon">🎯</div><div class="si-text">Акцентный цвет</div><div class="si-value" style="color:' + (s.accent_color || '#8b7fff') + ';font-size:20px;">●</div><div class="si-arrow">›</div></div>';
   html += '</div>';
 
   html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 azerta v10.6<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v11.0<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
@@ -956,7 +947,7 @@ function changeLastSeen() {
 
 function openColorPicker(target) {
   state.currentColorTarget = target;
-  const colors = ['#a855f7','#ec4899','#6d28d9','#fbbf24','#22c55e','#06b6d4','#ef4444','#f97316','#8b5cf6','#14b8a6','#f43f5e','#3b82f6'];
+  const colors = ['#8b7fff','#ec4899','#6d5eff','#fbbf24','#22c55e','#06b6d4','#ef4444','#f97316','#a78bfa','#14b8a6','#f43f5e','#3b82f6'];
   const grid = $('color-grid');
   grid.innerHTML = '';
   colors.forEach(function (c) {
@@ -1019,14 +1010,14 @@ function openSessions() {
       sessions.forEach(function (s) {
         const isCurrent = s.id === state.me.sessionId;
         const date = new Date(Number(s.last_active)).toLocaleString('ru-RU');
-        html += '<div class="session-item"><div class="device">' + escapeHtml(s.device || 'Web') + (isCurrent ? ' <span style="color:#22c55e">— это устройство</span>' : '') + '</div>';
+        html += '<div class="session-item"><div class="device">' + escapeHtml(s.device || 'Web') + (isCurrent ? ' <span style="color:#4ade80">— это устройство</span>' : '') + '</div>';
         html += '<div class="meta">Активность: ' + date + '</div>';
         if (!isCurrent) html += '<button onclick="terminateSession(\'' + s.id + '\')">Завершить</button>';
         html += '</div>';
       });
     }
-    html += '<button class="modal-danger" style="margin:16px;width:calc(100% - 32px);padding:14px;border-radius:var(--radius-md);" onclick="terminateAllOthers()">Завершить все другие</button>';
-    html += '<button class="modal-secondary" style="margin:8px 16px;width:calc(100% - 32px);padding:14px;border-radius:var(--radius-md);" onclick="renderSettings()">Назад</button>';
+    html += '<button class="modal-danger" style="margin:16px;width:calc(100% - 32px);padding:14px;border-radius:14px;" onclick="terminateAllOthers()">Завершить все другие</button>';
+    html += '<button class="modal-secondary" style="margin:8px 16px;width:calc(100% - 32px);padding:14px;border-radius:14px;" onclick="renderSettings()">Назад</button>';
     box.innerHTML = html;
   });
 }
@@ -1051,7 +1042,7 @@ function openBlockedList() {
         html += '<div class="session-item"><div class="device">@' + escapeHtml(u) + '</div><button onclick="unblockUser(\'' + u + '\')">Разблокировать</button></div>';
       });
     }
-    html += '<button class="modal-secondary" style="margin:16px;width:calc(100% - 32px);padding:14px;border-radius:var(--radius-md);" onclick="renderSettings()">Назад</button>';
+    html += '<button class="modal-secondary" style="margin:16px;width:calc(100% - 32px);padding:14px;border-radius:14px;" onclick="renderSettings()">Назад</button>';
     box.innerHTML = html;
   });
 }
@@ -1284,29 +1275,21 @@ socket.on('me updated', function (data) {
   if (state.activeTab === 'settings') renderSettingsTab();
 });
 
-// ═══════════════════════════════════════════════════════════
-// 🔧 ФИКС: проверка авторизации на сервере перед действиями
-// ═══════════════════════════════════════════════════════════
-
 function ensureAuthorized(callback) {
   if (!isLoggedInOnServer || !state.me.username) {
-    // Проверяем — может, сессия есть
     const creds = loadJson(STORAGE.SESSION);
     if (creds && creds.sessionId) {
-      console.log('🔄 Проверяю сессию...');
       socket.emit('login with session', { sessionId: creds.sessionId }, function (res) {
         if (res && res.ok) {
           isLoggedInOnServer = true;
           state.me.username = res.username;
           if (callback) callback(true);
         } else {
-          console.warn('❌ Сессия недействительна');
           forceShowAuth('Сессия истекла');
           if (callback) callback(false);
         }
       });
     } else {
-      console.warn('❌ Нет сессии');
       forceShowAuth('Войди заново');
       if (callback) callback(false);
     }
@@ -1315,10 +1298,6 @@ function ensureAuthorized(callback) {
   if (callback) callback(true);
   return true;
 }
-
-// ═══════════════════════════════════════════════════════════
-// 🔧 ФИКС ДОБАВЛЕНИЯ КОНТАКТОВ
-// ═══════════════════════════════════════════════════════════
 
 function openAddContactModal() {
   $('add-display-name').value = '';
@@ -1334,7 +1313,6 @@ function openAddContactModal() {
 }
 
 function doAddContact() {
-  // 🔧 ФИКС: сначала проверяем авторизацию
   ensureAuthorized(function (ok) {
     if (!ok) return;
     doAddContactReal();
@@ -1386,7 +1364,6 @@ function doAddContactReal() {
   socket.emit('add contact', { username: username, displayName: displayName }, function (res) {
     if (!res || !res.ok) {
       errEl.textContent = '❌ ' + ((res && res.error) || 'Ошибка');
-      // 🔧 ФИКС: если "Не авторизован" — показываем экран входа
       if (res && res.error && res.error.indexOf('авторизован') !== -1) {
         setTimeout(function () {
           closeModal('add-modal');
@@ -1401,14 +1378,12 @@ function doAddContactReal() {
     userInput.value = '';
     errEl.textContent = '';
 
-    // 🔧 ФИКС: если сервер вернул список — обновляем сразу
     if (res.contacts && Array.isArray(res.contacts)) {
       state.contacts = res.contacts;
       saveJson(STORAGE.CONTACTS_CACHE, state.contacts);
       renderChatList();
       if (state.activeTab === 'contacts') renderContactsTab();
     } else {
-      // fallback — запрашиваем через 500мс
       setTimeout(function () {
         socket.emit('get contacts', function (list) {
           if (list && Array.isArray(list)) {
@@ -1448,7 +1423,7 @@ function renderContactsTab() {
   });
   box.innerHTML = '';
   if (list.length === 0) {
-    box.innerHTML = '<div class="tab-empty"><div class="big">👥</div>' + (q ? 'Ничего не найдено' : 'Пока нет контактов') + '<br><br><button style="background:var(--accent);color:#fff;border:none;padding:12px 24px;border-radius:var(--radius-md);font-weight:600;" onclick="openAddContactModal()">➕ Добавить контакт</button></div>';
+    box.innerHTML = '<div class="tab-empty"><div class="big">👥</div>' + (q ? 'Ничего не найдено' : 'Пока нет контактов') + '<br><br><button style="background:var(--accent);color:#fff;border:none;padding:12px 24px;border-radius:14px;font-weight:600;" onclick="openAddContactModal()">➕ Добавить контакт</button></div>';
     return;
   }
   list.forEach(function (c) {
@@ -1481,8 +1456,8 @@ function openContactProfile(username) {
       : ((contact && contact.displayName) || username);
     const emojiStr = data.emojiStatus ? ' ' + data.emojiStatus : '';
     let extra = '';
-    if (data.blockedByMe) extra = '<div style="color:#ef4444;font-size:13px;margin-bottom:8px;text-align:center;">🚫 Вы заблокировали</div>';
-    else if (data.blockedMe) extra = '<div style="color:#ef4444;font-size:13px;margin-bottom:8px;text-align:center;">🚫 Вас заблокировали</div>';
+    if (data.blockedByMe) extra = '<div style="color:#f87171;font-size:13px;margin-bottom:8px;text-align:center;">🚫 Вы заблокировали</div>';
+    else if (data.blockedMe) extra = '<div style="color:#f87171;font-size:13px;margin-bottom:8px;text-align:center;">🚫 Вас заблокировали</div>';
     let giftsHtml = '';
     if (data.gifts && data.gifts.length > 0) {
       giftsHtml = '<div class="profile-gifts"><div class="pg-title">🎁 Подарки (' + data.gifts.length + ')</div><div class="pg-row">';
@@ -1595,6 +1570,7 @@ function clearUnread(key) {
   }
 }
 
+// 🖼 ОБОИ ЧАТА — улучшенная версия
 function getChatWallpaper(chatKey) {
   if (!chatKey) return null;
   return state.chatWallpapers[chatKey] || null;
@@ -1617,11 +1593,13 @@ function applyChatWallpaper() {
     box.style.backgroundImage = 'url(' + wp + ')';
     box.style.backgroundSize = 'cover';
     box.style.backgroundPosition = 'center';
+    box.style.backgroundRepeat = 'no-repeat';
     box.classList.add('has-wallpaper');
   } else {
     box.style.backgroundImage = '';
     box.style.backgroundSize = '';
     box.style.backgroundPosition = '';
+    box.style.backgroundRepeat = '';
     box.classList.remove('has-wallpaper');
   }
 }
@@ -1629,12 +1607,46 @@ function applyChatWallpaper() {
 function openWallpaperPicker() {
   const chatKey = state.currentChat || (state.currentGroup ? 'g:' + state.currentGroup.id : null);
   if (!chatKey) return;
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.onchange = function (e) {
+
+  const existing = $('wallpaper-modal');
+  if (existing) existing.remove();
+
+  const currentWp = getChatWallpaper(chatKey);
+
+  const modal = document.createElement('div');
+  modal.id = 'wallpaper-modal';
+  modal.className = 'modal active';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;';
+
+  modal.innerHTML = '<div class="modal-box" style="background:var(--bg-panel);border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:24px;max-width:420px;width:100%;max-height:88vh;overflow-y:auto;animation:modalIn 0.3s var(--ease-spring);">' +
+    '<h3 style="margin-bottom:18px;font-size:20px;text-align:center;font-weight:700;">🎨 Обои чата</h3>' +
+    '<div id="wallpaper-preview" style="width:100%;height:200px;border-radius:14px;background:var(--bg-input);background-size:cover;background-position:center;margin-bottom:16px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px;">' +
+      (currentWp ? '' : 'Пока нет обоев') +
+    '</div>' +
+    '<button class="modal-primary" onclick="document.getElementById(\'wallpaper-file\').click()" style="width:100%;padding:14px;margin-bottom:10px;border-radius:14px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;border:none;cursor:pointer;">' +
+      '📷 Выбрать из галереи' +
+    '</button>' +
+    '<button class="modal-secondary" onclick="removeChatWallpaper()" style="width:100%;padding:14px;margin-bottom:10px;border-radius:14px;background:var(--bg-input);color:inherit;font-size:15px;font-weight:600;border:none;cursor:pointer;">' +
+      '🗑 Убрать обои' +
+    '</button>' +
+    '<button class="modal-secondary" onclick="document.getElementById(\'wallpaper-modal\').remove()" style="width:100%;padding:14px;border-radius:14px;background:var(--bg-input);color:inherit;font-size:15px;font-weight:600;border:none;cursor:pointer;">' +
+      'Отмена' +
+    '</button>' +
+    '<input type="file" id="wallpaper-file" accept="image/*" style="display:none" />' +
+  '</div>';
+
+  document.body.appendChild(modal);
+
+  if (currentWp) {
+    const preview = modal.querySelector('#wallpaper-preview');
+    preview.style.backgroundImage = 'url(' + currentWp + ')';
+    preview.textContent = '';
+  }
+
+  modal.querySelector('#wallpaper-file').addEventListener('change', function (e) {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = function (ev) {
       const img = new Image();
@@ -1647,15 +1659,25 @@ function openWallpaperPicker() {
         canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+        const preview = modal.querySelector('#wallpaper-preview');
+        preview.style.backgroundImage = 'url(' + dataUrl + ')';
+        preview.textContent = '';
+
         setChatWallpaper(chatKey, dataUrl);
         showToast('🎨 Обои установлены');
         vibrate(15);
+
+        setTimeout(function () { modal.remove(); }, 500);
       };
       img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
-  };
-  input.click();
+  });
+
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) modal.remove();
+  });
 }
 
 function removeChatWallpaper() {
@@ -1664,6 +1686,8 @@ function removeChatWallpaper() {
   setChatWallpaper(chatKey, null);
   showToast('🎨 Обои удалены');
   vibrate(10);
+  const modal = $('wallpaper-modal');
+  if (modal) modal.remove();
 }
 
 function renderChatList() {
@@ -1713,7 +1737,7 @@ function renderChatList() {
     empty.className = 'empty-state';
     if (state.showArchived) {
       empty.innerHTML = '<div class="big">📦</div>Архив пуст<br><br>' +
-        '<button style="background:var(--accent);color:#fff;border:none;padding:12px 24px;border-radius:var(--radius-md);font-weight:600;" onclick="toggleArchiveView()">← Назад</button>';
+        '<button style="background:var(--accent);color:#fff;border:none;padding:12px 24px;border-radius:14px;font-weight:600;" onclick="toggleArchiveView()">← Назад</button>';
     } else {
       empty.innerHTML = '<div class="big">👋</div>Пока никого нет.<br>Нажми <b>＋</b> и добавь друга или создай канал.';
     }
@@ -1777,7 +1801,7 @@ function renderContactItem(u) {
   const emojiStr = u.emojiStatus ? ' ' + u.emojiStatus : '';
   const isTyping = !!state.typingUsers[u.name];
   const preview = isTyping
-    ? '<span class="typing">печатает<span class="typing-dots"><span></span><span></span><span></span></span></span>'
+    ? '<span class="typing">печатает…</span>'
     : (unreadCount > 0 ? 'новое сообщение' : (u.online ? 'в сети' : 'был(а) недавно'));
   div.innerHTML = '<div class="avatar" style="' + style + '">' + content + onlineDot + '</div>' +
     '<div class="chat-info">' +
@@ -2222,7 +2246,7 @@ function scrollToMessage(id) {
   if (el) {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.style.transition = 'background 0.3s';
-    el.style.background = 'rgba(168, 85, 247, 0.2)';
+    el.style.background = 'rgba(139, 127, 255, 0.2)';
     setTimeout(function () { el.style.background = ''; }, 1000);
   }
 }
@@ -2953,7 +2977,7 @@ function renderCurrentStory() {
   else {
     av.style.backgroundImage = '';
     av.textContent = initials(u.firstName || u.username);
-    av.style.background = 'linear-gradient(135deg,#6d28d9,#a855f7)';
+    av.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
   }
   const displayName = (u.firstName || u.lastName)
     ? ((u.firstName || '') + ' ' + (u.lastName || '')).trim()
@@ -3175,7 +3199,7 @@ function openAddMembers() {
   const box = $('add-members-list');
   box.innerHTML = '';
   if (available.length === 0) {
-    box.innerHTML = '<div style="padding:20px;text-align:center;color:#7f91a4;">Все контакты уже в группе</div>';
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:#8b8b94;">Все контакты уже в группе</div>';
   } else {
     available.forEach(function (c) {
       const row = document.createElement('div');
@@ -3279,7 +3303,7 @@ function closeChannelChat() {
 function renderChannelPost(p) {
   const box = $('channel-posts');
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'margin-bottom:18px;padding:14px;background:var(--bg-panel);border-radius:var(--radius-md);border:var(--glass-border);';
+  wrap.style.cssText = 'margin-bottom:18px;padding:14px;background:var(--bg-panel);border-radius:14px;border:1px solid rgba(255,255,255,0.05);';
   let html = '';
   if (p.from_user !== state.me.username) {
     const authorContact = state.contacts.find(function (c) { return c.name === p.from_user; });
@@ -3291,7 +3315,7 @@ function renderChannelPost(p) {
       html += '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px;">📢 Я ' + myBadges + '</div>';
     }
   }
-  if (p.image) html += '<img src="' + p.image + '" style="max-width:100%;border-radius:var(--radius-md);margin-bottom:8px;display:block;">';
+  if (p.image) html += '<img src="' + p.image + '" style="max-width:100%;border-radius:14px;margin-bottom:8px;display:block;">';
   if (p.text) html += '<div style="font-size:15px;line-height:1.45;margin-bottom:8px;word-wrap:break-word;">' + escapeHtml(p.text) + '</div>';
   html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">' +
     '<button class="reaction-chip" onclick="socket.emit(\'view channel post\', {postId:' + p.id + '}); openChannelComments(' + p.id + ');">💬 ' + (p.commentCount || 0) + '</button>' +
@@ -3440,7 +3464,7 @@ function loadChannelComments(postId) {
     box.innerHTML = '';
     res.comments.forEach(function (c) {
       const div = document.createElement('div');
-      div.style.cssText = 'padding:10px 12px;background:var(--bg-input-inner);border-radius:var(--radius-md);margin-bottom:8px;';
+      div.style.cssText = 'padding:10px 12px;background:var(--bg-input);border-radius:12px;margin-bottom:8px;';
       const cContact = state.contacts.find(function (x) { return x.name === c.from_user; });
       const cBadges = renderBadges(cContact || {});
       div.innerHTML = '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:4px;">' + escapeHtml(displayNameForUser(c.from_user)) + ' ' + cBadges + '</div>' +
@@ -3482,7 +3506,7 @@ document.addEventListener('DOMContentLoaded', function () {
         : { query: q, withUser: state.currentChat };
       socket.emit('search messages', params, function (res) {
         if (!res || !res.ok || res.results.length === 0) {
-          results.innerHTML = '<div style="text-align:center;color:#7f91a4;padding:20px;">Ничего не найдено</div>';
+          results.innerHTML = '<div style="text-align:center;color:#8b8b94;padding:20px;">Ничего не найдено</div>';
           return;
         }
         results.innerHTML = '';
@@ -3574,7 +3598,6 @@ function chatMenuToggleArchive() {
   if (!key) return;
   socket.emit('toggle archive', { chatKey: key }, function () { closeModal('chat-menu-modal'); });
 }
-
 function openStarsHistory() {
   socket.emit('get stars', function (res) {
     if (!res || !res.ok) return;
@@ -3595,7 +3618,7 @@ function openStarsHistory() {
           label = '💸 Продажа ' + (g ? g.emoji + ' ' + g.name : gk);
         }
         const sign = t.amount > 0 ? '+' : '';
-        const color = t.amount > 0 ? '#22c55e' : '#ef4444';
+        const color = t.amount > 0 ? '#4ade80' : '#f87171';
         const div = document.createElement('div');
         div.className = 'session-item';
         div.innerHTML = '<div class="device">' + label + '</div>' +
@@ -3635,7 +3658,7 @@ function openGiftsCatalog(username) {
         state.giftsCatalog = r.catalog || {};
         openGiftsCatalog(username);
       } else {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:#ef4444;">Не удалось загрузить каталог</div>';
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:#f87171;">Не удалось загрузить каталог</div>';
       }
     });
     openModal('gifts-catalog-modal');
@@ -3771,7 +3794,7 @@ function loadGiftCodes() {
   socket.emit('list gift codes', function (res) {
     const box = $('gift-codes-list');
     if (!res || !res.ok) {
-      box.innerHTML = '<div style="text-align:center;padding:20px;color:#ef4444;">Нет доступа</div>';
+      box.innerHTML = '<div style="text-align:center;padding:20px;color:#f87171;">Нет доступа</div>';
       return;
     }
     if (res.codes.length === 0) {
@@ -3924,7 +3947,7 @@ function showCallScreen(peerName, contact, video, statusText) {
     } else {
       ba.style.backgroundImage = '';
       ba.textContent = initials(displayName);
-      ba.style.background = 'linear-gradient(135deg,#6d28d9,#a855f7)';
+      ba.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
     }
   }
   updateCallButtons();
@@ -3946,7 +3969,7 @@ socket.on('incoming-call', function (data) {
   } else {
     av.style.backgroundImage = '';
     av.textContent = initials(displayName);
-    av.style.background = 'linear-gradient(135deg,#6d28d9,#a855f7)';
+    av.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
   }
   $('incoming-screen').classList.add('active');
   playPing();
@@ -4435,7 +4458,7 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ azerta v10.6 — значки ✓ 🔨 💀 + фикс подарков + фикс контактов + фикс авторизации — загружена');
+console.log('✅ Azerta v11.0 — Clean Design + фикс контактов — загружена');
 
 (function initDoubleTap() {
   let lastTap = 0;
@@ -4523,5 +4546,5 @@ sendMsg = function () {
   if (!wasEmpty) vibrate(15);
 };
 
-console.log('🎬 Telegram-style animations loaded');
-console.log('✓ azerta v10.6 — ГОТОВО');
+console.log('🎬 Azerta animations loaded');
+console.log('✓ Azerta v11.0 — ГОТОВО');
