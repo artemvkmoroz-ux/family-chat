@@ -1,13 +1,10 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v10.2 — Client (полная поддержка ✓ 🔨 💀)
+   🌌 AURORA v10.3 — Client (полная поддержка ✓ 🔨 💀 + фикс подарков)
    ═══════════════════════════════════════════════════════════ */
 
-// Глобальная переменная для открытого профиля контакта
 var contactProfileCurrent = null;
-
-// 🔧 NEW: текущий выбранный тип значка в badge-modal
 var currentBadgeType = 'verified';
 
 const state = {
@@ -35,7 +32,7 @@ const state = {
   titleFlashInterval: null, myTypingTimeout: null, typingTimeouts: {},
   createSelected: new Set(), addMembersSelected: new Set(),
   currentColorTarget: null, toastTimeout: null, bootTimeoutId: null, isLoggedIn: false,
-  chatWallpapers: {},
+  chatWallpapers: {}, contactProfileCurrent: null,
 };
 
 const STORAGE = {
@@ -115,7 +112,6 @@ function displayNameForUser(username) {
   return c && c.displayName ? c.displayName : username;
 }
 
-// 🔧 NEW: Рендер значков (✓ 🔨 💀) — может быть несколько одновременно
 function renderBadges(user) {
   if (!user) return '';
   let html = '';
@@ -125,7 +121,6 @@ function renderBadges(user) {
   return html;
 }
 
-// 🔧 NEW: Рендер значков увеличенного размера (для профиля)
 function renderBadgesBig(user) {
   if (!user) return '';
   let html = '';
@@ -153,7 +148,6 @@ function vibrate(ms) {
   }
 }
 
-// ─── TOGGLE PASSWORD ───
 function togglePassword(inputId) {
   const input = $(inputId);
   if (!input) return;
@@ -168,7 +162,6 @@ function togglePassword(inputId) {
   vibrate(10);
 }
 
-// ─── SPINNER НА КНОПКАХ ───
 function showBtnSpinner(btnId, text) {
   const btn = $(btnId);
   if (!btn) return;
@@ -188,7 +181,6 @@ function hideBtnSpinner(btnId, text) {
   btn.disabled = false;
 }
 
-// ─── RIPPLE ───
 document.addEventListener('touchstart', function (e) {
   const btn = e.target.closest('.auth-btn-primary, .modal-primary, .modal-secondary, .modal-danger, .nav-btn, .create-menu-btn, .settings-item');
   if (!btn) return;
@@ -200,8 +192,6 @@ document.addEventListener('touchend', function (e) {
   setTimeout(function () { btn.style.transform = ''; }, 100);
 }, { passive: true });
 
-// ─── SPLASH ───
-const splashStart = now();
 let splashHidden = false;
 function hideSplash() {
   if (splashHidden) return;
@@ -215,7 +205,6 @@ function hideSplash() {
 setTimeout(hideSplash, 2000);
 setTimeout(hideSplash, 3000);
 
-// ─── ГЛОБАЛЬНЫЕ ОШИБКИ ───
 function showErrorScreen(text) {
   console.error('❌ Aurora error:', text);
   const screen = $('error-screen');
@@ -232,7 +221,6 @@ window.addEventListener('unhandledrejection', function (e) {
   showErrorScreen('Promise: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
 });
 
-// ─── SOCKET ───
 const socket = io({
   reconnection: true,
   reconnectionDelay: 1000,
@@ -240,7 +228,6 @@ const socket = io({
   reconnectionAttempts: Infinity,
 });
 
-// ─── MODAL HELPERS ───
 function openModal(id) { const m = $(id); if (m) m.classList.add('active'); }
 function closeModal(id) { const m = $(id); if (m) m.classList.remove('active'); }
 
@@ -249,8 +236,7 @@ document.querySelectorAll('.modal').forEach(function (m) {
     if (e.target === m) {
       m.classList.remove('active');
       if (m.id === 'contact-profile-modal') {
-        contactProfileCurrent = null;
-        state.contactProfileCurrent = null;
+        // НЕ сбрасываем contactProfileCurrent — может понадобиться для подарков
       }
     }
   });
@@ -262,7 +248,6 @@ function closeContactProfile() {
   state.contactProfileCurrent = null;
 }
 
-// ─── TOAST ───
 function showToast(text) {
   let toast = $('aurora-toast');
   if (!toast) {
@@ -276,7 +261,6 @@ function showToast(text) {
   state.toastTimeout = setTimeout(function () { toast.classList.remove('show'); }, 3000);
 }
 
-// ─── CONNECTION STATUS ───
 function setConnStatus(type, text) {
   const el = $('conn-status');
   const textEl = $('conn-text');
@@ -290,7 +274,6 @@ function hideConnStatus() {
   if (el) el.classList.remove('show');
 }
 
-// ─── АНИМАЦИЯ ВХОДА ───
 function playLoginTransition(username, firstName, isAutoLogin) {
   state.isLoggedIn = true;
   if (state.bootTimeoutId) { clearTimeout(state.bootTimeoutId); state.bootTimeoutId = null; }
@@ -350,7 +333,6 @@ function playLoginTransition(username, firstName, isAutoLogin) {
   }, 200);
 }
 
-// ─── AUTH SCREENS ───
 function switchAuthScreen(screen) {
   document.querySelectorAll('.auth-screen').forEach(function (s) { s.classList.remove('active'); });
   if (screen === 'login') {
@@ -377,11 +359,8 @@ function regShowStep(step) {
   if (backBtn) backBtn.classList.toggle('show', step > 1);
   document.querySelectorAll('.reg-step-card').forEach(function (el) {
     const s = Number(el.dataset.step);
-    if (s === step) {
-      el.classList.add('active');
-    } else {
-      el.classList.remove('active');
-    }
+    if (s === step) el.classList.add('active');
+    else el.classList.remove('active');
   });
   setTimeout(function () {
     if (step === 1) { const el = $('reg-username'); if (el) el.focus(); }
@@ -588,7 +567,6 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && p && document.activeElement === p) tryPasscode();
 });
 
-// ─── АВАРИЙНЫЙ ТАЙМАУТ ───
 function startBootTimeout() {
   if (state.bootTimeoutId) clearTimeout(state.bootTimeoutId);
   state.bootTimeoutId = setTimeout(function () {
@@ -608,7 +586,6 @@ function forceShowLogin() {
   state.isLoggedIn = false;
 }
 
-// ─── SOCKET CONNECT ───
 let autoLoginDone = false;
 
 async function tryAutoLogin() {
@@ -692,7 +669,6 @@ socket.io.on('reconnect', function () {
   if (state.isLoggedIn) loadStories();
 });
 
-// ─── УВЕДОМЛЕНИЯ ───
 function initNotifications() {
   if (!('Notification' in window)) return;
   if (Notification.permission === 'granted') state.notificationsAllowed = true;
@@ -740,7 +716,6 @@ function showBrowserNotification(from, text) {
   } catch (e) {}
 }
 
-// ─── TITLE ───
 function updateTitle() {
   const total = Object.values(state.unread).reduce(function (a, b) { return a + b; }, 0);
   if (total > 0) {
@@ -769,7 +744,6 @@ function updateTitle() {
   }
 }
 
-// ─── SETTINGS ───
 function applyLocalSettings() {
   const s = state.settings;
   if (s.theme === 'light') document.body.classList.add('light');
@@ -800,7 +774,6 @@ socket.on('stars updated', function (data) {
   if (state.activeTab === 'settings') renderSettingsTab();
 });
 
-// ─── TABS ───
 const TAB_TITLES = { chats: 'Aurora', calls: 'Звонки', contacts: 'Контакты', settings: 'Настройки' };
 
 function switchTab(tab) {
@@ -838,7 +811,6 @@ function renderCallsTab() {
   if (box) box.innerHTML = '';
 }
 
-// ─── SETTINGS SCREEN ───
 function openSettings() {
   $('settings-screen').classList.add('active');
   renderSettings();
@@ -914,7 +886,7 @@ function renderSettings() {
 
   html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.2<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.3<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
@@ -1113,7 +1085,6 @@ function confirmDeleteAccount() {
   });
 }
 
-// ─── ПРОФИЛЬ ───
 function openProfile() {
   $('profile-username').textContent = '@' + (state.me.username || '');
   $('my-first-name').value = state.me.firstName || '';
@@ -1205,7 +1176,6 @@ function updateVerifyChannelButton() {
   }
 }
 
-// 🔧 NEW: Открыть модалку выдачи значка
 function openBadgeModal() {
   $('badge-username').value = '';
   $('badge-error').textContent = '';
@@ -1213,7 +1183,6 @@ function openBadgeModal() {
   openModal('badge-modal');
 }
 
-// 🔧 NEW: Открыть модалку выдачи значка из профиля контакта
 function openBadgeModalForCurrent() {
   const u = (contactProfileCurrent && contactProfileCurrent.username) || (state.contactProfileCurrent && state.contactProfileCurrent.username);
   if (!u) return;
@@ -1224,7 +1193,6 @@ function openBadgeModalForCurrent() {
   openModal('badge-modal');
 }
 
-// 🔧 NEW: Выбор типа значка в модалке
 function selectBadgeType(type) {
   currentBadgeType = type;
   document.querySelectorAll('.badge-option').forEach(function (el) {
@@ -1236,17 +1204,14 @@ function selectBadgeType(type) {
   vibrate(10);
 }
 
-// 🔧 NEW: Выдать значок
 function giveBadgeAction() {
   const username = $('badge-username').value.trim().toLowerCase();
   const errEl = $('badge-error');
   errEl.textContent = '';
   if (!username) { errEl.textContent = 'Введи ник'; return; }
-
   const events = { verified: 'verify', hammer: 'give hammer', scam: 'give scam' };
   const event = events[currentBadgeType];
   if (!event) { errEl.textContent = 'Неизвестный значок'; return; }
-
   socket.emit(event, { username: username }, function (res) {
     if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('badge-modal');
@@ -1255,17 +1220,14 @@ function giveBadgeAction() {
   });
 }
 
-// 🔧 NEW: Снять значок
 function removeBadgeAction() {
   const username = $('badge-username').value.trim().toLowerCase();
   const errEl = $('badge-error');
   errEl.textContent = '';
   if (!username) { errEl.textContent = 'Введи ник'; return; }
-
   const events = { verified: 'unverify', hammer: 'remove hammer', scam: 'remove scam' };
   const event = events[currentBadgeType];
   if (!event) { errEl.textContent = 'Неизвестный значок'; return; }
-
   socket.emit(event, { username: username }, function (res) {
     if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('badge-modal');
@@ -1303,7 +1265,6 @@ socket.on('me updated', function (data) {
   if (state.activeTab === 'settings') renderSettingsTab();
 });
 
-// ─── КОНТАКТЫ ───
 function doAddContact() {
   const displayName = $('add-display-name').value.trim();
   const username = $('add-username').value.trim().toLowerCase();
@@ -1389,7 +1350,6 @@ function openContactProfile(username) {
     } else {
       giftBtn.style.display = 'none';
     }
-    // 🔧 NEW: кнопка управления значками (только для moroz)
     const badgeBtn = $('give-badge-to-contact-btn');
     if (badgeBtn) {
       if (state.me.username === 'moroz' && username !== state.me.username) {
@@ -1477,7 +1437,6 @@ function clearUnread(key) {
   }
 }
 
-// ─── ОБОИ ЧАТА ───
 function getChatWallpaper(chatKey) {
   if (!chatKey) return null;
   return state.chatWallpapers[chatKey] || null;
@@ -1485,11 +1444,8 @@ function getChatWallpaper(chatKey) {
 
 function setChatWallpaper(chatKey, dataUrl) {
   if (!chatKey) return;
-  if (dataUrl) {
-    state.chatWallpapers[chatKey] = dataUrl;
-  } else {
-    delete state.chatWallpapers[chatKey];
-  }
+  if (dataUrl) state.chatWallpapers[chatKey] = dataUrl;
+  else delete state.chatWallpapers[chatKey];
   saveJson(STORAGE.WALLPAPERS, state.chatWallpapers);
   applyChatWallpaper();
 }
@@ -1552,7 +1508,6 @@ function removeChatWallpaper() {
   vibrate(10);
 }
 
-// ─── CHAT LIST ───
 function renderChatList() {
   const box = $('chat-list');
   if (!box) return;
@@ -1678,7 +1633,6 @@ function renderContactItem(u) {
 
 function filterContacts() { renderChatList(); }
 
-// ─── ЧАТ ───
 function openChat(name) {
   state.currentChat = name;
   state.currentGroup = null;
@@ -1808,7 +1762,6 @@ function closeChat() {
   renderChatList();
 }
 
-// ─── SCROLL ───
 var scrollDownBound = false;
 function bindScrollDown() {
   const box = $('messages');
@@ -1849,7 +1802,6 @@ function bumpScrollDownBadge() {
   }
 }
 
-// ─── SWIPE REPLY ───
 function bindSwipeReply(msgDiv, wrap, msg) {
   if (msg.deleted) return;
   const icon = document.createElement('div');
@@ -1934,7 +1886,6 @@ function triggerReplyFromSwipe(msg) {
   }
 }
 
-// ─── RENDER MESSAGE ───
 function renderMessage(msg) {
   const box = $('messages');
   if (!box) return;
@@ -2109,10 +2060,6 @@ function renderMessage(msg) {
   box.scrollTop = box.scrollHeight;
 }
 
-// ═══════════════════════════════════════════════════════════
-// ⚠️ КОНЕЦ ЧАСТИ 1/4
-// Дальше: Часть 2/4 — начнётся с "function scrollToMessage(id)..."
-// ═══════════════════════════════════════════════════════════
 function scrollToMessage(id) {
   const el = document.querySelector('.msg-wrap[data-id="' + id + '"]');
   if (el) {
@@ -2151,7 +2098,6 @@ function renderReactionsInto(wrap, reactions, isGroup) {
   if (msgEl) msgEl.appendChild(bar);
 }
 
-// ─── REACTION / ACTION MENUS ───
 function showReactionMenu(e, messageId, wrap, isGroup) {
   state.activeReactionMsgId = messageId;
   state.activeReactionGroupId = isGroup && state.currentGroup ? state.currentGroup.id : null;
@@ -2273,12 +2219,11 @@ function actionPin() {
 }
 document.addEventListener('click', function (e) {
   const rm = $('reaction-menu');
-  if (rm.classList.contains('active') && !rm.contains(e.target)) hideReactionMenu();
+  if (rm && rm.classList.contains('active') && !rm.contains(e.target)) hideReactionMenu();
   const am = $('action-menu');
-  if (am.classList.contains('active') && !am.contains(e.target)) hideActionMenu();
+  if (am && am.classList.contains('active') && !am.contains(e.target)) hideActionMenu();
 });
 
-// ─── SEND ───
 function sendMsg() {
   const input = $('msgInput');
   const text = input.value.trim();
@@ -2321,7 +2266,6 @@ function updateTopStatusTyping() {
   }
 }
 
-// ─── PHOTO / VOICE / CIRCLE ───
 function sendPhoto(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -2512,7 +2456,6 @@ function cleanupCircle() {
   state.circleChunks = [];
 }
 
-// ─── STICKERS ───
 function loadStickerRecent() { state.stickerRecent = loadJson(STORAGE.RECENT_STICKERS, []) || []; }
 function saveStickerRecent() { saveJson(STORAGE.RECENT_STICKERS, state.stickerRecent.slice(0, 30)); }
 function pushStickerRecent(url) {
@@ -2728,7 +2671,6 @@ function submitGifUrl() {
   });
 }
 
-// ─── STORIES ───
 function loadStories() {
   socket.emit('load stories', function (res) {
     if (!res || !res.ok) return;
@@ -2986,7 +2928,6 @@ function openStoryViewers() {
   });
 }
 
-// ─── GROUPS ───
 function openCreateGroupModal() {
   if (!state.canCreateGroup) { alert('Ты уже создал группу. Максимум — одна.'); return; }
   if (state.contacts.length === 0) { alert('Сначала добавь контакты'); return; }
@@ -3127,11 +3068,7 @@ function confirmDeleteGroup() {
   });
 }
 
-// ═══════════════════════════════════════════════════════════
-// ⚠️ КОНЕЦ ЧАСТИ 2/4
-// Дальше: Часть 3/4 — начнётся с "// ─── CHANNELS ───"
-// ═══════════════════════════════════════════════════════════
-// ─── CHANNELS ───
+// ─── КАНАЛЫ ───
 function openCreateChannelModal() {
   if (!state.canCreateChannel) { alert('Ты уже создал канал. Максимум — один.'); return; }
   $('channel-slug').value = '';
@@ -3189,7 +3126,6 @@ function renderChannelPost(p) {
   wrap.style.cssText = 'margin-bottom:18px;padding:14px;background:var(--bg-panel);border-radius:var(--radius-md);border:var(--glass-border);';
   let html = '';
   if (p.from_user !== state.me.username) {
-    // 🔧 NEW: значки автора поста
     const authorContact = state.contacts.find(function (c) { return c.name === p.from_user; });
     const authorBadges = renderBadges(authorContact || {});
     html += '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px;">📢 ' + escapeHtml(displayNameForUser(p.from_user)) + ' ' + authorBadges + '</div>';
@@ -3349,7 +3285,6 @@ function loadChannelComments(postId) {
     res.comments.forEach(function (c) {
       const div = document.createElement('div');
       div.style.cssText = 'padding:10px 12px;background:var(--bg-input-inner);border-radius:var(--radius-md);margin-bottom:8px;';
-      // 🔧 NEW: значки автора комментария
       const cContact = state.contacts.find(function (x) { return x.name === c.from_user; });
       const cBadges = renderBadges(cContact || {});
       div.innerHTML = '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:4px;">' + escapeHtml(displayNameForUser(c.from_user)) + ' ' + cBadges + '</div>' +
@@ -3371,7 +3306,6 @@ function submitChannelComment() {
   });
 }
 
-// ─── SEARCH / GALLERY ───
 function openSearchInChat() {
   if (!state.currentChat && !state.currentGroup) return;
   $('search-input').value = '';
@@ -3457,7 +3391,6 @@ function openLightbox(src) {
   $('lightbox').classList.add('active');
 }
 
-// ─── CHAT MENU ───
 function currentChatKey() {
   return state.currentGroup ? 'g:' + state.currentGroup.id : state.currentChat;
 }
@@ -3486,7 +3419,7 @@ function chatMenuToggleArchive() {
   socket.emit('toggle archive', { chatKey: key }, function () { closeModal('chat-menu-modal'); });
 }
 
-// ─── STARS / GIFTS / CODES ───
+// ─── ЗВЁЗДЫ / ПОДАРКИ / КОДЫ ───
 function openStarsHistory() {
   socket.emit('get stars', function (res) {
     if (!res || !res.ok) return;
@@ -3520,50 +3453,82 @@ function openStarsHistory() {
   });
 }
 
+// 🔧 FIX: ФИКС ПОДАРКОВ
 function openGiftsCatalog(username) {
   if (!username) {
-    username = (contactProfileCurrent && contactProfileCurrent.username) || (state.contactProfileCurrent && state.contactProfileCurrent.username);
+    username = state.currentGiftTarget ||
+               (contactProfileCurrent && contactProfileCurrent.username) ||
+               (state.contactProfileCurrent && state.contactProfileCurrent.username);
   }
-  if (!username) return;
-  if (username === state.me.username) { alert('Себе дарить нельзя 🐎'); return; }
+  if (!username) {
+    showToast('⚠️ Не удалось определить получателя');
+    return;
+  }
+  if (username === state.me.username) { showToast('Себе дарить нельзя 🐎'); return; }
+
   state.currentGiftTarget = username;
+
   const contact = state.contacts.find(function (c) { return c.name === username; });
   const displayName = (contact && contact.displayName) || username;
   $('gifts-catalog-target').textContent = 'Кому: ' + displayName;
   $('gifts-catalog-balance').textContent = state.me.stars;
   $('gifts-catalog-error').textContent = '';
-  closeModal('contact-profile-modal');
+
   const grid = $('gifts-grid');
   grid.innerHTML = '';
   const entries = Object.entries(state.giftsCatalog);
   if (entries.length === 0) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted);">Каталог пуст</div>';
-  } else {
-    entries.forEach(function (entry) {
-      const key = entry[0], gift = entry[1];
-      const affordable = state.me.stars >= gift.price;
-      const div = document.createElement('div');
-      div.className = 'gift-card ' + (affordable ? 'affordable' : 'unaffordable');
-      div.innerHTML = '<span class="gift-emoji">' + gift.emoji + '</span>' +
-        '<span class="gift-name">' + gift.name + '</span>' +
-        '<span class="gift-price">' + gift.price + ' ⭐</span>';
-      if (affordable) div.onclick = function () { sendGift(key); };
-      grid.appendChild(div);
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted);">Загрузка каталога...</div>';
+    socket.emit('get gifts catalog', function (r) {
+      if (r && r.ok) {
+        state.giftsCatalog = r.catalog || {};
+        openGiftsCatalog(username);
+      } else {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:#ef4444;">Не удалось загрузить каталог</div>';
+      }
     });
+    openModal('gifts-catalog-modal');
+    closeModal('contact-profile-modal');
+    return;
   }
+  entries.forEach(function (entry) {
+    const key = entry[0], gift = entry[1];
+    const affordable = state.me.stars >= gift.price;
+    const div = document.createElement('div');
+    div.className = 'gift-card ' + (affordable ? 'affordable' : 'unaffordable');
+    div.innerHTML = '<span class="gift-emoji">' + gift.emoji + '</span>' +
+      '<span class="gift-name">' + gift.name + '</span>' +
+      '<span class="gift-price">' + gift.price + ' ⭐</span>';
+    if (affordable) div.onclick = function () { sendGift(key); };
+    grid.appendChild(div);
+  });
   openModal('gifts-catalog-modal');
+  closeModal('contact-profile-modal');
 }
 
+// 🔧 FIX: ФИКС ОТПРАВКИ ПОДАРКА
 function sendGift(giftKey) {
   const gift = state.giftsCatalog[giftKey];
-  if (!gift) return;
+  if (!gift) { showToast('⚠️ Подарок не найден'); return; }
+
+  const to = state.currentGiftTarget;
+  if (!to) { showToast('⚠️ Не выбран получатель'); return; }
+  if (to === state.me.username) { showToast('Себе дарить нельзя 🐎'); return; }
+
   if (!confirm('Подарить ' + gift.emoji + ' ' + gift.name + ' за ' + gift.price + ' ⭐?')) return;
+
   const errEl = $('gifts-catalog-error');
   errEl.textContent = '';
-  socket.emit('send gift', { to: state.currentGiftTarget, giftKey: giftKey }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+
+  socket.emit('send gift', { to: to, giftKey: giftKey }, function (res) {
+    if (!res || !res.ok) {
+      errEl.textContent = (res && res.error) || 'Ошибка при отправке';
+      showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+      return;
+    }
     closeModal('gifts-catalog-modal');
     showToast('🎁 Подарок отправлен! -' + gift.price + ' ⭐');
+    state.currentGiftTarget = null;
   });
 }
 
@@ -3605,11 +3570,23 @@ function sellGift(giftId) {
   });
 }
 
+// 🔧 FIX: обработка полученного подарка
 socket.on('gift received', function (payload) {
-  const gift = state.giftsCatalog[payload.gift_key];
-  const contact = state.contacts.find(function (c) { return c.name === payload.from_user; });
-  const fromName = (contact && contact.displayName) || payload.from_user;
-  if (gift) showToast('🎁 ' + fromName + ' подарил: ' + gift.emoji + ' ' + gift.name + '!');
+  const giftKey = payload.gift_key || payload.giftKey;
+  const gift = state.giftsCatalog[giftKey];
+  const fromUser = payload.from_user || payload.from;
+  const contact = state.contacts.find(function (c) { return c.name === fromUser; });
+  const fromName = (contact && contact.displayName) || fromUser;
+  if (gift) {
+    showToast('🎁 ' + fromName + ' подарил: ' + gift.emoji + ' ' + gift.name + '!');
+    playPing();
+    vibrate();
+  } else {
+    showToast('🎁 ' + fromName + ' подарил подарок!');
+    socket.emit('get gifts catalog', function (r) {
+      if (r && r.ok) state.giftsCatalog = r.catalog || {};
+    });
+  }
 });
 
 socket.on('my gifts updated', function () {
@@ -3679,7 +3656,7 @@ function copyText(text) {
   navigator.clipboard.writeText(text).then(function () { showToast('📋 Скопировано'); }).catch(function () {});
 }
 
-// ─── CALLS ───
+// ─── ЗВОНКИ ───
 var RTC_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -3777,7 +3754,6 @@ async function startCall(video) {
 }
 
 function showCallScreen(peerName, contact, video, statusText) {
-  // 🔧 NEW: значки собеседника в звонке
   const badges = renderBadgesBig(contact || {});
   const displayName = (contact && contact.displayName) || peerName;
   $('call-peer-name').innerHTML = escapeHtml(displayName) + ' ' + badges;
@@ -3814,7 +3790,6 @@ socket.on('incoming-call', function (data) {
   state.pendingOffer = data.offer;
   const contact = state.contacts.find(function (c) { return c.name === data.from; });
   const displayName = (contact && contact.displayName) || data.from;
-  // 🔧 NEW: значки звонящего
   const badges = renderBadgesBig(contact || {});
   $('incoming-name').innerHTML = escapeHtml(displayName) + ' ' + badges;
   $('incoming-type').textContent = data.video ? 'Видеозвонок' : 'Аудиозвонок';
@@ -3938,11 +3913,7 @@ function hangUp() {
   cleanupCall();
 }
 
-// ═══════════════════════════════════════════════════════════
-// ⚠️ КОНЕЦ ЧАСТИ 3/4
-// Дальше: Часть 4/4 — начнётся с "// ─── SOCKET EVENTS — MESSAGES ───"
-// ═══════════════════════════════════════════════════════════
-// ─── SOCKET EVENTS — MESSAGES ───
+// ─── SOCKET EVENTS ───
 socket.on('history', function (data) {
   if (state.galleryWaiting) { fillGallery(data.messages); state.galleryWaiting = false; return; }
   if (data.withUser !== state.currentChat) return;
@@ -4038,7 +4009,6 @@ socket.on('private message', function (data) {
         self: false, replyData: data.replyData
       });
       clearUnread(data.from);
-      // 🔧 smooth scroll
       setTimeout(function () {
         const box = $('messages');
         if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
@@ -4107,7 +4077,6 @@ socket.on('group message', function (data) {
         self: false, senderName: displayNameForUser(data.from), isGroup: true, replyData: data.replyData
       });
       clearUnread('g:' + data.groupId);
-      // 🔧 smooth scroll
       setTimeout(function () {
         const box = $('messages');
         if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
@@ -4256,7 +4225,6 @@ socket.on('account deleted', function () {
   location.reload();
 });
 
-// 🔧 NEW: обновление значка друга в реальном времени
 socket.on('friend updated', function (data) {
   if (!data || !data.username) return;
   const c = state.contacts.find(function (x) { return x.name === data.username; });
@@ -4269,7 +4237,6 @@ socket.on('friend updated', function (data) {
     renderChatList();
     if (state.activeTab === 'contacts') renderContactsTab();
     if (state.currentChat === data.username) {
-      // обновляем шапку чата
       const badges = renderBadgesBig(c);
       const displayName = c.displayName || c.name;
       const nameEl = $('chat-top-name');
@@ -4278,7 +4245,6 @@ socket.on('friend updated', function (data) {
   }
 });
 
-// ─── ИНИЦИАЛИЗАЦИЯ ───
 window.addEventListener('load', function () {
   loadUnread();
   initNotifications();
@@ -4324,11 +4290,7 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Aurora v10.2 — значки ✓ 🔨 💀 — загружена');
-
-// ═══════════════════════════════════════════════════════════
-// 🎬 TELEGRAM-STYLE ANIMATIONS
-// ═══════════════════════════════════════════════════════════
+console.log('✅ Aurora v10.3 — значки ✓ 🔨 💀 + фикс подарков — загружена');
 
 // ─── ДВОЙНОЙ ТАП = БЫСТРАЯ РЕАКЦИЯ ❤️ ───
 (function initDoubleTap() {
@@ -4368,7 +4330,6 @@ console.log('✅ Aurora v10.2 — значки ✓ 🔨 💀 — загруже�
   });
 })();
 
-// ─── АНИМАЦИЯ ОТПРАВКИ СООБЩЕНИЯ ───
 var _origRenderMessage = renderMessage;
 renderMessage = function (msg) {
   _origRenderMessage(msg);
@@ -4382,79 +4343,6 @@ renderMessage = function (msg) {
   }
 };
 
-// ─── ПРЕВЬЮ СТИКЕРА (долгий тап) ───
-(function initStickerPreview() {
-  let pressTimer = null;
-  let previewEl = null;
-
-  function showPreview(img) {
-    if (previewEl) previewEl.remove();
-    previewEl = document.createElement('div');
-    previewEl.className = 'sticker-preview';
-
-    let clone;
-    if (img.tagName === 'VIDEO') {
-      clone = document.createElement('video');
-      clone.src = img.src;
-      clone.autoplay = true;
-      clone.loop = true;
-      clone.muted = true;
-      clone.playsInline = true;
-    } else {
-      clone = document.createElement('img');
-      clone.src = img.src;
-    }
-    previewEl.appendChild(clone);
-    document.body.appendChild(previewEl);
-
-    requestAnimationFrame(function () { previewEl.classList.add('active'); });
-    vibrate(20);
-  }
-
-  function hidePreview() {
-    if (previewEl) {
-      previewEl.classList.remove('active');
-      const el = previewEl;
-      previewEl = null;
-      setTimeout(function () {
-        if (el && el.parentNode) el.remove();
-      }, 300);
-    }
-  }
-
-  document.addEventListener('touchstart', function (e) {
-    const stickerItem = e.target.closest('.sticker-item');
-    if (!stickerItem) return;
-    const img = stickerItem.querySelector('img, video');
-    if (!img) return;
-    pressTimer = setTimeout(function () { showPreview(img); }, 400);
-  }, { passive: true });
-
-  document.addEventListener('touchend', function () {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    hidePreview();
-  });
-
-  document.addEventListener('touchmove', function () {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    hidePreview();
-  });
-
-  document.addEventListener('mousedown', function (e) {
-    const stickerItem = e.target.closest('.sticker-item');
-    if (!stickerItem) return;
-    const img = stickerItem.querySelector('img, video');
-    if (!img) return;
-    pressTimer = setTimeout(function () { showPreview(img); }, 400);
-  });
-
-  document.addEventListener('mouseup', function () {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    hidePreview();
-  });
-})();
-
-// ─── ПЛАВНАЯ ОТПРАВКА СТИКЕРА ───
 var _origSendSticker = sendSticker;
 sendSticker = function (url, type) {
   if (!url) return;
@@ -4470,21 +4358,6 @@ sendSticker = function (url, type) {
   _origSendSticker(url, type);
 };
 
-// ─── BADGE PULSE ───
-function updateBadgePulse() {
-  document.querySelectorAll('.chat-badge').forEach(function (badge) {
-    if (!badge.classList.contains('pulse')) {
-      badge.classList.add('pulse');
-    }
-  });
-}
-
-const badgeObserver = new MutationObserver(function () {
-  updateBadgePulse();
-});
-badgeObserver.observe(document.body, { childList: true, subtree: true });
-
-// ─── ПЛАВНОЕ ПОЯВЛЕНИЕ ПАНЕЛИ СТИКЕРОВ ───
 var _origOpenStickers = openStickersPanel;
 openStickersPanel = function () {
   _origOpenStickers();
@@ -4498,7 +4371,6 @@ openStickersPanel = function () {
   }
 };
 
-// ─── ВИБРАЦИЯ ПРИ ОТПРАВКЕ ───
 var _origSendMsg = sendMsg;
 sendMsg = function () {
   const input = document.getElementById('msgInput');
@@ -4508,4 +4380,4 @@ sendMsg = function () {
 };
 
 console.log('🎬 Telegram-style animations loaded');
-console.log('✓ Aurora v10.2 — ГОТОВО. Значки: ✓ 🔨 💀 (только moroz)');
+console.log('✓ Aurora v10.3 — ГОТОВО');
