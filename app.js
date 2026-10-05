@@ -1,11 +1,15 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v10.5 — Client (ФИКС добавления контактов)
+   🌌 AURORA v10.6 — Client
+   ✓ ФИКС: "Не авторизован" при добавлении контакта
+   ✓ ФИКС: auto-login при истёкшей сессии
+   ✓ ФИКС: принудительный показ авторизации
    ═══════════════════════════════════════════════════════════ */
 
 var contactProfileCurrent = null;
 var currentBadgeType = 'verified';
+var isLoggedInOnServer = false; // 🔧 NEW: флаг серверной авторизации
 
 const state = {
   me: { username: null, avatar: null, verified: false, bio: '', firstName: '', lastName: '', birthday: '', emoji: '', stars: 0, sessionId: null, hammer: false, scam: false },
@@ -272,6 +276,7 @@ function hideConnStatus() {
 
 function playLoginTransition(username, firstName, isAutoLogin) {
   state.isLoggedIn = true;
+  isLoggedInOnServer = true; // 🔧 NEW
   const authEl = $('auth');
   const appEl = $('app');
   const flashEl = $('welcome-flash');
@@ -325,6 +330,26 @@ function playLoginTransition(username, firstName, isAutoLogin) {
     renderStoriesBar();
     applyChatWallpaper();
   }, 200);
+}
+
+// 🔧 NEW: принудительно показать экран входа
+function forceShowAuth(message) {
+  console.warn('🔒 Принудительный выход:', message || '');
+  isLoggedInOnServer = false;
+  state.isLoggedIn = false;
+  state.me.username = null;
+  state.me.sessionId = null;
+  // НЕ удаляем session из localStorage — вдруг она рабочая
+  // Но чистим кэши
+  const appEl = $('app'); if (appEl) appEl.classList.remove('active');
+  const chatEl = $('chat-screen'); if (chatEl) chatEl.classList.remove('active');
+  const authEl = $('auth'); if (authEl) {
+    authEl.classList.remove('auth-exit');
+    authEl.classList.add('active');
+  }
+  const passEl = $('passcode-screen'); if (passEl) passEl.classList.remove('active');
+  hideSplash();
+  showToast('⚠️ ' + (message || 'Войди заново'));
 }
 
 function switchAuthScreen(screen) {
@@ -568,6 +593,7 @@ function forceShowLogin() {
   $('app').classList.remove('active');
   $('auth').classList.add('active');
   state.isLoggedIn = false;
+  isLoggedInOnServer = false;
 }
 
 let autoLoginDone = false;
@@ -580,6 +606,7 @@ async function tryAutoLogin() {
     const timeoutId = setTimeout(function () {
       if (resolved) return;
       resolved = true;
+      console.log('⏱ Auto-login timeout');
       resolve(false);
     }, 6000);
     socket.emit('login with session', { sessionId: creds.sessionId }, function (res) {
@@ -587,7 +614,10 @@ async function tryAutoLogin() {
       resolved = true;
       clearTimeout(timeoutId);
       if (!res || !res.ok) {
+        console.log('❌ Auto-login failed:', res && res.error);
         localStorage.removeItem(STORAGE.SESSION);
+        // 🔧 ФИКС: принудительно показываем экран входа
+        forceShowAuth('Сессия истекла — войди заново');
         resolve(false);
         return;
       }
@@ -626,7 +656,13 @@ socket.on('connect', async function () {
   state.reconnectAttempts = 0;
   if (autoLoginDone) return;
   const ok = await tryAutoLogin();
-  if (!ok) $('auth').classList.add('active');
+  if (!ok) {
+    // 🔧 ФИКС: убеждаемся, что приложение закрыто, а авторизация открыта
+    $('app').classList.remove('active');
+    $('auth').classList.add('active');
+    state.isLoggedIn = false;
+    isLoggedInOnServer = false;
+  }
   autoLoginDone = true;
 });
 
@@ -869,7 +905,7 @@ function renderSettings() {
 
   html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.5<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.6<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
@@ -1249,15 +1285,45 @@ socket.on('me updated', function (data) {
 });
 
 // ═══════════════════════════════════════════════════════════
+// 🔧 ФИКС: проверка авторизации на сервере перед действиями
+// ═══════════════════════════════════════════════════════════
+
+function ensureAuthorized(callback) {
+  if (!isLoggedInOnServer || !state.me.username) {
+    // Проверяем — может, сессия есть
+    const creds = loadJson(STORAGE.SESSION);
+    if (creds && creds.sessionId) {
+      console.log('🔄 Проверяю сессию...');
+      socket.emit('login with session', { sessionId: creds.sessionId }, function (res) {
+        if (res && res.ok) {
+          isLoggedInOnServer = true;
+          state.me.username = res.username;
+          if (callback) callback(true);
+        } else {
+          console.warn('❌ Сессия недействительна');
+          forceShowAuth('Сессия истекла');
+          if (callback) callback(false);
+        }
+      });
+    } else {
+      console.warn('❌ Нет сессии');
+      forceShowAuth('Войди заново');
+      if (callback) callback(false);
+    }
+    return false;
+  }
+  if (callback) callback(true);
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════
 // 🔧 ФИКС ДОБАВЛЕНИЯ КОНТАКТОВ
 // ═══════════════════════════════════════════════════════════
 
-// Открыть модалку добавления контакта с автофокусом
 function openAddContactModal() {
   $('add-display-name').value = '';
   $('add-username').value = '';
   $('add-error').textContent = '';
-  // Визуально убираем старые ошибки
   $('add-display-name').classList.remove('input-error');
   $('add-username').classList.remove('input-error');
   openModal('add-modal');
@@ -1267,8 +1333,15 @@ function openAddContactModal() {
   }, 150);
 }
 
-// 🔧 ФИКС: добавление контакта с проверкой и принудительным обновлением
 function doAddContact() {
+  // 🔧 ФИКС: сначала проверяем авторизацию
+  ensureAuthorized(function (ok) {
+    if (!ok) return;
+    doAddContactReal();
+  });
+}
+
+function doAddContactReal() {
   const nameInput = $('add-display-name');
   const userInput = $('add-username');
   const errEl = $('add-error');
@@ -1280,7 +1353,6 @@ function doAddContact() {
   nameInput.classList.remove('input-error');
   userInput.classList.remove('input-error');
 
-  // Валидация на клиенте
   if (!displayName) {
     errEl.textContent = '⚠️ Введи имя';
     nameInput.classList.add('input-error');
@@ -1309,42 +1381,52 @@ function doAddContact() {
     return;
   }
 
-  // Показываем индикатор загрузки
   errEl.innerHTML = '<span style="color:var(--accent);">⏳ Добавляю…</span>';
 
   socket.emit('add contact', { username: username, displayName: displayName }, function (res) {
     if (!res || !res.ok) {
       errEl.textContent = '❌ ' + ((res && res.error) || 'Ошибка');
+      // 🔧 ФИКС: если "Не авторизован" — показываем экран входа
+      if (res && res.error && res.error.indexOf('авторизован') !== -1) {
+        setTimeout(function () {
+          closeModal('add-modal');
+          forceShowAuth('Сессия истекла');
+        }, 1500);
+      }
       vibrate([30, 20, 30]);
       return;
     }
 
-    // ✅ УСПЕХ
     nameInput.value = '';
     userInput.value = '';
     errEl.textContent = '';
 
+    // 🔧 ФИКС: если сервер вернул список — обновляем сразу
+    if (res.contacts && Array.isArray(res.contacts)) {
+      state.contacts = res.contacts;
+      saveJson(STORAGE.CONTACTS_CACHE, state.contacts);
+      renderChatList();
+      if (state.activeTab === 'contacts') renderContactsTab();
+    } else {
+      // fallback — запрашиваем через 500мс
+      setTimeout(function () {
+        socket.emit('get contacts', function (list) {
+          if (list && Array.isArray(list)) {
+            state.contacts = list;
+            saveJson(STORAGE.CONTACTS_CACHE, state.contacts);
+            renderChatList();
+            if (state.activeTab === 'contacts') renderContactsTab();
+          }
+        });
+      }, 500);
+    }
+
     closeModal('add-modal');
     showToast('✓ ' + displayName + ' добавлен');
-
-    // 🔧 ФИКС: принудительно запрашиваем обновлённый список контактов
-    // (на случай если сервер не успел прислать автоматически)
-    setTimeout(function () {
-      socket.emit('get contacts', function (list) {
-        if (list && Array.isArray(list)) {
-          state.contacts = list;
-          saveJson(STORAGE.CONTACTS_CACHE, state.contacts);
-          renderChatList();
-          if (state.activeTab === 'contacts') renderContactsTab();
-        }
-      });
-    }, 500);
-
     vibrate([50, 30, 50]);
   });
 }
 
-// Enter в полях добавления контакта
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && $('add-modal').classList.contains('active')) {
     const active = document.activeElement;
@@ -1355,7 +1437,6 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-// Открыть список контактов с кнопкой обновления
 function renderContactsTab() {
   const box = $('contacts-list');
   if (!box) return;
@@ -4354,7 +4435,7 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Aurora v10.5 — значки ✓ 🔨 💀 + фикс подарков + фикс контактов + без "Долго грузимся" — загружена');
+console.log('✅ Aurora v10.6 — значки ✓ 🔨 💀 + фикс подарков + фикс контактов + фикс авторизации — загружена');
 
 (function initDoubleTap() {
   let lastTap = 0;
@@ -4443,4 +4524,4 @@ sendMsg = function () {
 };
 
 console.log('🎬 Telegram-style animations loaded');
-console.log('✓ Aurora v10.5 — ГОТОВО');
+console.log('✓ Aurora v10.6 — ГОТОВО');
