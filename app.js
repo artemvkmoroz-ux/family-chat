@@ -1,7 +1,9 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AURORA v10.3 — Client (полная поддержка ✓ 🔨 💀 + фикс подарков)
+   🌌 AURORA v10.4 — Client (плашка "Долго грузимся" убрана)
+   ✓ Галочка / 🔨 Молоток / 💀 Скам
+   ✓ Фикс подарков
    ═══════════════════════════════════════════════════════════ */
 
 var contactProfileCurrent = null;
@@ -66,7 +68,6 @@ const BUILTIN_GIFS = [
   { emoji: '👏', url: 'https://media.giphy.com/media/7rj2ZgttvgomY/giphy.gif' },
 ];
 
-// ─── УТИЛИТЫ ───
 function $(id) { return document.getElementById(id); }
 
 function escapeHtml(s) {
@@ -235,9 +236,6 @@ document.querySelectorAll('.modal').forEach(function (m) {
   m.addEventListener('click', function (e) {
     if (e.target === m) {
       m.classList.remove('active');
-      if (m.id === 'contact-profile-modal') {
-        // НЕ сбрасываем contactProfileCurrent — может понадобиться для подарков
-      }
     }
   });
 });
@@ -276,13 +274,11 @@ function hideConnStatus() {
 
 function playLoginTransition(username, firstName, isAutoLogin) {
   state.isLoggedIn = true;
-  if (state.bootTimeoutId) { clearTimeout(state.bootTimeoutId); state.bootTimeoutId = null; }
   const authEl = $('auth');
   const appEl = $('app');
   const flashEl = $('welcome-flash');
   const toastEl = $('welcome-toast');
   hideSplash();
-  const bootEl = $('boot-timeout'); if (bootEl) bootEl.classList.remove('active');
   const passEl = $('passcode-screen'); if (passEl) passEl.classList.remove('active');
 
   if (authEl && authEl.classList.contains('active')) {
@@ -567,19 +563,13 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && p && document.activeElement === p) tryPasscode();
 });
 
+// 🔧 УБРАНО: плашка «Долго грузимся» полностью отключена
 function startBootTimeout() {
-  if (state.bootTimeoutId) clearTimeout(state.bootTimeoutId);
-  state.bootTimeoutId = setTimeout(function () {
-    if (!state.isLoggedIn && !$('app').classList.contains('active')) {
-      const bootEl = $('boot-timeout');
-      if (bootEl) bootEl.classList.add('active');
-    }
-  }, 8000);
+  // пусто
 }
 
+// 🔧 УБРАНО: ссылка на boot-timeout убрана
 function forceShowLogin() {
-  const bootEl = $('boot-timeout');
-  if (bootEl) bootEl.classList.remove('active');
   localStorage.removeItem(STORAGE.SESSION);
   $('app').classList.remove('active');
   $('auth').classList.add('active');
@@ -886,7 +876,7 @@ function renderSettings() {
 
   html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.3<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Aurora v10.4<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
@@ -3068,7 +3058,6 @@ function confirmDeleteGroup() {
   });
 }
 
-// ─── КАНАЛЫ ───
 function openCreateChannelModal() {
   if (!state.canCreateChannel) { alert('Ты уже создал канал. Максимум — один.'); return; }
   $('channel-slug').value = '';
@@ -3419,7 +3408,6 @@ function chatMenuToggleArchive() {
   socket.emit('toggle archive', { chatKey: key }, function () { closeModal('chat-menu-modal'); });
 }
 
-// ─── ЗВЁЗДЫ / ПОДАРКИ / КОДЫ ───
 function openStarsHistory() {
   socket.emit('get stars', function (res) {
     if (!res || !res.ok) return;
@@ -3453,7 +3441,6 @@ function openStarsHistory() {
   });
 }
 
-// 🔧 FIX: ФИКС ПОДАРКОВ
 function openGiftsCatalog(username) {
   if (!username) {
     username = state.currentGiftTarget ||
@@ -3506,7 +3493,6 @@ function openGiftsCatalog(username) {
   closeModal('contact-profile-modal');
 }
 
-// 🔧 FIX: ФИКС ОТПРАВКИ ПОДАРКА
 function sendGift(giftKey) {
   const gift = state.giftsCatalog[giftKey];
   if (!gift) { showToast('⚠️ Подарок не найден'); return; }
@@ -3570,7 +3556,6 @@ function sellGift(giftId) {
   });
 }
 
-// 🔧 FIX: обработка полученного подарка
 socket.on('gift received', function (payload) {
   const giftKey = payload.gift_key || payload.giftKey;
   const gift = state.giftsCatalog[giftKey];
@@ -3656,7 +3641,6 @@ function copyText(text) {
   navigator.clipboard.writeText(text).then(function () { showToast('📋 Скопировано'); }).catch(function () {});
 }
 
-// ─── ЗВОНКИ ───
 var RTC_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -3913,7 +3897,6 @@ function hangUp() {
   cleanupCall();
 }
 
-// ─── SOCKET EVENTS ───
 socket.on('history', function (data) {
   if (state.galleryWaiting) { fillGallery(data.messages); state.galleryWaiting = false; return; }
   if (data.withUser !== state.currentChat) return;
@@ -4290,9 +4273,8 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Aurora v10.3 — значки ✓ 🔨 💀 + фикс подарков — загружена');
+console.log('✅ Aurora v10.4 — значки ✓ 🔨 💀 + фикс подарков + без "Долго грузимся" — загружена');
 
-// ─── ДВОЙНОЙ ТАП = БЫСТРАЯ РЕАКЦИЯ ❤️ ───
 (function initDoubleTap() {
   let lastTap = 0;
   let lastMsgId = null;
@@ -4380,4 +4362,4 @@ sendMsg = function () {
 };
 
 console.log('🎬 Telegram-style animations loaded');
-console.log('✓ Aurora v10.3 — ГОТОВО');
+console.log('✓ Aurora v10.4 — ГОТОВО');
