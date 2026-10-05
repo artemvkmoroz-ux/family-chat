@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Azerta</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f0a1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Azerta">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══ SPLASH ═══ -->
+<div id="splash-screen">
+  <div id="splash-logo">
+    <img id="splash-icon" src="icon-192.png" alt="" onerror="this.style.display='none'; this.parentNode.textContent='🌌';">
+  </div>
+  <div id="splash-title">AZERTA</div>
+  <div id="splash-subtitle">premium messenger</div>
+  <div id="splash-loader"></div>
+</div>
+
+<!-- ═══ ERROR SCREEN ═══ -->
+<div id="error-screen">
+  <div class="icon">😢</div>
+  <h2>Azerta сломалась</h2>
+  <p>Скопируй текст ниже и покажи разработчику:</p>
+  <pre id="error-text"></pre>
+  <button onclick="location.reload()">🔄 Перезагрузить</button>
+</div>
+
+<!-- ═══ PASSCODE ═══ -->
+<div id="passcode-screen">
+  <div class="lock">🔒</div>
+  <input id="passcode-input" type="password" inputmode="numeric" maxlength="12" placeholder="••••" />
+  <button onclick="tryPasscode()">Войти</button>
+  <div class="err" id="passcode-error"></div>
+</div>
+
+<!-- ═══ NOTIF BANNER ═══ -->
+<div id="notif-banner">
+  <span>🔔 Включить уведомления?</span>
+  <button onclick="enableNotifications()">Включить</button>
+</div>
+
+<!-- ═══ AUTH ═══ -->
+<div id="auth">
+
+  <div class="auth-bg">
+    <div class="auth-blob auth-blob-1"></div>
+    <div class="auth-blob auth-blob-2"></div>
+    <div class="auth-blob auth-blob-3"></div>
+  </div>
+
+  <div id="auth-login-screen" class="auth-screen active">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="auth-logo-inner">🌌</div>
+      </div>
+      <h1 class="auth-title">Azerta</h1>
+      <p class="auth-subtitle">Твой премиум-мессенджер</p>
+
+      <div class="auth-input-group">
+        <input id="login-username" class="auth-input" placeholder=" " autocapitalize="none" autocomplete="username" />
+        <label class="auth-label" for="login-username">Ник</label>
+        <span class="auth-input-icon">👤</span>
+      </div>
+
+      <div class="auth-input-group">
+        <input id="login-password" class="auth-input" type="password" placeholder=" " autocomplete="current-password" />
+        <label class="auth-label" for="login-password">Пароль</label>
+        <span class="auth-input-icon">🔒</span>
+        <button type="button" class="auth-toggle-password" onclick="togglePassword('login-password')">👁</button>
+      </div>
+
+      <div class="auth-err" id="login-error"></div>
+
+      <button class="auth-btn-primary" id="login-btn" onclick="doLogin()">
+        <span class="btn-text">Войти</span>
+        <span class="btn-spinner" style="display:none;">
+          <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </span>
+      </button>
+
+      <button class="auth-btn-link" onclick="switchAuthScreen('register')">
+        Нет аккаунта? <span>Зарегистрироваться</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="auth-register-screen" class="auth-screen">
+    <div class="reg-top-bar">
+      <button class="reg-back-btn" id="reg-back-btn" onclick="regBack()">
+        <span>‹</span>
+      </button>
+      <div class="reg-progress">
+        <div class="reg-progress-seg active" data-step="1"></div>
+        <div class="reg-progress-seg" data-step="2"></div>
+        <div class="reg-progress-seg" data-step="3"></div>
+      </div>
+    </div>
+
+    <div class="auth-card reg-step-card active" data-step="1">
+      <div class="auth-logo">
+        <div class="auth-logo-inner">✨</div>
+      </div>
+      <h1 class="auth-title">Придумай ник</h1>
+      <p class="auth-subtitle">Латиница, цифры и _</p>
+
+      <div class="auth-input-group reg-username-group" id="reg-username-wrap">
+        <span class="auth-input-prefix">@</span>
+        <input id="reg-username" class="auth-input" placeholder=" " autocapitalize="none" autocomplete="off" maxlength="20" oninput="onRegUsernameInput()" />
+        <label class="auth-label" for="reg-username">username</label>
+        <span class="reg-status" id="reg-username-status"></span>
+      </div>
+      <div class="auth-hint" id="reg-username-hint">Минимум 3 символа</div>
+
+      <div class="auth-err" id="reg-error-1"></div>
+
+      <button class="auth-btn-primary" id="reg-next-1" onclick="regNext(1)" disabled>
+        <span class="btn-text">Далее</span>
+        <span class="btn-arrow">→</span>
+      </button>
+
+      <button class="auth-btn-link" onclick="switchAuthScreen('login')">
+        Уже есть аккаунт? <span>Войти</span>
+      </button>
+    </div>
+
+    <div class="auth-card reg-step-card" data-step="2">
+      <div class="auth-logo">
+        <div class="auth-logo-inner">👋</div>
+      </div>
+      <h1 class="auth-title">Как тебя зовут?</h1>
+      <p class="auth-subtitle">Так тебя увидят другие</p>
+
+      <div class="auth-input-group">
+        <input id="reg-displayname" class="auth-input" placeholder=" " maxlength="40" autocomplete="name" />
+        <label class="auth-label" for="reg-displayname">Имя</label>
+        <span class="auth-input-icon">💫</span>
+      </div>
+      <div class="auth-hint">Можно изменить позже в настройках</div>
+
+      <div class="auth-err" id="reg-error-2"></div>
+
+      <button class="auth-btn-primary" id="reg-next-2" onclick="regNext(2)">
+        <span class="btn-text">Далее</span>
+        <span class="btn-arrow">→</span>
+      </button>
+
+      <button class="auth-btn-link" onclick="regBack()">‹ Назад</button>
+    </div>
+
+    <div class="auth-card reg-step-card" data-step="3">
+      <div class="auth-logo">
+        <div class="auth-logo-inner">🔐</div>
+      </div>
+      <h1 class="auth-title">Придумай пароль</h1>
+      <p class="auth-subtitle">Минимум 8 символов</p>
+
+      <div class="auth-input-group">
+        <input id="reg-password" class="auth-input" type="password" placeholder=" " autocomplete="new-password" oninput="onRegPasswordInput()" />
+        <label class="auth-label" for="reg-password">Пароль</label>
+        <button type="button" class="auth-toggle-password" onclick="togglePassword('reg-password')">👁</button>
+      </div>
+
+      <div class="reg-strength">
+        <div class="reg-strength-bar" id="reg-strength-bar"></div>
+      </div>
+      <div class="auth-hint" id="reg-strength-label">Введи пароль</div>
+
+      <div class="auth-input-group">
+        <input id="reg-password2" class="auth-input" type="password" placeholder=" " autocomplete="new-password" oninput="onRegPassword2Input()" />
+        <label class="auth-label" for="reg-password2">Повтори пароль</label>
+        <button type="button" class="auth-toggle-password" onclick="togglePassword('reg-password2')">👁</button>
+      </div>
+      <div class="auth-hint" id="reg-password2-hint"></div>
+
+      <div class="auth-err" id="reg-error-3"></div>
+
+      <button class="auth-btn-primary auth-btn-success" id="reg-submit" onclick="doRegister()" disabled>
+        <span class="btn-text">Создать аккаунт</span>
+        <span class="btn-spinner" style="display:none;">
+          <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </span>
+      </button>
+
+      <button class="auth-btn-link" onclick="regBack()">‹ Назад</button>
+    </div>
+  </div>
+
+  <div class="auth-bonus" id="auth-bonus">
+    <span class="bonus-emoji">🎁</span>
+    <div class="bonus-text">
+      <div class="bonus-title">Бонус новичку</div>
+      <div class="bonus-sub">+10 ⭐ на старте</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CREATE MENU ═══ -->
+<div class="modal" id="create-menu-modal"><div class="modal-box">
+  <h3>Что создать?</h3>
+  <button class="create-menu-btn" onclick="closeModal('create-menu-modal'); openModal('add-modal');">
+    <span class="cm-icon">👤</span>
+    <span class="cm-text"><span class="cm-title">Добавить контакт</span><span class="cm-sub">Найти друга по нику</span></span>
+  </button>
+  <button class="create-menu-btn" onclick="closeModal('create-menu-modal'); openCreateChannelModal();">
+    <span class="cm-icon">📢</span>
+    <span class="cm-text"><span class="cm-title">Создать канал</span><span class="cm-sub">Максимум — 1 канал</span></span>
+  </button>
+  <button class="create-menu-btn" onclick="closeModal('create-menu-modal'); openCreateGroupModal();">
+    <span class="cm-icon">👥</span>
+    <span class="cm-text"><span class="cm-title">Создать группу</span><span class="cm-sub">Максимум — 1 группа</span></span>
+  </button>
+  <button class="modal-secondary" onclick="closeModal('create-menu-modal')">Отмена</button>
+</div></div>
+
+<!-- ═══ PROFILE ═══ -->
+<div class="modal" id="profile-modal"><div class="modal-box">
+  <h3>Мой профиль</h3>
+  <div id="profile-username" style="text-align:center;color:#7f91a4;margin-bottom:16px;font-size:14px"></div>
+  <label>Имя</label><input id="my-first-name" placeholder="Имя" maxlength="40" />
+  <label>Фамилия</label><input id="my-last-name" placeholder="Фамилия" maxlength="40" />
+  <label>О себе</label><textarea id="my-bio" placeholder="Пара слов" maxlength="200" rows="3"></textarea>
+  <label>День рождения</label><input id="my-birthday" type="date" />
+  <label>Эмодзи-статус</label><input id="my-emoji" placeholder="😎" maxlength="4" />
+  <button class="modal-primary" onclick="saveProfile()">💾 Сохранить</button>
+  <button class="modal-primary" onclick="document.getElementById('avatarFile').click()">📷 Сменить фото</button>
+  <button class="modal-primary" id="verify-btn" onclick="openBadgeModal()" style="display:none;">🏅 Выдать значок</button>
+  <button class="modal-primary" id="verify-channel-btn" onclick="openModal('verify-channel-modal')" style="display:none;">✓ Выдать галочку каналу</button>
+  <button class="modal-secondary" onclick="closeModal('profile-modal')">Закрыть</button>
+</div></div>
+
+<!-- ═══ BADGE MODAL ═══ -->
+<div class="modal" id="badge-modal"><div class="modal-box">
+  <h3 id="badge-modal-title">🏅 Выдать значок</h3>
+  <div class="modal-desc">Введи ник того, кому хочешь дать значок</div>
+  <input id="badge-username" type="text" placeholder="Ник" autocapitalize="none" />
+
+  <div class="modal-desc" style="margin-top:10px;">Выбери значок</div>
+  <div class="badge-picker" id="badge-picker">
+    <button class="badge-option active" data-badge="verified" onclick="selectBadgeType('verified')">
+      <span class="badge-icon-verified">✓</span>
+      <span class="badge-label">Галочка</span>
+    </button>
+    <button class="badge-option" data-badge="hammer" onclick="selectBadgeType('hammer')">
+      <span class="badge-icon-hammer">🔨</span>
+      <span class="badge-label">Молоток</span>
+    </button>
+    <button class="badge-option" data-badge="scam" onclick="selectBadgeType('scam')">
+      <span class="badge-icon-scam">💀</span>
+      <span class="badge-label">Скам</span>
+    </button>
+  </div>
+
+  <div class="badge-actions">
+    <button class="modal-primary" onclick="giveBadgeAction()">Выдать</button>
+    <button class="modal-danger" onclick="removeBadgeAction()">Снять</button>
+  </div>
+
+  <div class="modal-error" id="badge-error"></div>
+  <button class="modal-secondary" onclick="closeModal('badge-modal')">Отмена</button>
+</div></div>
+
+<!-- ═══ VERIFY CHANNEL MODAL ═══ -->
+<div class="modal" id="verify-channel-modal"><div class="modal-box">
+  <h3>✓ Выдать галочку каналу</h3>
+  <div class="modal-desc">Введи ID канала</div>
+  <input id="verify-channel-slug" type="text" placeholder="ID канала (без @)" autocapitalize="none" />
+  <div class="modal-error" id="verify-channel-error"></div>
+  <button class="modal-primary" onclick="doVerifyChannel()">Выдать</button>
+  <button class="modal-secondary" onclick="closeModal('verify-channel-modal')">Отмена</button>
+</div></div>
+
+<!-- ═══ ADD CONTACT ═══ -->
+<div class="modal" id="add-modal"><div class="modal-box">
+  <h3>Добавить контакт</h3>
+  <input id="add-display-name" placeholder="Имя" />
+  <input id="add-username" placeholder="Ник" autocapitalize="none" />
+  <div class="modal-error" id="add-error"></div>
+  <button class="modal-primary" onclick="doAddContact()">Добавить</button>
+  <button class="modal-secondary" onclick="closeModal('add-modal')">Отмена</button>
+</div></div>
+
+<!-- ═══ CONTACT PROFILE ═══ -->
+<div class="modal" id="contact-profile-modal"><div class="modal-box">
+  <div id="contact-profile-content"></div>
+  <button class="modal-primary" id="gift-to-contact-btn" onclick="openGiftsCatalog(contactProfileCurrent?.username)" style="display:none;">🎁 Подарить подарок</button>
+  <button class="modal-primary" id="give-badge-to-contact-btn" onclick="openBadgeModalForCurrent()" style="display:none;">🏅 Управление значками</button>
+  <div style="display:flex;gap:10px;">
+    <button class="modal-secondary" style="flex:1;" onclick="closeModal('contact-profile-modal')">Закрыть</button>
+    <button class="modal-danger" style="flex:1;" id="block-action-btn" onclick="toggleBlockCurrent()">🚫 Блок</button>
+  </div>
+</div></div>
+
+<!-- ═══ GROUPS ═══ -->
+<div class="modal" id="create-group-modal"><div class="modal-box">
+  <h3>Создать группу</h3>
+  <input id="group-name" placeholder="Название группы" />
+  <div class="modal-desc">Выбери участников:</div>
+  <div class="member-picker" id="create-members"></div>
+  <div class="modal-error" id="create-error"></div>
+  <button class="modal-primary" onclick="doCreateGroup()">Создать</button>
+  <button class="modal-secondary" onclick="closeModal('create-group-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="group-info-modal"><div class="modal-box">
+  <h3 id="group-info-title">Группа</h3>
+  <div id="group-info-desc" class="modal-desc"></div>
+  <div class="member-list" id="group-info-members"></div>
+  <button class="modal-primary" onclick="openAddMembers()">➕ Добавить участников</button>
+  <button class="modal-primary" id="edit-group-btn" onclick="openEditGroup()" style="display:none;">✏️ Изменить группу</button>
+  <button class="modal-danger" id="delete-group-btn" onclick="confirmDeleteGroup()" style="display:none;">🗑 Удалить группу</button>
+  <button class="modal-danger" onclick="confirmLeaveGroup()">🚪 Выйти из группы</button>
+  <button class="modal-secondary" onclick="closeModal('group-info-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="edit-group-modal"><div class="modal-box">
+  <h3>Изменить группу</h3>
+  <input id="edit-group-name" placeholder="Название" />
+  <textarea id="edit-group-desc" placeholder="Описание" rows="3" maxlength="200"></textarea>
+  <button class="modal-primary" onclick="doEditGroup()">Сохранить</button>
+  <button class="modal-secondary" onclick="closeModal('edit-group-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="add-members-modal"><div class="modal-box">
+  <h3>Добавить участников</h3>
+  <div class="member-picker" id="add-members-list"></div>
+  <div class="modal-error" id="add-members-error"></div>
+  <button class="modal-primary" onclick="doAddMembers()">Добавить</button>
+  <button class="modal-secondary" onclick="closeModal('add-members-modal')">Отмена</button>
+</div></div>
+
+<!-- ═══ CHANNELS ═══ -->
+<div class="modal" id="create-channel-modal"><div class="modal-box">
+  <h3>📢 Создать канал</h3>
+  <div class="modal-desc">Один канал на аккаунт</div>
+  <label>ID канала (без @)</label>
+  <input id="channel-slug" placeholder="news" autocapitalize="none" maxlength="30" />
+  <label>Название</label>
+  <input id="channel-name" placeholder="Название канала" maxlength="60" />
+  <label>Описание</label>
+  <textarea id="channel-desc" placeholder="О чём канал?" maxlength="200" rows="3"></textarea>
+  <div class="modal-error" id="create-channel-error"></div>
+  <button class="modal-primary" onclick="doCreateChannel()">Создать</button>
+  <button class="modal-secondary" onclick="closeModal('create-channel-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="channel-info-modal"><div class="modal-box">
+  <h3 id="channel-info-title">Канал</h3>
+  <div id="channel-info-desc" class="modal-desc"></div>
+  <div id="channel-info-stats" style="text-align:center;color:var(--text-muted);font-size:13px;margin-bottom:16px;"></div>
+  <button class="modal-primary" id="channel-invite-btn" onclick="createChannelInvite()" style="display:none;">🔗 Создать ссылку (24ч)</button>
+  <button class="modal-primary" id="channel-edit-btn" onclick="openEditChannel()" style="display:none;">✏️ Изменить канал</button>
+  <button class="modal-danger" id="channel-delete-btn" onclick="confirmDeleteChannel()" style="display:none;">🗑 Удалить канал</button>
+  <button class="modal-danger" id="channel-leave-btn" onclick="confirmLeaveChannel()" style="display:none;">🚪 Отписаться</button>
+  <button class="modal-secondary" onclick="closeModal('channel-info-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="edit-channel-modal"><div class="modal-box">
+  <h3>Изменить канал</h3>
+  <input id="edit-channel-name" placeholder="Название" />
+  <textarea id="edit-channel-desc" placeholder="Описание" rows="3" maxlength="200"></textarea>
+  <button class="modal-primary" onclick="doEditChannel()">Сохранить</button>
+  <button class="modal-secondary" onclick="closeModal('edit-channel-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="find-channel-modal"><div class="modal-box">
+  <h3>🔍 Найти канал</h3>
+  <div class="modal-desc">Введи ID канала или код приглашения</div>
+  <input id="find-channel-input" placeholder="news или ABC123XY" autocapitalize="none" />
+  <div class="modal-error" id="find-channel-error"></div>
+  <button class="modal-primary" onclick="doFindChannel()">Найти</button>
+  <button class="modal-secondary" onclick="closeModal('find-channel-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="channel-comments-modal"><div class="modal-box" style="max-width:460px;">
+  <h3>💬 Комментарии</h3>
+  <div id="channel-comments-list" style="max-height:50vh;overflow-y:auto;margin-bottom:12px;"></div>
+  <textarea id="channel-comment-input" placeholder="Комментарий..." rows="2" maxlength="500"></textarea>
+  <button class="modal-primary" onclick="submitChannelComment()">Отправить</button>
+  <button class="modal-secondary" onclick="closeModal('channel-comments-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="channel-invite-result-modal"><div class="modal-box">
+  <h3>🔗 Ссылка создана</h3>
+  <div class="modal-desc">Живёт 24 часа</div>
+  <div id="channel-invite-code" style="text-align:center;font-size:32px;font-weight:800;letter-spacing:6px;color:var(--gold);padding:20px;background:var(--bg-input-inner);border-radius:var(--radius-md);margin-bottom:12px;font-family:monospace;"></div>
+  <button class="modal-primary" onclick="copyInviteCode()">📋 Скопировать</button>
+  <button class="modal-secondary" onclick="closeModal('channel-invite-result-modal')">Закрыть</button>
+</div></div>
+
+<!-- ═══ MESSAGES ═══ -->
+<div class="modal" id="edit-message-modal"><div class="modal-box">
+  <h3>Редактировать</h3>
+  <textarea id="edit-message-text" rows="4"></textarea>
+  <button class="modal-primary" onclick="doEditMessage()">Сохранить</button>
+  <button class="modal-secondary" onclick="closeModal('edit-message-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="search-modal"><div class="modal-box">
+  <h3>Поиск в чате</h3>
+  <input id="search-input" placeholder="Что искать..." />
+  <div id="search-results" style="max-height:50vh;overflow-y:auto;margin-top:10px;"></div>
+  <button class="modal-secondary" onclick="closeModal('search-modal')">Закрыть</button>
+</div></div>
+
+<!-- ═══ SETTINGS MODALS ═══ -->
+<div class="modal" id="passcode-setup-modal"><div class="modal-box">
+  <h3>Код-пароль</h3>
+  <div class="modal-desc">Защити Azerta паролем (4+ символа)</div>
+  <input id="passcode-new" type="password" placeholder="Новый код" maxlength="12" />
+  <input id="passcode-confirm" type="password" placeholder="Повтори код" maxlength="12" />
+  <div class="modal-error" id="passcode-error-modal"></div>
+  <button class="modal-primary" onclick="savePasscode()">Установить</button>
+  <button class="modal-danger" onclick="removePasscode()">Удалить код-пароль</button>
+  <button class="modal-secondary" onclick="closeModal('passcode-setup-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="delete-account-modal"><div class="modal-box">
+  <h3>Удалить аккаунт</h3>
+  <div class="modal-desc">Это действие нельзя отменить.</div>
+  <input id="delete-account-pass" type="password" placeholder="Введи пароль" />
+  <div class="modal-error" id="delete-account-error"></div>
+  <button class="modal-danger" onclick="confirmDeleteAccount()">Удалить навсегда</button>
+  <button class="modal-secondary" onclick="closeModal('delete-account-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="color-modal"><div class="modal-box">
+  <h3 id="color-modal-title">Выбери цвет</h3>
+  <div class="color-grid" id="color-grid"></div>
+  <button class="modal-secondary" onclick="closeModal('color-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="my-qr-modal"><div class="modal-box">
+  <h3>Мой QR-код</h3>
+  <div class="modal-desc">Покажи его — тебя добавят в контакты</div>
+  <div id="qr-display"></div>
+  <button class="modal-primary" onclick="copyQrLink()">📋 Скопировать ссылку</button>
+  <button class="modal-secondary" onclick="closeModal('my-qr-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="qr-found-modal"><div class="modal-box">
+  <h3>Найден контакт</h3>
+  <div id="qr-found-content"></div>
+  <button class="modal-primary" onclick="addFromQr()">➕ Добавить</button>
+  <button class="modal-secondary" onclick="closeModal('qr-found-modal')">Отмена</button>
+</div></div>
+
+<!-- ═══ GALLERY / CHAT MENU ═══ -->
+<div class="modal" id="gallery-modal"><div class="modal-box" style="max-width:500px;">
+  <h3>🖼 Галерея</h3>
+  <div id="gallery-content"></div>
+  <div class="modal-desc" id="gallery-empty" style="display:none;">Пока нет фото и видео</div>
+  <button class="modal-secondary" onclick="closeModal('gallery-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="chat-menu-modal"><div class="modal-box">
+  <h3 id="chat-menu-title">Чат</h3>
+  <button class="modal-secondary" id="chat-menu-mute" onclick="chatMenuToggleMute()">🔕 Отключить уведомления</button>
+  <button class="modal-secondary" id="chat-menu-archive" onclick="chatMenuToggleArchive()">📦 В архив</button>
+  <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openSearchInChat();">🔍 Поиск в чате</button>
+  <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openGallery();">🖼 Галерея</button>
+  <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openWallpaperPicker();">🎨 Установить обои</button>
+  <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); removeChatWallpaper();">🗑 Убрать обои</button>
+  <button class="modal-secondary" onclick="closeModal('chat-menu-modal')">Отмена</button>
+</div></div>
+
+<!-- ═══ GIF ═══ -->
+<div class="modal" id="gif-url-modal"><div class="modal-box">
+  <h3>🎬 GIF по ссылке</h3>
+  <div class="modal-desc">Вставь ссылку на GIF</div>
+  <input id="gif-url-input" placeholder="https://media.giphy.com/..." autocapitalize="none" />
+  <div class="modal-error" id="gif-url-error"></div>
+  <button class="modal-primary" onclick="submitGifUrl()">Сохранить</button>
+  <button class="modal-secondary" onclick="closeModal('gif-url-modal')">Отмена</button>
+</div></div>
+
+<!-- ═══ GIFTS ═══ -->
+<div class="modal" id="gift-modal"><div class="modal-box">
+  <h3>🎁 Премиум по коду</h3>
+  <div class="modal-desc">Введи подарочный код (+25 ⭐)</div>
+  <input id="gift-code-input" placeholder="AZERTA-XXXX-XXXX" autocapitalize="characters" />
+  <div class="modal-error" id="gift-error"></div>
+  <button class="modal-primary" onclick="redeemGiftCode()">✅ Активировать</button>
+  <button class="modal-secondary" onclick="closeModal('gift-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="gift-admin-modal"><div class="modal-box">
+  <h3>🎁 Управление кодами</h3>
+  <div class="modal-desc">Генерируй подарочные коды</div>
+  <div class="gift-actions">
+    <button class="modal-primary" onclick="generateGiftCode()">➕ Создать код</button>
+    <button class="modal-secondary" onclick="loadGiftCodes()">🔄 Обновить</button>
+  </div>
+  <div id="gift-codes-list" style="max-height:50vh;overflow-y:auto;margin-bottom:12px;"></div>
+  <button class="modal-secondary" onclick="closeModal('gift-admin-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="gifts-catalog-modal"><div class="modal-box">
+  <h3>🎁 Подарить подарок</h3>
+  <div class="modal-desc" id="gifts-catalog-target">Кому: —</div>
+  <div class="modal-desc">У тебя: <span id="gifts-catalog-balance" style="color:var(--gold);font-weight:700;">0</span> ⭐</div>
+  <div class="gifts-grid" id="gifts-grid"></div>
+  <div class="modal-error" id="gifts-catalog-error"></div>
+  <button class="modal-secondary" onclick="closeModal('gifts-catalog-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="my-gifts-modal"><div class="modal-box">
+  <h3>🎁 Мои подарки</h3>
+  <div class="modal-desc">Продай подарок за 50% цены</div>
+  <div id="my-gifts-list"></div>
+  <button class="modal-secondary" onclick="closeModal('my-gifts-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="stars-history-modal"><div class="modal-box">
+  <h3>⭐ История звёзд</h3>
+  <div id="stars-history-list" style="max-height:60vh;overflow-y:auto;"></div>
+  <button class="modal-secondary" onclick="closeModal('stars-history-modal')">Закрыть</button>
+</div></div>
+
+<!-- ═══ STORIES ═══ -->
+<div class="modal" id="story-add-modal"><div class="modal-box">
+  <h3>📸 Новая история</h3>
+  <div class="modal-desc">Картинка будет видна 24 часа.</div>
+  <input type="file" id="story-file" accept="image/*" style="display:none" onchange="onStoryFileSelected(event)" />
+  <button class="modal-primary" onclick="document.getElementById('story-file').click()">🖼 Выбрать картинку</button>
+  <div id="story-preview-wrap" style="display:none;text-align:center;margin-bottom:12px;">
+    <img id="story-preview-img" style="max-width:100%;max-height:200px;border-radius:var(--radius-md);" />
+  </div>
+  <input id="story-caption-input" placeholder="Подпись (необязательно)" maxlength="200" />
+  <div class="modal-error" id="story-add-error"></div>
+  <button class="modal-primary" onclick="submitStory()" id="story-submit-btn" disabled>📤 Опубликовать</button>
+  <button class="modal-secondary" onclick="closeModal('story-add-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="story-viewers-modal"><div class="modal-box">
+  <h3>👁 Просмотры</h3>
+  <div id="story-viewers-list"></div>
+  <button class="modal-secondary" onclick="closeModal('story-viewers-modal')">Закрыть</button>
+</div></div>
+
+<!-- ═══ CIRCLE PREVIEW ═══ -->
+<div id="circle-preview">
+  <video id="circle-video-preview" autoplay muted playsinline></video>
+  <div class="timer" id="circle-timer">0:00</div>
+  <div class="controls">
+    <button class="circle-btn cancel" onclick="cancelCircle()">✕</button>
+    <button class="circle-btn send" onclick="sendCircle()">➤</button>
+  </div>
+</div>
+
+<!-- ═══ STORY VIEWER ═══ -->
+<div id="story-viewer">
+  <div id="story-progress-bar"></div>
+  <div id="story-header">
+    <div class="story-avatar" id="story-avatar"></div>
+    <div class="story-info">
+      <div class="story-name" id="story-name">—</div>
+      <div class="story-time" id="story-time">—</div>
+    </div>
+    <button class="story-close" onclick="closeStoryViewer()">×</button>
+  </div>
+  <div id="story-image-wrap">
+    <img id="story-image" src="" alt="">
+    <div id="story-caption"></div>
+    <div id="story-nav-left" onclick="prevStory()"></div>
+    <div id="story-nav-right" onclick="nextStory()"></div>
+  </div>
+  <div id="story-bottom">
+    <button id="story-views-btn" onclick="openStoryViewers()" style="display:none;">👁 0</button>
+    <button class="story-action-btn danger" id="story-delete-btn" onclick="deleteCurrentStory()" style="display:none;">🗑</button>
+  </div>
+</div>
+
+<!-- ═══ MAIN APP ═══ -->
+<div id="app" data-tab="chats">
+  <div id="conn-status"><span class="dot"></span><span class="text" id="conn-text">Azerta: я с тобой ✨</span></div>
+
+  <div id="main-header">
+    <button id="burger" onclick="openSettings()">☰</button>
+    <h2>Azerta</h2>
+    <button class="icon-btn" onclick="openFindChannelModal()" title="Найти канал">🔍</button>
+    <button class="icon-btn" onclick="openModal('create-menu-modal')" title="Создать">＋</button>
+    <button class="icon-btn" id="my-avatar-btn" onclick="openSettings()"></button>
+  </div>
+
+  <div id="stories-bar"><div id="stories-row"></div></div>
+  <div id="search-wrap"><input id="search" placeholder="Поиск" oninput="filterContacts()" /></div>
+  <div id="chat-list"></div>
+
+  <div id="tab-calls" class="app-tab">
+    <div class="tab-empty"><div class="big">📞</div><div>История звонков</div><div class="tab-empty-sub">Пока нет вызовов</div></div>
+    <div id="calls-list"></div>
+  </div>
+
+  <div id="tab-contacts" class="app-tab">
+    <div class="tab-search-wrap"><input id="contacts-search" placeholder="Поиск контактов" oninput="renderContactsTab()" /></div>
+    <div id="contacts-list"></div>
+  </div>
+
+  <div id="tab-settings" class="app-tab"><div id="tab-settings-content"></div></div>
+
+  <div id="bottom-nav">
+    <button class="nav-btn active" data-tab="chats" onclick="switchTab('chats')">
+      <span class="nav-icon">💬</span><span class="nav-label">Чаты</span>
+      <span class="nav-badge" id="nav-badge-chats" style="display:none;"></span>
+    </button>
+    <button class="nav-btn" data-tab="calls" onclick="switchTab('calls')">
+      <span class="nav-icon">📞</span><span class="nav-label">Звонки</span>
+    </button>
+    <button class="nav-btn" data-tab="contacts" onclick="switchTab('contacts')">
+      <span class="nav-icon">👥</span><span class="nav-label">Контакты</span>
+    </button>
+    <button class="nav-btn" data-tab="settings" onclick="switchTab('settings')">
+      <span class="nav-icon">⚙️</span><span class="nav-label">Настройки</span>
+    </button>
+  </div>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div id="settings-screen">
+  <div id="settings-header">
+    <button class="back-btn" onclick="closeSettings()">‹</button>
+    <h2>Настройки</h2>
+  </div>
+  <div id="settings-content"></div>
+</div>
+
+<!-- ═══ CHAT SCREEN ═══ -->
+<div id="chat-screen">
+  <div id="chat-top">
+    <button class="back-btn" onclick="closeChat()">‹</button>
+    <div class="avatar" id="chat-avatar"></div>
+    <div id="chat-top-info">
+      <div id="chat-top-name">—</div>
+      <div id="chat-top-status">—</div>
+    </div>
+    <div id="chat-actions">
+      <button onclick="openSearchInChat()">🔍</button>
+      <button onclick="openGallery()">🖼</button>
+      <button id="callBtn1" onclick="startCall(false)">📞</button>
+      <button id="callBtn2" onclick="startCall(true)">📹</button>
+      <button onclick="openChatMenuV2()">⋮</button>
+    </div>
+  </div>
+
+  <div id="pinned-bar" onclick="scrollToPinned()">
+    <span class="pin-icon">📌</span>
+    <div class="pin-text" id="pinned-text">Закреплённое сообщение</div>
+  </div>
+
+  <div id="messages"></div>
+  <button id="scroll-down-btn" onclick="scrollToBottom()">
+    <span id="scroll-down-badge" style="display:none;"></span>↓
+  </button>
+
+  <div id="reply-preview">
+    <div class="rp-text">
+      <div class="rp-name" id="rp-name">—</div>
+      <div class="rp-msg" id="rp-msg">—</div>
+    </div>
+    <button class="rp-close" onclick="cancelReply()">✕</button>
+  </div>
+
+  <div id="input-area">
+    <button class="attach" onclick="document.getElementById('photoFile').click()">📎</button>
+    <button class="attach" id="stickersBtn" onclick="toggleStickersPanel()" title="Стикеры и GIF">😀</button>
+    <input type="file" id="photoFile" accept="image/*" style="display:none" onchange="sendPhoto(event)" />
+    <input id="msgInput" placeholder="Сообщение" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMsg();}" oninput="onInputTyping()" />
+    <button class="camera" id="circleBtn" onclick="startCircleRecording()">🎥</button>
+    <button class="mic" id="micBtnInput" onclick="toggleVoiceRecording()">🎤</button>
+    <button id="send-btn" onclick="sendMsg()">➤</button>
+  </div>
+
+  <div id="stickers-panel">
+    <button id="stickers-close" onclick="closeStickersPanel()">×</button>
+    <div id="stickers-tabs">
+      <button class="sticker-tab active" data-tab="recent" onclick="switchStickerTab('recent')">🕐 Недавние</button>
+      <button class="sticker-tab" data-tab="my" onclick="switchStickerTab('my')">🐱 Мои</button>
+      <button class="sticker-tab" data-tab="gif" onclick="switchStickerTab('gif')">🎬 GIF</button>
+    </div>
+    <div id="stickers-search-wrap">
+      <input id="stickers-search" placeholder="Поиск..." oninput="onStickerSearch()" />
+    </div>
+    <div id="stickers-content"></div>
+  </div>
+</div>
+
+<!-- ═══ CHANNEL SCREEN ═══ -->
+<div id="channel-screen">
+  <div id="channel-top">
+    <button class="back-btn" onclick="closeChannelChat()">‹</button>
+    <div class="avatar channel" id="channel-avatar">📢</div>
+    <div id="channel-top-info">
+      <div id="channel-top-name">—</div>
+      <div id="channel-top-status">—</div>
+    </div>
+    <button class="icon-btn" onclick="openChannelInfo()">⋮</button>
+  </div>
+  <div id="channel-posts"></div>
+  <div id="channel-input-area">
+    <input id="channel-post-input" placeholder="Публикация..." onkeydown="if(event.key==='Enter')sendChannelPost()" />
+    <button onclick="sendChannelPost()">➤</button>
+  </div>
+</div>
+
+<!-- ═══ HIDDEN INPUTS ═══ -->
+<input type="file" id="stickerFileImage" accept="image/*" style="display:none" onchange="uploadSticker(event, 'image')" />
+<input type="file" id="stickerFileVideo" accept="video/*" style="display:none" onchange="uploadSticker(event, 'video')" />
+<input type="file" id="avatarFile" accept="image/*" style="display:none" onchange="uploadAvatar(event)" />
+
+<!-- ═══ REACTION MENU ═══ -->
+<div id="reaction-menu">
+  <button class="reaction-option" onclick="applyReaction('❤️')">❤️</button>
+  <button class="reaction-option" onclick="applyReaction('👍')">👍</button>
+  <button class="reaction-option" onclick="applyReaction('😂')">😂</button>
+  <button class="reaction-option" onclick="applyReaction('😮')">😮</button>
+  <button class="reaction-option" onclick="applyReaction('😢')">😢</button>
+  <button class="reaction-option" onclick="applyReaction('🔥')">🔥</button>
+</div>
+
+<!-- ═══ ACTION MENU ═══ -->
+<div id="action-menu">
+  <div class="action-item" onclick="actionReply()">↩️ Ответить</div>
+  <div class="action-item" onclick="actionCopy()">📋 Копировать</div>
+  <div class="action-item" onclick="actionSave()">⭐ В Избранное</div>
+  <div class="action-item" onclick="actionPin()" id="action-pin" style="display:none;">📌 Закрепить</div>
+  <div class="action-item" onclick="actionEdit()" id="action-edit" style="display:none;">✏️ Изменить</div>
+  <div class="action-item danger" onclick="actionDelete()" id="action-delete" style="display:none;">🗑 Удалить</div>
+</div>
+
+<!-- ═══ RECORDING BAR ═══ -->
+<div id="recording-bar">
+  <button class="rec-cancel" onclick="stopVoiceRecording(true)">✕</button>
+  <div id="recording-dot"></div>
+  <span id="recording-time">0:00</span>
+  <span style="flex:1;text-align:center;font-size:13px;">● Запись</span>
+  <button class="rec-send" onclick="stopVoiceRecording(false)">➤</button>
+</div>
+
+<!-- ═══ CALL SCREEN ═══ -->
+<div id="call-screen">
+  <div id="remote-video-wrap">
+    <video id="remoteVideo" autoplay playsinline></video>
+    <div id="call-avatar-big"></div>
+  </div>
+  <div id="call-info">
+    <div id="call-peer-name">—</div>
+    <div id="call-status">Соединение...</div>
+    <div id="call-timer"></div>
+  </div>
+  <div id="local-video-wrap"><video id="localVideo" autoplay muted playsinline></video></div>
+  <div id="call-controls-bar">
+    <button class="call-btn" id="micBtn" onclick="toggleMic()">🎤</button>
+    <button class="call-btn" id="camBtn" onclick="toggleCamera()">📷</button>
+    <button class="call-btn" id="screenBtn" onclick="toggleScreenShare()">🖥</button>
+    <button class="call-btn hangup" onclick="hangUp()">📵</button>
+  </div>
+</div>
+
+<!-- ═══ INCOMING CALL ═══ -->
+<div id="incoming-screen">
+  <div>
+    <div class="from-label">Входящий звонок</div>
+    <div class="from-name" id="incoming-name">—</div>
+    <div class="type" id="incoming-type">Видеозвонок</div>
+  </div>
+  <div class="avatar-big" id="incoming-avatar"></div>
+  <div class="buttons">
+    <button class="incoming-btn decline" onclick="declineIncoming()">📵</button>
+    <button class="incoming-btn accept" onclick="acceptIncoming()">📞</button>
+  </div>
+</div>
+
+<!-- ═══ LIGHTBOX ═══ -->
+<div id="lightbox" onclick="this.classList.remove('active')">
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<!-- ═══ WELCOME ANIMATION ═══ -->
+<div id="welcome-flash"></div>
+<div id="welcome-toast">
+  <span class="wt-emoji">👋</span>
+  <span class="wt-name">Привет!</span>
+  <span class="wt-sub">С возвращением</span>
+</div>
+
+<!-- ═══ SCRIPTS ═══ -->
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
