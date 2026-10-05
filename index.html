@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Aurora</title>
+<title>Azerta</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0f0a1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Aurora">
+<meta name="apple-mobile-web-app-title" content="Azerta">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -19,7 +19,7 @@
   <div id="splash-logo">
     <img id="splash-icon" src="icon-192.png" alt="" onerror="this.style.display='none'; this.parentNode.textContent='🌌';">
   </div>
-  <div id="splash-title">AURORA</div>
+  <div id="splash-title">AZERTA</div>
   <div id="splash-subtitle">premium messenger</div>
   <div id="splash-loader"></div>
 </div>
@@ -27,7 +27,7 @@
 <!-- ═══ ERROR SCREEN ═══ -->
 <div id="error-screen">
   <div class="icon">😢</div>
-  <h2>Aurora сломалась</h2>
+  <h2>Azerta сломалась</h2>
   <p>Скопируй текст ниже и покажи разработчику:</p>
   <pre id="error-text"></pre>
   <button onclick="location.reload()">🔄 Перезагрузить</button>
@@ -47,7 +47,7 @@
   <button onclick="enableNotifications()">Включить</button>
 </div>
 
-<!-- ═══ AUTH v10 — Красивый вход ═══ -->
+<!-- ═══ AUTH ═══ -->
 <div id="auth">
 
   <!-- Анимированный фон -->
@@ -63,7 +63,7 @@
       <div class="auth-logo">
         <div class="auth-logo-inner">🌌</div>
       </div>
-      <h1 class="auth-title">Aurora</h1>
+      <h1 class="auth-title">Azerta</h1>
       <p class="auth-subtitle">Твой премиум-мессенджер</p>
 
       <div class="auth-input-group">
@@ -243,7 +243,7 @@
   <button class="modal-secondary" onclick="closeModal('profile-modal')">Закрыть</button>
 </div></div>
 
-<!-- ═══ BADGE MODAL (универсальная для ✓ 🔨 💀) ═══ -->
+<!-- ═══ BADGE MODAL ═══ -->
 <div class="modal" id="badge-modal"><div class="modal-box">
   <h3 id="badge-modal-title">🏅 Выдать значок</h3>
   <div class="modal-desc">Введи ник того, кому хочешь дать значок</div>
@@ -274,7 +274,7 @@
   <button class="modal-secondary" onclick="closeModal('badge-modal')">Отмена</button>
 </div></div>
 
-<!-- ═══ VERIFY CHANNEL MODAL (галочка каналу) ═══ -->
+<!-- ═══ VERIFY CHANNEL MODAL ═══ -->
 <div class="modal" id="verify-channel-modal"><div class="modal-box">
   <h3>✓ Выдать галочку каналу</h3>
   <div class="modal-desc">Введи ID канала</div>
@@ -420,7 +420,7 @@
 <!-- ═══ SETTINGS MODALS ═══ -->
 <div class="modal" id="passcode-setup-modal"><div class="modal-box">
   <h3>Код-пароль</h3>
-  <div class="modal-desc">Защити Aurora паролем (4+ символа)</div>
+  <div class="modal-desc">Защити Azerta паролем (4+ символа)</div>
   <input id="passcode-new" type="password" placeholder="Новый код" maxlength="12" />
   <input id="passcode-confirm" type="password" placeholder="Повтори код" maxlength="12" />
   <div class="modal-error" id="passcode-error-modal"></div>
@@ -473,6 +473,8 @@
   <button class="modal-secondary" id="chat-menu-archive" onclick="chatMenuToggleArchive()">📦 В архив</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openSearchInChat();">🔍 Поиск в чате</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openGallery();">🖼 Галерея</button>
+  <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openWallpaperPicker();">🎨 Установить обои</button>
+  <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); removeChatWallpaper();">🗑 Убрать обои</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal')">Отмена</button>
 </div></div>
 
@@ -490,7 +492,7 @@
 <div class="modal" id="gift-modal"><div class="modal-box">
   <h3>🎁 Премиум по коду</h3>
   <div class="modal-desc">Введи подарочный код (+25 ⭐)</div>
-  <input id="gift-code-input" placeholder="AURORA-XXXX-XXXX" autocapitalize="characters" />
+  <input id="gift-code-input" placeholder="AZERTA-XXXX-XXXX" autocapitalize="characters" />
   <div class="modal-error" id="gift-error"></div>
   <button class="modal-primary" onclick="redeemGiftCode()">✅ Активировать</button>
   <button class="modal-secondary" onclick="closeModal('gift-modal')">Отмена</button>
@@ -585,11 +587,11 @@
 
 <!-- ═══ MAIN APP ═══ -->
 <div id="app" data-tab="chats">
-  <div id="conn-status"><span class="dot"></span><span class="text" id="conn-text">Aurora: я с тобой ✨</span></div>
+  <div id="conn-status"><span class="dot"></span><span class="text" id="conn-text">Azerta: я с тобой ✨</span></div>
 
   <div id="main-header">
     <button id="burger" onclick="openSettings()">☰</button>
-    <h2>Aurora</h2>
+    <h2>Azerta</h2>
     <button class="icon-btn" onclick="openFindChannelModal()" title="Найти канал">🔍</button>
     <button class="icon-btn" onclick="openModal('create-menu-modal')" title="Создать">＋</button>
     <button class="icon-btn" id="my-avatar-btn" onclick="openSettings()"></button>
