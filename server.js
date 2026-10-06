@@ -1,8 +1,9 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.0 — Server
+   🌌 AZERTA v13.1 — Server
    ✓ Боты (создание, автоответы, конструктор команд)
+   ✓ 🎨 Баннеры профиля
    ✓ Описание к подаркам
    ✓ Закреплённые чаты
    ✓ Упоминания @ник
@@ -32,6 +33,7 @@ const CONFIG = {
   MAX_VOICE: 4_000_000,
   MAX_VIDEO: 15_000_000,
   MAX_STICKER: 4_000_000,
+  MAX_BANNER: 2_000_000,
   MAX_GIFTS_PER_DAY: 20,
   MAX_USERNAME_LEN: 20,
   MIN_USERNAME_LEN: 3,
@@ -215,7 +217,7 @@ for (const dir of [STORIES_DIR, STICKERS_DIR]) {
 app.use('/stories', express.static(STORIES_DIR));
 app.use('/stickers', express.static(STICKERS_DIR));
 
-console.log('🚀 Azerta v13.0: старт...');
+console.log('🚀 Azerta v13.1: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? '✓ задан' : '✗ НЕ ЗАДАН');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? '✓ задан' : '✗ НЕ ЗАДАН');
 
@@ -234,6 +236,7 @@ async function initDB() {
     username TEXT PRIMARY KEY,
     password TEXT NOT NULL,
     avatar TEXT,
+    banner TEXT,
     verified INTEGER DEFAULT 0,
     badge_hammer INTEGER DEFAULT 0,
     badge_scam INTEGER DEFAULT 0,
@@ -254,6 +257,7 @@ async function initDB() {
   await db.execute(`ALTER TABLE users ADD COLUMN last_seen_visibility TEXT DEFAULT 'everyone'`).catch(() => {});
   await db.execute(`ALTER TABLE users ADD COLUMN badge_hammer INTEGER DEFAULT 0`).catch(() => {});
   await db.execute(`ALTER TABLE users ADD COLUMN badge_scam INTEGER DEFAULT 0`).catch(() => {});
+  await db.execute(`ALTER TABLE users ADD COLUMN banner TEXT`).catch(() => {});
 
   await db.execute(`CREATE TABLE IF NOT EXISTS user_settings (
     username TEXT PRIMARY KEY,
@@ -546,7 +550,7 @@ async function getUser(username) {
 
 async function getContactInfo(username) {
   const r = await db.execute({
-    sql: 'SELECT username, avatar, verified, badge_hammer, badge_scam, bio, first_name, last_name, emoji_status, last_seen_visibility FROM users WHERE username = ?',
+    sql: 'SELECT username, avatar, banner, verified, badge_hammer, badge_scam, bio, first_name, last_name, emoji_status, last_seen_visibility FROM users WHERE username = ?',
     args: [username]
   });
   return r.rows[0] || null;
@@ -574,6 +578,10 @@ function safeParseReactions(raw) {
 function validImage(s) { return typeof s === 'string' && s.startsWith('data:image/') && s.length <= CONFIG.MAX_IMAGE; }
 function validVoice(s) { return typeof s === 'string' && s.startsWith('data:audio/') && s.length <= CONFIG.MAX_VOICE; }
 function validVideo(s) { return typeof s === 'string' && s.startsWith('data:video/') && s.length <= CONFIG.MAX_VIDEO; }
+function validBanner(s) {
+  if (typeof s !== 'string' || s.length > CONFIG.MAX_BANNER) return false;
+  return s.startsWith('data:image/');
+}
 function validStickerData(s) {
   if (typeof s !== 'string' || s.length > CONFIG.MAX_STICKER) return false;
   return s.startsWith('data:image/') || s.startsWith('data:video/') || /^https?:\/\//i.test(s);
@@ -1208,7 +1216,7 @@ async function deleteSticker(id, username) {
   await db.execute({ sql: 'DELETE FROM stickers WHERE id = ? AND username = ?', args: [id, username] });
 }
 
-/* ─── CLEANUP (без автоудаления сообщений) ─── */
+/* ─── CLEANUP ─── */
 async function cleanupExpiredStories() {
   try {
     const t = now();
@@ -1245,7 +1253,7 @@ async function sendContactsTo(username) {
   const ph = names.map(() => '?').join(',');
 
   const usersR = await db.execute({
-    sql: `SELECT username, avatar, verified, badge_hammer, badge_scam, first_name, last_name, emoji_status, last_seen_visibility 
+    sql: `SELECT username, avatar, banner, verified, badge_hammer, badge_scam, first_name, last_name, emoji_status, last_seen_visibility 
           FROM users WHERE username IN (${ph})`,
     args: names
   });
@@ -1285,6 +1293,7 @@ async function sendContactsTo(username) {
         name: bot.username,
         displayName: bot.name,
         avatar: bot.avatar,
+        banner: null,
         verified: false,
         hammer: false,
         scam: false,
@@ -1306,6 +1315,7 @@ async function sendContactsTo(username) {
       name: row.contact,
       displayName: row.display_name || row.contact,
       avatar: info ? info.avatar : null,
+      banner: info ? info.banner : null,
       verified: info ? !!info.verified : false,
       hammer: info ? !!info.badge_hammer : false,
       scam: info ? !!info.badge_scam : false,
@@ -1558,8 +1568,8 @@ io.on('connection', (socket) => {
       const t = now();
 
       await db.execute({
-        sql: `INSERT INTO users (username, password, avatar, verified, badge_hammer, badge_scam, bio, first_name, last_name, birthday, emoji_status, last_seen_visibility, phone, registered_at) 
-              VALUES (?, ?, NULL, 0, 0, 0, NULL, ?, NULL, NULL, NULL, 'everyone', NULL, ?)`,
+        sql: `INSERT INTO users (username, password, avatar, banner, verified, badge_hammer, badge_scam, bio, first_name, last_name, birthday, emoji_status, last_seen_visibility, phone, registered_at) 
+              VALUES (?, ?, NULL, NULL, 0, 0, 0, NULL, ?, NULL, NULL, NULL, 'everyone', NULL, ?)`,
         args: [username, hash, displayName || null, t]
       });
 
@@ -1577,7 +1587,8 @@ io.on('connection', (socket) => {
 
       cb && cb({
         ok: true, bonus: 10, sessionId, username,
-        avatar: user.avatar, verified: false, hammer: false, scam: false,
+        avatar: user.avatar, banner: user.banner,
+        verified: false, hammer: false, scam: false,
         bio: user.bio, firstName: user.first_name, stars
       });
 
@@ -1613,7 +1624,7 @@ io.on('connection', (socket) => {
       const stars = await getStars(session.username);
 
       cb && cb({
-        ok: true, avatar: user.avatar, username: session.username,
+        ok: true, avatar: user.avatar, banner: user.banner, username: session.username,
         verified: !!user.verified, hammer: !!user.badge_hammer, scam: !!user.badge_scam,
         bio: user.bio, firstName: user.first_name, lastName: user.last_name,
         birthday: user.birthday, emojiStatus: user.emoji_status,
@@ -1663,7 +1674,7 @@ io.on('connection', (socket) => {
       const stars = await getStars(username);
 
       cb && cb({
-        ok: true, avatar: user.avatar, username,
+        ok: true, avatar: user.avatar, banner: user.banner, username,
         verified: !!user.verified, hammer: !!user.badge_hammer, scam: !!user.badge_scam,
         bio: user.bio, firstName: user.first_name, lastName: user.last_name,
         birthday: user.birthday, emojiStatus: user.emoji_status,
@@ -1686,6 +1697,36 @@ io.on('connection', (socket) => {
     await db.execute({ sql: 'UPDATE users SET avatar = ? WHERE username = ?', args: [avatar, socket.username] });
     refreshForFriends(socket.username).catch(() => {});
     notifyAllFriends(socket.username, 'friend updated', { username: socket.username, avatar }).catch(() => {});
+  });
+
+  /* ─── 🎨 БАННЕР ПРОФИЛЯ ─── */
+  socket.on('set banner', async ({ banner }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      if (banner && !validBanner(banner)) return cb && cb({ ok: false, error: 'Некорректное изображение' });
+      if (banner && banner.length > CONFIG.MAX_BANNER) return cb && cb({ ok: false, error: 'Баннер слишком большой (макс 2 МБ)' });
+
+      await db.execute({ sql: 'UPDATE users SET banner = ? WHERE username = ?', args: [banner || null, socket.username] });
+
+      refreshForFriends(socket.username).catch(() => {});
+      notifyAllFriends(socket.username, 'friend updated', { username: socket.username, banner: banner || null }).catch(() => {});
+
+      socket.emit('me updated', { banner: banner || null });
+      cb && cb({ ok: true });
+    } catch (e) { console.error('set banner:', e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('remove banner', async (cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      await db.execute({ sql: 'UPDATE users SET banner = NULL WHERE username = ?', args: [socket.username] });
+
+      refreshForFriends(socket.username).catch(() => {});
+      notifyAllFriends(socket.username, 'friend updated', { username: socket.username, banner: null }).catch(() => {});
+
+      socket.emit('me updated', { banner: null });
+      cb && cb({ ok: true });
+    } catch (e) { console.error('remove banner:', e); cb && cb({ ok: false }); }
   });
 
   socket.on('update profile', async ({ firstName, lastName, bio, birthday, emojiStatus }, cb) => {
@@ -1716,7 +1757,8 @@ io.on('connection', (socket) => {
       socket.emit('me updated', {
         firstName: user.first_name, lastName: user.last_name, bio: user.bio,
         birthday: user.birthday, emojiStatus: user.emoji_status,
-        avatar: user.avatar, verified: !!user.verified,
+        avatar: user.avatar, banner: user.banner,
+        verified: !!user.verified,
         hammer: !!user.badge_hammer, scam: !!user.badge_scam
       });
       cb && cb({ ok: true });
@@ -1788,7 +1830,7 @@ io.on('connection', (socket) => {
       const ph = names.map(() => '?').join(',');
 
       const usersR = await db.execute({
-        sql: `SELECT username, avatar, verified, badge_hammer, badge_scam, first_name, last_name, emoji_status, last_seen_visibility 
+        sql: `SELECT username, avatar, banner, verified, badge_hammer, badge_scam, first_name, last_name, emoji_status, last_seen_visibility 
               FROM users WHERE username IN (${ph})`,
         args: names
       });
@@ -1825,7 +1867,7 @@ io.on('connection', (socket) => {
 
         if (bot) {
           return {
-            name: bot.username, displayName: bot.name, avatar: bot.avatar,
+            name: bot.username, displayName: bot.name, avatar: bot.avatar, banner: null,
             verified: false, hammer: false, scam: false,
             firstName: null, lastName: null, emojiStatus: bot.emoji,
             online: true,
@@ -1839,6 +1881,7 @@ io.on('connection', (socket) => {
           name: row.contact,
           displayName: row.display_name || row.contact,
           avatar: info ? info.avatar : null,
+          banner: info ? info.banner : null,
           verified: info ? !!info.verified : false,
           hammer: info ? !!info.badge_hammer : false,
           scam: info ? !!info.badge_scam : false,
@@ -1902,6 +1945,7 @@ io.on('connection', (socket) => {
       return cb && cb({
         username: bot.username,
         avatar: bot.avatar,
+        banner: null,
         verified: false, hammer: false, scam: false,
         bio: bot.description,
         firstName: bot.name, lastName: null,
@@ -1921,7 +1965,7 @@ io.on('connection', (socket) => {
     const lastSeenVisible = info.last_seen_visibility !== 'nobody';
     const gifts = await getGiftsOfUser(username);
     cb && cb({
-      username: info.username, avatar: info.avatar,
+      username: info.username, avatar: info.avatar, banner: info.banner,
       verified: !!info.verified, hammer: !!info.badge_hammer, scam: !!info.badge_scam,
       bio: info.bio, firstName: info.first_name, lastName: info.last_name,
       emojiStatus: info.emoji_status,
@@ -1937,7 +1981,7 @@ io.on('connection', (socket) => {
     if (!info) return cb && cb(null);
     const gifts = await getGiftsOfUser(username);
     cb && cb({
-      username: info.username, avatar: info.avatar,
+      username: info.username, avatar: info.avatar, banner: info.banner,
       verified: !!info.verified, hammer: !!info.badge_hammer, scam: !!info.badge_scam,
       bio: info.bio, firstName: info.first_name, lastName: info.last_name,
       emojiStatus: info.emoji_status, gifts
@@ -3557,19 +3601,18 @@ initDB()
   .then(() => {
     console.log('✅ initDB завершён успешно');
 
-    // Планировщики (без автоудаления сообщений)
     setInterval(cleanupExpiredStories, 60 * 60 * 1000);
     setInterval(cleanupExpiredInvites, 30 * 60 * 1000);
     setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);
 
-    // Первый прогон
     cleanupExpiredStories().catch(() => {});
     cleanupExpiredInvites().catch(() => {});
     cleanupExpiredSessions().catch(() => {});
 
     server.listen(CONFIG.PORT, () => {
-      console.log('🌌 Azerta v13.0 запущена на порту ' + CONFIG.PORT);
+      console.log('🌌 Azerta v13.1 запущена на порту ' + CONFIG.PORT);
       console.log('👉 http://localhost:' + CONFIG.PORT);
+      console.log('🎨 Баннеры профиля: ВКЛЮЧЕНЫ');
       console.log('🗑 Автоудаление сообщений: ВЫКЛЮЧЕНО');
     });
   })
