@@ -198,6 +198,10 @@
 <!-- ═══ PROFILE ═══ -->
 <div class="modal" id="profile-modal"><div class="modal-box">
   <h3>Мой профиль</h3>
+  <div id="profile-banner-preview" class="profile-banner-preview" style="display:none;">
+    <img id="profile-banner-img" src="" alt="" />
+    <button class="banner-remove-btn" onclick="removeMyBanner(event)" title="Убрать баннер">×</button>
+  </div>
   <div id="profile-username" style="text-align:center;color:var(--text-muted);margin-bottom:16px;font-size:14px"></div>
   <label>Имя</label><input id="my-first-name" placeholder="Имя" maxlength="40" />
   <label>Фамилия</label><input id="my-last-name" placeholder="Фамилия" maxlength="40" />
@@ -206,6 +210,7 @@
   <label>Эмодзи-статус</label><input id="my-emoji" placeholder="😎" maxlength="4" />
   <button class="modal-primary" onclick="saveProfile()">💾 Сохранить</button>
   <button class="modal-primary" onclick="document.getElementById('avatarFile').click()">📷 Сменить фото</button>
+  <button class="modal-primary" onclick="document.getElementById('bannerFile').click()">🎨 Сменить баннер</button>
   <button class="modal-primary" id="verify-btn" onclick="openBadgeModal()" style="display:none;">🏅 Выдать значок</button>
   <button class="modal-primary" id="verify-channel-btn" onclick="openModal('verify-channel-modal')" style="display:none;">✓ Выдать галочку каналу</button>
   <button class="modal-secondary" onclick="closeModal('profile-modal')">Закрыть</button>
@@ -788,6 +793,7 @@
 <input type="file" id="stickerFileVideo" accept="video/*" style="display:none" onchange="uploadSticker(event, 'video')" />
 <input type="file" id="avatarFile" accept="image/*" style="display:none" onchange="uploadAvatar(event)" />
 <input type="file" id="botAvatarFile" accept="image/*" style="display:none" onchange="uploadBotAvatar(event)" />
+<input type="file" id="bannerFile" accept="image/*" style="display:none" onchange="uploadBanner(event)" />
 
 <!-- ═══ REACTION MENU ═══ -->
 <div id="reaction-menu">
