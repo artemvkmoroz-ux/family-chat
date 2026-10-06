@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Azerta</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f0a1a">
+<meta name="theme-color" content="#0e0e10">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Azerta">
@@ -20,7 +20,7 @@
     <img id="splash-icon" src="icon-192.png" alt="" onerror="this.style.display='none'; this.parentNode.textContent='🌌';">
   </div>
   <div id="splash-title">AZERTA</div>
-  <div id="splash-subtitle">premium messenger</div>
+  <div id="splash-subtitle">семейный мессенджер</div>
   <div id="splash-loader"></div>
 </div>
 
@@ -62,7 +62,7 @@
         <div class="auth-logo-inner">🌌</div>
       </div>
       <h1 class="auth-title">Azerta</h1>
-      <p class="auth-subtitle">Твой премиум-мессенджер</p>
+      <p class="auth-subtitle">Твой семейный мессенджер</p>
 
       <div class="auth-input-group">
         <input id="login-username" class="auth-input" placeholder=" " autocapitalize="none" autocomplete="username" />
@@ -223,7 +223,7 @@
 <!-- ═══ PROFILE ═══ -->
 <div class="modal" id="profile-modal"><div class="modal-box">
   <h3>Мой профиль</h3>
-  <div id="profile-username" style="text-align:center;color:#7f91a4;margin-bottom:16px;font-size:14px"></div>
+  <div id="profile-username" style="text-align:center;color:var(--text-muted);margin-bottom:16px;font-size:14px"></div>
   <label>Имя</label><input id="my-first-name" placeholder="Имя" maxlength="40" />
   <label>Фамилия</label><input id="my-last-name" placeholder="Фамилия" maxlength="40" />
   <label>О себе</label><textarea id="my-bio" placeholder="Пара слов" maxlength="200" rows="3"></textarea>
@@ -390,7 +390,7 @@
 <div class="modal" id="channel-invite-result-modal"><div class="modal-box">
   <h3>🔗 Ссылка создана</h3>
   <div class="modal-desc">Живёт 24 часа</div>
-  <div id="channel-invite-code" style="text-align:center;font-size:32px;font-weight:800;letter-spacing:6px;color:var(--gold);padding:20px;background:var(--bg-input-inner);border-radius:var(--radius-md);margin-bottom:12px;font-family:monospace;"></div>
+  <div id="channel-invite-code" style="text-align:center;font-size:32px;font-weight:800;letter-spacing:6px;color:var(--gold);padding:20px;background:var(--bg-input);border-radius:var(--radius-md);margin-bottom:12px;font-family:monospace;"></div>
   <button class="modal-primary" onclick="copyInviteCode()">📋 Скопировать</button>
   <button class="modal-secondary" onclick="closeModal('channel-invite-result-modal')">Закрыть</button>
 </div></div>
@@ -463,12 +463,22 @@
 <div class="modal" id="chat-menu-modal"><div class="modal-box">
   <h3 id="chat-menu-title">Чат</h3>
   <button class="modal-secondary" id="chat-menu-mute" onclick="chatMenuToggleMute()">🔕 Отключить уведомления</button>
+  <button class="modal-secondary" id="chat-menu-pin" onclick="chatMenuTogglePin()">📌 Закрепить чат</button>
   <button class="modal-secondary" id="chat-menu-archive" onclick="chatMenuToggleArchive()">📦 В архив</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openSearchInChat();">🔍 Поиск в чате</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openGallery();">🖼 Галерея</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); openWallpaperPicker();">🎨 Установить обои</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal'); removeChatWallpaper();">🗑 Убрать обои</button>
+  <button class="modal-danger" onclick="closeModal('chat-menu-modal'); openClearHistoryConfirm();">🧹 Очистить историю</button>
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal')">Отмена</button>
+</div></div>
+
+<!-- 🆕 CLEAR HISTORY CONFIRM -->
+<div class="modal" id="clear-history-modal"><div class="modal-box">
+  <h3>🧹 Очистить историю?</h3>
+  <div class="modal-desc">Все сообщения в этом чате будут удалены <b>для всех</b>. Это действие нельзя отменить.</div>
+  <button class="modal-danger" onclick="confirmClearHistory()">Да, очистить</button>
+  <button class="modal-secondary" onclick="closeModal('clear-history-modal')">Отмена</button>
 </div></div>
 
 <!-- ═══ GIF ═══ -->
@@ -511,6 +521,18 @@
   <button class="modal-secondary" onclick="closeModal('gifts-catalog-modal')">Закрыть</button>
 </div></div>
 
+<!-- 🆕 GIFT MESSAGE (описание к подарку) -->
+<div class="modal" id="gift-message-modal"><div class="modal-box">
+  <h3>🎁 Подарок</h3>
+  <div class="modal-desc" id="gift-message-target">Кому: —</div>
+  <div id="gift-message-preview" style="text-align:center;font-size:56px;margin:12px 0;">🎁</div>
+  <label>Добавить пожелание (необязательно)</label>
+  <textarea id="gift-message-input" placeholder="Например: С днём рождения!" rows="3" maxlength="200"></textarea>
+  <div class="modal-error" id="gift-message-error"></div>
+  <button class="modal-primary" onclick="confirmSendGift()">🎁 Отправить за <span id="gift-message-price">0</span> ⭐</button>
+  <button class="modal-secondary" onclick="closeModal('gift-message-modal')">Отмена</button>
+</div></div>
+
 <div class="modal" id="my-gifts-modal"><div class="modal-box">
   <h3>🎁 Мои подарки</h3>
   <div class="modal-desc">Продай подарок за 50% цены</div>
@@ -522,6 +544,22 @@
   <h3>⭐ История звёзд</h3>
   <div id="stars-history-list" style="max-height:60vh;overflow-y:auto;"></div>
   <button class="modal-secondary" onclick="closeModal('stars-history-modal')">Закрыть</button>
+</div></div>
+
+<!-- 🆕 ACHIEVEMENTS -->
+<div class="modal" id="achievements-modal"><div class="modal-box" style="max-width:520px;">
+  <h3>🏆 Достижения</h3>
+  <div class="modal-desc">Твой прогресс</div>
+  <div id="achievements-content" style="max-height:60vh;overflow-y:auto;"></div>
+  <button class="modal-secondary" onclick="closeModal('achievements-modal')">Закрыть</button>
+</div></div>
+
+<!-- 🆕 STATS -->
+<div class="modal" id="stats-modal"><div class="modal-box">
+  <h3>📊 Статистика</h3>
+  <div class="modal-desc">Твои цифры в Azerta</div>
+  <div id="stats-content" style="max-height:60vh;overflow-y:auto;"></div>
+  <button class="modal-secondary" onclick="closeModal('stats-modal')">Закрыть</button>
 </div></div>
 
 <!-- ═══ STORIES ═══ -->
