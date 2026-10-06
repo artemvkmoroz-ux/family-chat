@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Azerta">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="animations.css">
 </head>
 <body>
 
@@ -58,9 +59,7 @@
 
   <div id="auth-login-screen" class="auth-screen active">
     <div class="auth-card">
-      <div class="auth-logo">
-        <div class="auth-logo-inner">🌌</div>
-      </div>
+      <div class="auth-logo"><div class="auth-logo-inner">🌌</div></div>
       <h1 class="auth-title">Azerta</h1>
       <p class="auth-subtitle">Твой семейный мессенджер</p>
 
@@ -94,9 +93,7 @@
 
   <div id="auth-register-screen" class="auth-screen">
     <div class="reg-top-bar">
-      <button class="reg-back-btn" id="reg-back-btn" onclick="regBack()">
-        <span>‹</span>
-      </button>
+      <button class="reg-back-btn" id="reg-back-btn" onclick="regBack()"><span>‹</span></button>
       <div class="reg-progress">
         <div class="reg-progress-seg active" data-step="1"></div>
         <div class="reg-progress-seg" data-step="2"></div>
@@ -105,12 +102,9 @@
     </div>
 
     <div class="auth-card reg-step-card active" data-step="1">
-      <div class="auth-logo">
-        <div class="auth-logo-inner">✨</div>
-      </div>
+      <div class="auth-logo"><div class="auth-logo-inner">✨</div></div>
       <h1 class="auth-title">Придумай ник</h1>
       <p class="auth-subtitle">Латиница, цифры и _</p>
-
       <div class="auth-input-group reg-username-group" id="reg-username-wrap">
         <span class="auth-input-prefix">@</span>
         <input id="reg-username" class="auth-input" placeholder=" " autocapitalize="none" autocomplete="off" maxlength="20" oninput="onRegUsernameInput()" />
@@ -118,77 +112,54 @@
         <span class="reg-status" id="reg-username-status"></span>
       </div>
       <div class="auth-hint" id="reg-username-hint">Минимум 3 символа</div>
-
       <div class="auth-err" id="reg-error-1"></div>
-
       <button class="auth-btn-primary" id="reg-next-1" onclick="regNext(1)" disabled>
-        <span class="btn-text">Далее</span>
-        <span class="btn-arrow">→</span>
+        <span class="btn-text">Далее</span><span class="btn-arrow">→</span>
       </button>
-
-      <button class="auth-btn-link" onclick="switchAuthScreen('login')">
-        Уже есть аккаунт? <span>Войти</span>
-      </button>
+      <button class="auth-btn-link" onclick="switchAuthScreen('login')">Уже есть аккаунт? <span>Войти</span></button>
     </div>
 
     <div class="auth-card reg-step-card" data-step="2">
-      <div class="auth-logo">
-        <div class="auth-logo-inner">👋</div>
-      </div>
+      <div class="auth-logo"><div class="auth-logo-inner">👋</div></div>
       <h1 class="auth-title">Как тебя зовут?</h1>
       <p class="auth-subtitle">Так тебя увидят другие</p>
-
       <div class="auth-input-group">
         <input id="reg-displayname" class="auth-input" placeholder=" " maxlength="40" autocomplete="name" />
         <label class="auth-label" for="reg-displayname">Имя</label>
         <span class="auth-input-icon">💫</span>
       </div>
       <div class="auth-hint">Можно изменить позже в настройках</div>
-
       <div class="auth-err" id="reg-error-2"></div>
-
       <button class="auth-btn-primary" id="reg-next-2" onclick="regNext(2)">
-        <span class="btn-text">Далее</span>
-        <span class="btn-arrow">→</span>
+        <span class="btn-text">Далее</span><span class="btn-arrow">→</span>
       </button>
-
       <button class="auth-btn-link" onclick="regBack()">‹ Назад</button>
     </div>
 
     <div class="auth-card reg-step-card" data-step="3">
-      <div class="auth-logo">
-        <div class="auth-logo-inner">🔐</div>
-      </div>
+      <div class="auth-logo"><div class="auth-logo-inner">🔐</div></div>
       <h1 class="auth-title">Придумай пароль</h1>
       <p class="auth-subtitle">Минимум 8 символов</p>
-
       <div class="auth-input-group">
         <input id="reg-password" class="auth-input" type="password" placeholder=" " autocomplete="new-password" oninput="onRegPasswordInput()" />
         <label class="auth-label" for="reg-password">Пароль</label>
         <button type="button" class="auth-toggle-password" onclick="togglePassword('reg-password')">👁</button>
       </div>
-
-      <div class="reg-strength">
-        <div class="reg-strength-bar" id="reg-strength-bar"></div>
-      </div>
+      <div class="reg-strength"><div class="reg-strength-bar" id="reg-strength-bar"></div></div>
       <div class="auth-hint" id="reg-strength-label">Введи пароль</div>
-
       <div class="auth-input-group">
         <input id="reg-password2" class="auth-input" type="password" placeholder=" " autocomplete="new-password" oninput="onRegPassword2Input()" />
         <label class="auth-label" for="reg-password2">Повтори пароль</label>
         <button type="button" class="auth-toggle-password" onclick="togglePassword('reg-password2')">👁</button>
       </div>
       <div class="auth-hint" id="reg-password2-hint"></div>
-
       <div class="auth-err" id="reg-error-3"></div>
-
       <button class="auth-btn-primary auth-btn-success" id="reg-submit" onclick="doRegister()" disabled>
         <span class="btn-text">Создать аккаунт</span>
         <span class="btn-spinner" style="display:none;">
           <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
         </span>
       </button>
-
       <button class="auth-btn-link" onclick="regBack()">‹ Назад</button>
     </div>
   </div>
@@ -217,6 +188,10 @@
     <span class="cm-icon">👥</span>
     <span class="cm-text"><span class="cm-title">Создать группу</span><span class="cm-sub">Максимум — 1 группа</span></span>
   </button>
+  <button class="create-menu-btn" onclick="closeModal('create-menu-modal'); openCreateBotModal();">
+    <span class="cm-icon">🤖</span>
+    <span class="cm-text"><span class="cm-title">Создать бота</span><span class="cm-sub">До 3 ботов на аккаунт</span></span>
+  </button>
   <button class="modal-secondary" onclick="closeModal('create-menu-modal')">Отмена</button>
 </div></div>
 
@@ -241,28 +216,22 @@
   <h3 id="badge-modal-title">🏅 Выдать значок</h3>
   <div class="modal-desc">Введи ник того, кому хочешь дать значок</div>
   <input id="badge-username" type="text" placeholder="Ник" autocapitalize="none" />
-
   <div class="modal-desc" style="margin-top:10px;">Выбери значок</div>
   <div class="badge-picker" id="badge-picker">
     <button class="badge-option active" data-badge="verified" onclick="selectBadgeType('verified')">
-      <span class="badge-icon-verified">✓</span>
-      <span class="badge-label">Галочка</span>
+      <span class="badge-icon-verified">✓</span><span class="badge-label">Галочка</span>
     </button>
     <button class="badge-option" data-badge="hammer" onclick="selectBadgeType('hammer')">
-      <span class="badge-icon-hammer">🔨</span>
-      <span class="badge-label">Молоток</span>
+      <span class="badge-icon-hammer">🔨</span><span class="badge-label">Молоток</span>
     </button>
     <button class="badge-option" data-badge="scam" onclick="selectBadgeType('scam')">
-      <span class="badge-icon-scam">💀</span>
-      <span class="badge-label">Скам</span>
+      <span class="badge-icon-scam">💀</span><span class="badge-label">Скам</span>
     </button>
   </div>
-
   <div class="badge-actions">
     <button class="modal-primary" onclick="giveBadgeAction()">Выдать</button>
     <button class="modal-danger" onclick="removeBadgeAction()">Снять</button>
   </div>
-
   <div class="modal-error" id="badge-error"></div>
   <button class="modal-secondary" onclick="closeModal('badge-modal')">Отмена</button>
 </div></div>
@@ -473,7 +442,6 @@
   <button class="modal-secondary" onclick="closeModal('chat-menu-modal')">Отмена</button>
 </div></div>
 
-<!-- 🆕 CLEAR HISTORY CONFIRM -->
 <div class="modal" id="clear-history-modal"><div class="modal-box">
   <h3>🧹 Очистить историю?</h3>
   <div class="modal-desc">Все сообщения в этом чате будут удалены <b>для всех</b>. Это действие нельзя отменить.</div>
@@ -521,7 +489,6 @@
   <button class="modal-secondary" onclick="closeModal('gifts-catalog-modal')">Закрыть</button>
 </div></div>
 
-<!-- 🆕 GIFT MESSAGE (описание к подарку) -->
 <div class="modal" id="gift-message-modal"><div class="modal-box">
   <h3>🎁 Подарок</h3>
   <div class="modal-desc" id="gift-message-target">Кому: —</div>
@@ -546,7 +513,7 @@
   <button class="modal-secondary" onclick="closeModal('stars-history-modal')">Закрыть</button>
 </div></div>
 
-<!-- 🆕 ACHIEVEMENTS -->
+<!-- ═══ ACHIEVEMENTS / STATS ═══ -->
 <div class="modal" id="achievements-modal"><div class="modal-box" style="max-width:520px;">
   <h3>🏆 Достижения</h3>
   <div class="modal-desc">Твой прогресс</div>
@@ -554,12 +521,80 @@
   <button class="modal-secondary" onclick="closeModal('achievements-modal')">Закрыть</button>
 </div></div>
 
-<!-- 🆕 STATS -->
 <div class="modal" id="stats-modal"><div class="modal-box">
   <h3>📊 Статистика</h3>
   <div class="modal-desc">Твои цифры в Azerta</div>
   <div id="stats-content" style="max-height:60vh;overflow-y:auto;"></div>
   <button class="modal-secondary" onclick="closeModal('stats-modal')">Закрыть</button>
+</div></div>
+
+<!-- ═══ 🤖 BOTS ═══ -->
+<div class="modal" id="create-bot-modal"><div class="modal-box">
+  <h3>🤖 Создать бота</h3>
+  <div class="modal-desc">Бот будет отвечать на команды. Ник должен заканчиваться на <b>_bot</b>.</div>
+  <label>Ник бота</label>
+  <div class="auth-input-group" style="margin-bottom:12px;">
+    <span class="auth-input-prefix">@</span>
+    <input id="bot-username" class="auth-input" placeholder="mybot_bot" autocapitalize="none" maxlength="20" style="padding-left:34px;" />
+  </div>
+  <label>Имя бота</label>
+  <input id="bot-name" placeholder="Мой бот" maxlength="40" />
+  <label>Описание</label>
+  <textarea id="bot-description" placeholder="Что умеет бот?" rows="2" maxlength="200"></textarea>
+  <label>Эмодзи бота</label>
+  <input id="bot-emoji" placeholder="🤖" maxlength="4" />
+  <label>Аватар (необязательно)</label>
+  <button class="modal-primary" onclick="document.getElementById('botAvatarFile').click()">📷 Выбрать картинку</button>
+  <div id="bot-avatar-preview" style="display:none;text-align:center;margin:8px 0;">
+    <img id="bot-avatar-img" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" />
+  </div>
+  <div class="modal-desc" style="margin-top:10px;">Команды бота</div>
+  <div id="bot-commands-list" class="bot-commands-list"></div>
+  <button class="modal-secondary" onclick="addBotCommandRow()" style="margin-bottom:10px;">➕ Добавить команду</button>
+  <div class="modal-error" id="create-bot-error"></div>
+  <button class="modal-primary" onclick="doCreateBot()">🤖 Создать бота</button>
+  <button class="modal-secondary" onclick="closeModal('create-bot-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="my-bots-modal"><div class="modal-box">
+  <h3>🤖 Мои боты</h3>
+  <div class="modal-desc">Твои боты (максимум 3)</div>
+  <div id="my-bots-list" style="max-height:60vh;overflow-y:auto;"></div>
+  <button class="modal-primary" onclick="closeModal('my-bots-modal'); openCreateBotModal();">➕ Создать бота</button>
+  <button class="modal-secondary" onclick="closeModal('my-bots-modal')">Закрыть</button>
+</div></div>
+
+<div class="modal" id="edit-bot-modal"><div class="modal-box">
+  <h3>🤖 Редактировать бота</h3>
+  <input type="hidden" id="edit-bot-username" />
+  <label>Имя</label>
+  <input id="edit-bot-name" placeholder="Имя бота" maxlength="40" />
+  <label>Описание</label>
+  <textarea id="edit-bot-description" placeholder="Описание" rows="2" maxlength="200"></textarea>
+  <label>Эмодзи</label>
+  <input id="edit-bot-emoji" placeholder="🤖" maxlength="4" />
+  <div class="modal-desc" style="margin-top:10px;">Команды</div>
+  <div id="edit-bot-commands-list" class="bot-commands-list"></div>
+  <button class="modal-secondary" onclick="addEditBotCommandRow()" style="margin-bottom:10px;">➕ Добавить команду</button>
+  <div class="modal-error" id="edit-bot-error"></div>
+  <button class="modal-primary" onclick="doUpdateBot()">💾 Сохранить</button>
+  <button class="modal-danger" onclick="confirmDeleteBot()">🗑 Удалить бота</button>
+  <button class="modal-secondary" onclick="closeModal('edit-bot-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="find-bot-modal"><div class="modal-box">
+  <h3>🔍 Найти бота</h3>
+  <div class="modal-desc">Введи ник бота (например azerta)</div>
+  <input id="find-bot-input" placeholder="azerta" autocapitalize="none" />
+  <div class="modal-error" id="find-bot-error"></div>
+  <button class="modal-primary" onclick="doFindBot()">Найти</button>
+  <button class="modal-secondary" onclick="closeModal('find-bot-modal')">Отмена</button>
+</div></div>
+
+<div class="modal" id="bot-info-modal"><div class="modal-box">
+  <div id="bot-info-content"></div>
+  <button class="modal-primary" onclick="addFoundBot()">➕ Добавить и написать</button>
+  <button class="modal-secondary" onclick="closeModal('bot-info-modal')">Закрыть</button>
 </div></div>
 
 <!-- ═══ STORIES ═══ -->
@@ -752,6 +787,7 @@
 <input type="file" id="stickerFileImage" accept="image/*" style="display:none" onchange="uploadSticker(event, 'image')" />
 <input type="file" id="stickerFileVideo" accept="video/*" style="display:none" onchange="uploadSticker(event, 'video')" />
 <input type="file" id="avatarFile" accept="image/*" style="display:none" onchange="uploadAvatar(event)" />
+<input type="file" id="botAvatarFile" accept="image/*" style="display:none" onchange="uploadBotAvatar(event)" />
 
 <!-- ═══ REACTION MENU ═══ -->
 <div id="reaction-menu">
