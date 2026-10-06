@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.0 — style.css
+   🌌 AZERTA v13.2 — style.css
    Полный файл: base, auth, app, chat, modals, settings,
                 gifts, achievements, stats, stories, stickers,
-                channels, bots, calls, adaptation
+                channels, bots, calls, banners, adaptation
    ═══════════════════════════════════════════════════════════ */
 
 *, *::before, *::after {
@@ -615,7 +615,6 @@ body.light .auth-card {
   opacity: 0.7;
 }
 
-/* 🤖 Метка бота */
 .bot-mark {
   display: inline-flex;
   align-items: center;
@@ -1334,6 +1333,94 @@ body.light .auth-card {
   text-align: center; margin-bottom: 16px;
 }
 
+/* ─── 🎨 БАННЕР ПРОФИЛЯ ─── */
+.profile-banner-preview {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  background: var(--bg-input);
+  animation: bannerIn 0.5s var(--ease-spring);
+}
+.profile-banner-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.profile-banner-preview .banner-remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: none;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-spring), background var(--dur-base);
+  backdrop-filter: blur(6px);
+}
+.profile-banner-preview .banner-remove-btn:hover {
+  background: rgba(248, 113, 113, 0.85);
+}
+.profile-banner-preview .banner-remove-btn:active {
+  transform: scale(0.88);
+}
+
+@keyframes bannerIn {
+  0% { opacity: 0; transform: scale(0.96) translateY(-6px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Баннер в карточке контакта */
+.contact-banner {
+  position: relative;
+  width: calc(100% + 48px);
+  margin: -24px -24px 16px -24px;
+  height: 160px;
+  border-radius: 24px 24px 0 0;
+  overflow: hidden;
+  background: var(--bg-input);
+  animation: bannerIn 0.6s var(--ease-spring);
+}
+.contact-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.contact-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(26, 26, 31, 0.95) 100%);
+  pointer-events: none;
+}
+body.light .contact-banner::after {
+  background: linear-gradient(180deg, transparent 40%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+/* Сдвиг аватара и имени вниз при наличии баннера */
+.contact-profile-with-banner {
+  margin-top: -50px;
+  position: relative;
+  z-index: 2;
+  text-align: center;
+}
+.contact-profile-with-banner .profile-avatar-big {
+  border: 4px solid var(--bg-panel);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
 .profile-header { text-align: center; margin-bottom: 20px; }
 .profile-avatar-big {
   width: 100px; height: 100px;
@@ -1513,7 +1600,6 @@ body.light .auth-card {
   margin-top: 2px;
 }
 
-/* 🤖 Подсказка команд в чате с ботом */
 .bot-commands-hint {
   display: flex; flex-wrap: wrap;
   gap: 6px;
@@ -1540,7 +1626,6 @@ body.light .auth-card {
   transform: scale(0.95);
 }
 
-/* 🤖 Карточка найденного бота */
 #bot-info-content {
   text-align: center;
 }
@@ -2345,6 +2430,12 @@ body.light .auth-card {
   #gallery-content { grid-template-columns: repeat(3, 1fr); }
   .bot-command-row { flex-direction: column; }
   .bot-command-row .bcc-trigger { flex: 1; }
+
+  /* Баннеры — адаптация под мобилки */
+  .profile-banner-preview { height: 110px; }
+  .contact-banner { height: 130px; }
+  .contact-profile-with-banner { margin-top: -40px; }
+  .contact-profile-with-banner .profile-avatar-big { width: 80px; height: 80px; font-size: 32px; }
 }
 
 @media (max-width: 360px) {
@@ -2353,6 +2444,8 @@ body.light .auth-card {
   .chat-name { font-size: 14.5px; }
   .chat-preview { font-size: 12.5px; }
   .msg { font-size: 14px; }
+  .profile-banner-preview { height: 90px; }
+  .contact-banner { height: 110px; }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
