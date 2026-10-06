@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA — Clean Design v1.0
-   Плавный дизайн без премиума
+   🌌 AZERTA — style.css
+   Часть 1/5: base, переменные, splash, auth, регистрация
    ═══════════════════════════════════════════════════════════ */
 
 *, *::before, *::after {
@@ -550,6 +550,12 @@ body.light .auth-card {
 
 #auth-login-screen.active ~ .auth-bonus { display: flex; }
 
+/* ─── КОНЕЦ ЧАСТИ 1/5 ─── */
+/* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA — style.css
+   Часть 2/5: app, chat list, stories bar, chat screen, messages
+   ═══════════════════════════════════════════════════════════ */
+
 /* ─── APP ─── */
 #app {
   display: none; flex-direction: column;
@@ -615,6 +621,17 @@ body.light .auth-card {
 }
 .chat-item:active { transform: scale(0.985); background: var(--bg-active); }
 .chat-item.active { background: var(--bg-active); }
+
+/* 📌 Закреплённый чат — подсветка */
+.chat-item.pinned {
+  background: rgba(139, 127, 255, 0.06);
+  border-left: 3px solid var(--accent);
+}
+.chat-item .pin-mark {
+  font-size: 11px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
 
 .avatar {
   width: 54px; height: 54px;
@@ -735,7 +752,7 @@ body.light .auth-card {
 .nav-btn .nav-label { font-size: 11px; }
 .nav-badge {
   position: absolute; top: 0; right: 12px;
-  background: var(--accent-2, #ec4899);
+  background: #ec4899;
   color: #fff; font-size: 10px; font-weight: 700;
   min-width: 18px; height: 18px; line-height: 18px;
   border-radius: 999px; padding: 0 5px;
@@ -965,6 +982,19 @@ body.light .auth-card {
 }
 .msg.deleted { font-style: italic; opacity: 0.6; }
 
+/* 🆕 Системные сообщения (о звонках) */
+.msg.system {
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-style: italic;
+  padding: 8px 16px;
+  border-radius: 999px;
+  max-width: 90%;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .reply-block {
   border-left: 3px solid var(--accent);
   padding: 5px 10px;
@@ -982,6 +1012,19 @@ body.light .auth-card {
   color: rgba(255, 255, 255, 0.75);
   font-size: 12px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 🆕 Упоминание @ник */
+.mention {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-soft);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+.msg.self .mention {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .msg .meta {
@@ -1015,6 +1058,17 @@ body.light .auth-card {
 .gift-message-block .gift-emoji-big { font-size: 56px; line-height: 1; }
 .gift-message-block .gift-name-big { font-size: 15px; font-weight: 700; }
 .gift-message-block .gift-label { font-size: 11px; opacity: 0.7; letter-spacing: 1px; }
+/* 🆕 Описание к подарку */
+.gift-message-block .gift-user-msg {
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.9;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  max-width: 200px;
+  word-wrap: break-word;
+}
 
 .voice-msg { display: flex; align-items: center; gap: 12px; min-width: 180px; }
 .voice-play {
@@ -1155,63 +1209,60 @@ body.light .auth-card {
   pointer-events: auto;
 }
 #scroll-down-btn:active { transform: scale(0.9); }
+#scroll-down-badge {
+  position: absolute; top: -4px; right: -4px;
+  background: #ec4899; color: #fff;
+  font-size: 10px; font-weight: 700;
+  min-width: 18px; height: 18px; line-height: 18px;
+  border-radius: 999px; padding: 0 5px;
+  text-align: center;
+}
 
-/* ─── RECORDING BAR ─── */
-#recording-bar {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: var(--danger);
-  color: #fff;
-  padding: 16px 20px calc(30px + var(--safe-bottom));
-  display: none; align-items: center; gap: 12px;
-  z-index: 700;
+/* 🆕 Свайп-ответ + двойной тап ❤️ */
+.swipe-reply-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  color: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast);
 }
-#recording-bar.active { display: flex; }
-#recording-dot {
-  width: 12px; height: 12px;
-  border-radius: 50%; background: #fff;
-  animation: recPulse 1s infinite;
-}
-@keyframes recPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
-}
-.rec-cancel, .rec-send {
-  width: 44px; height: 44px;
-  border-radius: 50%; border: none;
-  font-size: 18px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; color: #fff;
-}
-.rec-cancel { background: rgba(255, 255, 255, 0.2); }
-.rec-send { background: #fff; color: var(--danger); font-weight: 700; }
+.msg-wrap.other .swipe-reply-icon { left: 8px; }
+.msg-wrap.self .swipe-reply-icon { right: 8px; }
+.msg-wrap.swipe-active .swipe-reply-icon { opacity: 0.7; }
+.msg-wrap.swipe-ready .swipe-reply-icon { opacity: 1; transform: translateY(-50%) scale(1.3); }
 
-/* ─── CIRCLE PREVIEW ─── */
-#circle-preview {
-  position: fixed; inset: 0;
-  background: rgba(0, 0, 0, 0.95);
-  z-index: 9500;
-  display: none; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 20px;
+.quick-react-heart {
+  position: absolute;
+  top: -8px;
+  font-size: 28px;
+  pointer-events: none;
+  animation: heartPop 1s var(--ease-out) forwards;
 }
-#circle-preview.active { display: flex; }
-#circle-video-preview {
-  width: 280px; height: 280px;
-  border-radius: 50%; object-fit: cover;
-  border: 4px solid var(--accent);
+.msg-wrap.self .quick-react-heart { right: 12px; }
+.msg-wrap.other .quick-react-heart { left: 12px; }
+@keyframes heartPop {
+  0% { opacity: 0; transform: scale(0.4) translateY(0); }
+  30% { opacity: 1; transform: scale(1.2) translateY(-10px); }
+  100% { opacity: 0; transform: scale(1) translateY(-40px); }
 }
-#circle-preview .controls { display: flex; gap: 30px; margin-top: 30px; }
-#circle-preview .circle-btn {
-  width: 64px; height: 64px;
-  border-radius: 50%; border: none;
-  font-size: 26px; color: #fff;
-  display: flex; align-items: center; justify-content: center;
+
+.msg-wrap.just-sent {
+  animation: justSent 0.6s var(--ease-spring);
 }
-#circle-preview .circle-btn.cancel { background: rgba(255, 255, 255, 0.2); }
-#circle-preview .circle-btn.send { background: var(--accent); }
-#circle-preview .timer {
-  color: #fff; font-size: 20px; font-weight: 700; margin-top: 16px;
+@keyframes justSent {
+  0% { transform: scale(0.9); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
 }
+
+/* ─── КОНЕЦ ЧАСТИ 2/5 ─── */
+/* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA — style.css
+   Часть 3/5: modals, settings, gifts, achievements, stats,
+              gallery, story viewer, stickers
+   ═══════════════════════════════════════════════════════════ */
 
 /* ─── MODALS ─── */
 .modal {
@@ -1341,6 +1392,55 @@ body.light .auth-card {
 .member-name { flex: 1; font-size: 15px; }
 .member-nick { color: var(--text-muted); font-size: 12px; }
 
+/* ─── BADGE PICKER ─── */
+.badge-picker {
+  display: flex; gap: 8px; margin-bottom: 16px;
+  justify-content: center;
+}
+.badge-option {
+  flex: 1;
+  padding: 14px 8px;
+  background: var(--bg-input);
+  border: 2px solid transparent;
+  border-radius: 14px;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 6px;
+  cursor: pointer;
+  font-size: 24px;
+  transition: all var(--dur-fast);
+}
+.badge-option.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.badge-option .badge-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.badge-option.active .badge-label { color: var(--accent); }
+.badge-icon-verified {
+  display: inline-flex; width: 24px; height: 24px;
+  background: var(--accent); border-radius: 50%;
+  align-items: center; justify-content: center;
+  font-size: 14px; color: #fff; font-weight: 700;
+}
+.badge-icon-hammer {
+  display: inline-flex; width: 24px; height: 24px;
+  background: var(--gold); border-radius: 50%;
+  align-items: center; justify-content: center;
+  font-size: 13px; color: #fff;
+}
+.badge-icon-scam {
+  display: inline-flex; width: 24px; height: 24px;
+  background: var(--danger); border-radius: 50%;
+  align-items: center; justify-content: center;
+  font-size: 13px; color: #fff;
+}
+.badge-actions { display: flex; gap: 10px; }
+.badge-actions button { flex: 1; }
+
+/* ─── LIGHTBOX ─── */
 #lightbox {
   position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.96);
@@ -1353,6 +1453,7 @@ body.light .auth-card {
   border-radius: 12px;
 }
 
+/* ─── REACTION MENU ─── */
 #reaction-menu {
   position: fixed; z-index: 2500;
   background: var(--bg-panel);
@@ -1369,6 +1470,7 @@ body.light .auth-card {
 }
 .reaction-option:active { transform: scale(0.9); }
 
+/* ─── ACTION MENU ─── */
 #action-menu {
   position: fixed; z-index: 2600;
   background: var(--bg-panel);
@@ -1389,7 +1491,7 @@ body.light .auth-card {
 .action-item:active { background: var(--bg-active); }
 .action-item.danger { color: var(--danger); }
 
-/* ─── SETTINGS ─── */
+/* ─── SETTINGS SCREEN ─── */
 #settings-screen {
   position: fixed; inset: 0;
   background: var(--bg-deep);
@@ -1531,6 +1633,157 @@ body.light .auth-card {
 .gallery-item.video-item {
   display: flex; align-items: center; justify-content: center;
   background: var(--accent); color: #fff; font-size: 24px;
+}
+
+/* ─── STARS / GIFTS ─── */
+.gifts-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px; margin-bottom: 12px;
+}
+.gift-card {
+  padding: 12px 6px;
+  background: var(--bg-input);
+  border-radius: 14px;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.gift-card.affordable { border-color: rgba(251, 191, 36, 0.4); }
+.gift-card.unaffordable { opacity: 0.4; cursor: not-allowed; }
+.gift-card .gift-emoji { font-size: 34px; line-height: 1; }
+.gift-card .gift-name { font-size: 12px; font-weight: 600; text-align: center; }
+.gift-card .gift-price { font-size: 12px; color: var(--gold); font-weight: 700; }
+
+.my-gifts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.my-gift-card {
+  padding: 12px 6px; background: var(--bg-input);
+  border-radius: 14px; display: flex; flex-direction: column;
+  align-items: center; gap: 4px; position: relative;
+}
+.my-gift-card .gift-emoji { font-size: 34px; }
+.my-gift-card .gift-from { font-size: 11px; color: var(--text-muted); text-align: center; }
+.my-gift-card .gift-sell {
+  position: absolute; bottom: 6px; right: 6px;
+  padding: 4px 8px;
+  background: var(--accent); color: #fff;
+  border-radius: 6px; font-size: 10px; font-weight: 700;
+}
+
+.profile-gifts {
+  background: var(--bg-input);
+  padding: 12px; border-radius: 14px;
+  margin-bottom: 16px;
+}
+.profile-gifts .pg-title {
+  font-size: 12px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 8px; text-align: center;
+}
+.profile-gifts .pg-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.profile-gifts .pg-item { font-size: 26px; }
+
+.gift-code-item {
+  padding: 12px 14px;
+  background: var(--bg-input);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  font-family: monospace; font-size: 14px;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+}
+.gift-code-item .code { font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+.gift-code-item .status { font-size: 11px; color: var(--text-muted); font-family: sans-serif; }
+.gift-code-item .status.used { color: var(--online); }
+.gift-actions { display: flex; gap: 10px; margin-bottom: 12px; }
+.gift-actions button { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 14px; font-weight: 600; }
+
+.create-menu-btn {
+  display: flex; align-items: center;
+  gap: 14px; padding: 16px;
+  border-radius: 14px;
+  background: var(--bg-input);
+  border: none; color: inherit;
+  margin-bottom: 10px; font-size: 15px;
+  width: 100%; text-align: left;
+}
+.create-menu-btn:active { transform: scale(0.98); }
+.create-menu-btn .cm-icon { font-size: 24px; }
+.create-menu-btn .cm-text { flex: 1; }
+.create-menu-btn .cm-title { font-weight: 600; margin-bottom: 2px; }
+.create-menu-btn .cm-sub { font-size: 12px; color: var(--text-muted); }
+
+/* ─── ACHIEVEMENTS ─── */
+.achievement-card {
+  display: flex; gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-input);
+  border-radius: 14px;
+  margin-bottom: 8px;
+  align-items: center;
+  border: 1px solid transparent;
+}
+.achievement-card.unlocked {
+  background: rgba(139, 127, 255, 0.08);
+  border-color: rgba(139, 127, 255, 0.3);
+}
+.achievement-card.locked { opacity: 0.65; }
+.achievement-emoji {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; flex-shrink: 0;
+}
+.achievement-card.unlocked .achievement-emoji {
+  background: var(--accent-soft);
+  box-shadow: 0 0 20px rgba(139, 127, 255, 0.3);
+}
+.achievement-info { flex: 1; min-width: 0; }
+.achievement-name {
+  font-weight: 700; font-size: 14px;
+  margin-bottom: 2px;
+}
+.achievement-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.achievement-progress-bar {
+  width: 100%; height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px; overflow: hidden;
+  margin-top: 4px;
+}
+.achievement-progress-fill {
+  height: 100%; background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.5s var(--ease-out);
+}
+.achievement-progress-text {
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 3px;
+}
+.achievement-unlocked-badge {
+  color: var(--accent); font-size: 18px; flex-shrink: 0;
+}
+
+/* ─── STATS ─── */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  padding: 14px;
+  background: var(--bg-input);
+  border-radius: 14px;
+  text-align: center;
+}
+.stat-card .stat-emoji { font-size: 26px; margin-bottom: 4px; }
+.stat-card .stat-value {
+  font-size: 22px; font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+.stat-card .stat-label {
+  font-size: 11px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
 }
 
 /* ─── STORY VIEWER ─── */
@@ -1732,82 +1985,75 @@ body.light .auth-card {
   color: inherit; font-size: 15px;
 }
 
-/* ─── STARS / GIFTS ─── */
-.gifts-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 10px; margin-bottom: 12px;
-}
-.gift-card {
-  padding: 12px 6px;
-  background: var(--bg-input);
-  border-radius: 14px;
-  display: flex; flex-direction: column;
-  align-items: center; gap: 4px;
-  cursor: pointer;
-  border: 2px solid transparent;
-}
-.gift-card.affordable { border-color: rgba(251, 191, 36, 0.4); }
-.gift-card.unaffordable { opacity: 0.4; cursor: not-allowed; }
-.gift-card .gift-emoji { font-size: 34px; line-height: 1; }
-.gift-card .gift-name { font-size: 12px; font-weight: 600; text-align: center; }
-.gift-card .gift-price { font-size: 12px; color: var(--gold); font-weight: 700; }
+/* ─── КОНЕЦ ЧАСТИ 3/5 ─── */
+/* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA — style.css
+   Часть 4/4: calls, recording, circle preview, welcome,
+              mobile adaptation
+   ═══════════════════════════════════════════════════════════ */
 
-.my-gifts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
-.my-gift-card {
-  padding: 12px 6px; background: var(--bg-input);
-  border-radius: 14px; display: flex; flex-direction: column;
-  align-items: center; gap: 4px; position: relative;
+/* ─── RECORDING BAR ─── */
+#recording-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--danger);
+  color: #fff;
+  padding: 16px 20px calc(30px + var(--safe-bottom));
+  display: none; align-items: center; gap: 12px;
+  z-index: 700;
 }
-.my-gift-card .gift-emoji { font-size: 34px; }
-.my-gift-card .gift-from { font-size: 11px; color: var(--text-muted); text-align: center; }
-.my-gift-card .gift-sell {
-  position: absolute; bottom: 6px; right: 6px;
-  padding: 4px 8px;
-  background: var(--accent); color: #fff;
-  border-radius: 6px; font-size: 10px; font-weight: 700;
+#recording-bar.active { display: flex; animation: slideUp var(--dur-base) var(--ease-out); }
+#recording-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%; background: #fff;
+  animation: recPulse 1s infinite;
 }
+@keyframes recPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+.rec-cancel, .rec-send {
+  width: 44px; height: 44px;
+  border-radius: 50%; border: none;
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: #fff;
+}
+.rec-cancel { background: rgba(255, 255, 255, 0.2); }
+.rec-send { background: #fff; color: var(--danger); font-weight: 700; }
+.rec-cancel:active, .rec-send:active { transform: scale(0.9); }
 
-.profile-gifts {
-  background: var(--bg-input);
-  padding: 12px; border-radius: 14px;
-  margin-bottom: 16px;
+/* ─── CIRCLE PREVIEW ─── */
+#circle-preview {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 9500;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 20px;
 }
-.profile-gifts .pg-title {
-  font-size: 12px; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 1px;
-  margin-bottom: 8px; text-align: center;
+#circle-preview.active { display: flex; animation: fadeIn var(--dur-base); }
+#circle-video-preview {
+  width: 280px; height: 280px;
+  border-radius: 50%; object-fit: cover;
+  border: 4px solid var(--accent);
+  background: #000;
+  box-shadow: 0 0 60px rgba(139, 127, 255, 0.4);
 }
-.profile-gifts .pg-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-.profile-gifts .pg-item { font-size: 26px; }
-
-.gift-code-item {
-  padding: 12px 14px;
-  background: var(--bg-input);
-  border-radius: 12px;
-  margin-bottom: 8px;
-  font-family: monospace; font-size: 14px;
-  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+#circle-preview .controls { display: flex; gap: 30px; margin-top: 30px; }
+#circle-preview .circle-btn {
+  width: 64px; height: 64px;
+  border-radius: 50%; border: none;
+  font-size: 26px; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform var(--dur-fast) var(--ease-spring);
 }
-.gift-code-item .code { font-weight: 700; color: var(--accent); letter-spacing: 1px; }
-.gift-code-item .status { font-size: 11px; color: var(--text-muted); font-family: sans-serif; }
-.gift-code-item .status.used { color: var(--online); }
-.gift-actions { display: flex; gap: 10px; margin-bottom: 12px; }
-.gift-actions button { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 14px; font-weight: 600; }
-
-.create-menu-btn {
-  display: flex; align-items: center;
-  gap: 14px; padding: 16px;
-  border-radius: 14px;
-  background: var(--bg-input);
-  border: none; color: inherit;
-  margin-bottom: 10px; font-size: 15px;
-  width: 100%; text-align: left;
+#circle-preview .circle-btn:active { transform: scale(0.9); }
+#circle-preview .circle-btn.cancel { background: rgba(255, 255, 255, 0.2); }
+#circle-preview .circle-btn.send { background: var(--accent); }
+#circle-preview .timer {
+  color: #fff; font-size: 20px; font-weight: 700; margin-top: 16px;
+  letter-spacing: 1px;
 }
-.create-menu-btn:active { transform: scale(0.98); }
-.create-menu-btn .cm-icon { font-size: 24px; }
-.create-menu-btn .cm-text { flex: 1; }
-.create-menu-btn .cm-title { font-weight: 600; margin-bottom: 2px; }
-.create-menu-btn .cm-sub { font-size: 12px; color: var(--text-muted); }
 
 /* ─── CALL SCREEN ─── */
 #call-screen {
@@ -1816,7 +2062,7 @@ body.light .auth-card {
   background: #0a0612;
   display: none; flex-direction: column;
 }
-#call-screen.active { display: flex; }
+#call-screen.active { display: flex; animation: fadeIn var(--dur-base); }
 #remote-video-wrap {
   flex: 1; position: relative;
   display: flex; align-items: center; justify-content: center;
@@ -1832,6 +2078,11 @@ body.light .auth-card {
   display: flex; align-items: center; justify-content: center;
   font-size: 56px; font-weight: 600; color: #fff;
   background: var(--accent); background-size: cover; background-position: center;
+  animation: callAvatarPulse 2s ease-in-out infinite;
+}
+@keyframes callAvatarPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 127, 255, 0.5); }
+  50% { box-shadow: 0 0 0 30px rgba(139, 127, 255, 0); }
 }
 #call-info {
   position: absolute; top: 0; left: 0; right: 0;
@@ -1854,6 +2105,7 @@ body.light .auth-card {
   width: 110px; height: 160px;
   border-radius: 14px; overflow: hidden; background: #000;
   z-index: 20; display: none;
+  border: 2px solid rgba(255, 255, 255, 0.15);
 }
 #local-video-wrap.active { display: block; }
 #local-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
@@ -1869,11 +2121,13 @@ body.light .auth-card {
   font-size: 26px; color: #fff;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: transform var(--dur-fast) var(--ease-spring);
 }
 .call-btn:active { transform: scale(0.88); }
 .call-btn.off { background: #fff; color: #000; }
 .call-btn.hangup { background: var(--danger); }
 
+/* ─── INCOMING CALL ─── */
 #incoming-screen {
   position: fixed; inset: 0; z-index: 4500;
   background: linear-gradient(180deg, #1a1428 0%, #0a0612 100%);
@@ -1883,7 +2137,7 @@ body.light .auth-card {
   padding-top: calc(80px + var(--safe-top));
   padding-bottom: calc(70px + var(--safe-bottom));
 }
-#incoming-screen.active { display: flex; }
+#incoming-screen.active { display: flex; animation: fadeIn var(--dur-base); }
 #incoming-screen .from-label { color: rgba(255, 255, 255, 0.5); font-size: 14px; margin-bottom: 10px; text-align: center; }
 #incoming-screen .from-name { font-size: 28px; font-weight: 700; margin-bottom: 10px; text-align: center; color: #fff; }
 #incoming-screen .type { color: rgba(255, 255, 255, 0.7); font-size: 15px; text-align: center; }
@@ -1893,6 +2147,11 @@ body.light .auth-card {
   display: flex; align-items: center; justify-content: center;
   font-size: 56px; font-weight: 600; color: #fff;
   background: var(--accent); background-size: cover; background-position: center;
+  animation: incomingPulse 1.5s ease-in-out infinite;
+}
+@keyframes incomingPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(139, 127, 255, 0.6); }
+  50% { transform: scale(1.03); box-shadow: 0 0 0 25px rgba(139, 127, 255, 0); }
 }
 #incoming-screen .buttons { display: flex; gap: 70px; }
 .incoming-btn {
@@ -1900,15 +2159,128 @@ body.light .auth-card {
   border-radius: 50%; border: none;
   font-size: 30px; color: #fff;
   display: flex; align-items: center; justify-content: center;
+  transition: transform var(--dur-fast) var(--ease-spring);
 }
 .incoming-btn:active { transform: scale(0.85); }
 .incoming-btn.accept { background: var(--online); }
 .incoming-btn.decline { background: var(--danger); }
 
-/* ─── МОБИЛЬНАЯ АДАПТАЦИЯ ─── */
+/* ─── WELCOME FLASH / TOAST ─── */
+#welcome-flash {
+  position: fixed; inset: 0;
+  background: var(--accent);
+  z-index: 99998;
+  opacity: 0;
+  pointer-events: none;
+}
+#welcome-flash.active { animation: flashIn 1s var(--ease-out) forwards; }
+@keyframes flashIn {
+  0% { opacity: 0; }
+  20% { opacity: 0.35; }
+  100% { opacity: 0; }
+}
+
+#welcome-toast {
+  position: fixed;
+  top: calc(40px + var(--safe-top));
+  left: 50%; transform: translateX(-50%) translateY(-30px);
+  background: var(--bg-panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  padding: 18px 26px;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(139, 127, 255, 0.2);
+  z-index: 99999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-base), transform var(--dur-slow) var(--ease-spring);
+  max-width: calc(100vw - 40px);
+}
+#welcome-toast.active {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+#welcome-toast .wt-emoji { font-size: 36px; margin-bottom: 4px; }
+#welcome-toast .wt-name {
+  font-size: 17px; font-weight: 700;
+  color: var(--text);
+}
+#welcome-toast .wt-sub {
+  font-size: 13px; color: var(--text-muted);
+}
+
+/* ─── CHAT WALLPAPER ─── */
+#messages.has-wallpaper {
+  background-color: transparent;
+}
+#messages.has-wallpaper::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  z-index: 0;
+}
+#messages.has-wallpaper .msg-wrap { position: relative; z-index: 1; }
+
+/* ─── MOBILE ADAPTATION ─── */
 @media (max-width: 420px) {
   .auth-card { padding: 28px 20px; border-radius: 20px; }
   .auth-logo { width: 72px; height: 72px; border-radius: 20px; margin-bottom: 16px; }
   .auth-logo-inner { font-size: 36px; }
   .auth-title { font-size: 24px; }
+
+  .chat-item { padding: 10px; }
+  .avatar { width: 48px; height: 48px; font-size: 18px; }
+
+  .msg { max-width: 85%; }
+
+  .video-circle-wrap { width: 160px; height: 160px; }
+
+  #circle-video-preview { width: 220px; height: 220px; }
+
+  .gifts-grid, .my-gifts-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .sticker-grid { grid-template-columns: repeat(3, 1fr); }
+  #gallery-content { grid-template-columns: repeat(3, 1fr); }
 }
+
+@media (max-width: 360px) {
+  .auth-card { padding: 24px 16px; }
+  .auth-title { font-size: 22px; }
+  .chat-name { font-size: 14.5px; }
+  .chat-preview { font-size: 12.5px; }
+  .msg { font-size: 14px; }
+}
+
+/* ─── LANDSCAPE FIXES ─── */
+@media (orientation: landscape) and (max-height: 500px) {
+  #story-header { top: calc(8px + var(--safe-top)); }
+  #story-bottom { padding: 8px 20px calc(8px + var(--safe-bottom)); }
+}
+
+/* ─── SAFE-AREA для iOS ─── */
+@supports (padding: env(safe-area-inset-top)) {
+  #main-header,
+  #chat-top,
+  #settings-header,
+  #channel-top {
+    padding-top: calc(10px + var(--safe-top));
+  }
+  #input-area,
+  #channel-input-area,
+  #bottom-nav,
+  #recording-bar {
+    padding-bottom: calc(14px + var(--safe-bottom));
+  }
+}
+
+/* ─── REDUCED MOTION ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── КОНЕЦ ФАЙЛА style.css ─── */
