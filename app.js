@@ -1,7 +1,8 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.0 — Client
+   🌌 AZERTA v13.2 — Client
+   ✓ 🎨 Баннеры профиля
    ✓ Боты (создание, чат, команды)
    ✓ Ripple + Skeleton + Spring
    ✓ Достижения, статистика, упоминания
@@ -15,7 +16,7 @@ var isLoggedInOnServer = false;
 
 const state = {
   me: {
-    username: null, avatar: null, verified: false, bio: '',
+    username: null, avatar: null, banner: null, verified: false, bio: '',
     firstName: '', lastName: '', birthday: '', emoji: '',
     stars: 0, sessionId: null, hammer: false, scam: false
   },
@@ -50,6 +51,7 @@ const state = {
   currentColorTarget: null, toastTimeout: null, isLoggedIn: false,
   chatWallpapers: {}, contactProfileCurrent: null,
   myBots: [], editingBotUsername: null, tempBotAvatar: null,
+  tempBanner: null
 };
 
 const STORAGE = {
@@ -240,7 +242,6 @@ function hideBtnSpinner(btnId, text) {
   btn.disabled = false;
 }
 
-/* ─── ТАЧ-АНИМАЦИИ ─── */
 document.addEventListener('touchstart', function (e) {
   const btn = e.target.closest('.auth-btn-primary, .modal-primary, .modal-secondary, .modal-danger, .nav-btn, .create-menu-btn, .settings-item');
   if (!btn) return;
@@ -608,6 +609,7 @@ function doLogin() {
 function onLoggedIn(res, isAutoLogin) {
   state.me.username = res.username;
   state.me.avatar = res.avatar || null;
+  state.me.banner = res.banner || null;
   state.me.verified = !!res.verified;
   state.me.hammer = !!res.hammer;
   state.me.scam = !!res.scam;
@@ -667,6 +669,7 @@ async function tryAutoLogin() {
       saveJson(STORAGE.SESSION, { username: res.username, sessionId: res.sessionId });
       state.me.username = res.username;
       state.me.avatar = res.avatar || null;
+      state.me.banner = res.banner || null;
       state.me.verified = !!res.verified;
       state.me.hammer = !!res.hammer;
       state.me.scam = !!res.scam;
@@ -947,7 +950,7 @@ function renderSettings() {
 
   html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
 
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.0<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.2<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
@@ -1078,7 +1081,7 @@ function confirmDeleteAccount() {
   });
 }
 
-/* ─── ПРОФИЛЬ ─── */
+/* ─── 🎨 БАННЕР ПРОФИЛЯ ─── */
 function openProfile() {
   $('profile-username').textContent = '@' + (state.me.username || '');
   $('my-first-name').value = state.me.firstName || '';
@@ -1086,9 +1089,114 @@ function openProfile() {
   $('my-bio').value = state.me.bio || '';
   $('my-birthday').value = state.me.birthday || '';
   $('my-emoji').value = state.me.emoji || '';
+
+  // 🎨 Превью баннера
+  const bannerPreview = $('profile-banner-preview');
+  const bannerImg = $('profile-banner-img');
+  if (state.me.banner) {
+    bannerImg.src = state.me.banner;
+    bannerPreview.style.display = 'block';
+    bannerPreview.classList.remove('removing');
+  } else {
+    bannerImg.src = '';
+    bannerPreview.style.display = 'none';
+  }
+
   updateVerifyButton();
   updateVerifyChannelButton();
   openModal('profile-modal');
+}
+
+function uploadBanner(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showToast('⚠️ Только изображения');
+    event.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const img = new Image();
+    img.onload = function () {
+      // 🎨 Сжатие: 1200×400, JPEG 0.75
+      const targetW = 1200;
+      const targetH = 400;
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+
+      // Cover: заполняем полностью, обрезаем лишнее
+      const scale = Math.max(targetW / img.width, targetH / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      const x = (targetW - w) / 2;
+      const y = (targetH - h) / 2;
+
+      ctx.drawImage(img, x, y, w, h);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+
+      // Проверка размера
+      if (dataUrl.length > 2_000_000) {
+        showToast('⚠️ Баннер слишком большой. Выбери картинку поменьше.');
+        return;
+      }
+
+      // Показываем превью сразу
+      const bannerPreview = $('profile-banner-preview');
+      const bannerImg = $('profile-banner-img');
+      bannerImg.src = dataUrl;
+      bannerPreview.style.display = 'block';
+      bannerPreview.classList.remove('removing');
+
+      // Сохраняем
+      socket.emit('set banner', { banner: dataUrl }, function (res) {
+        if (res && res.ok) {
+          state.me.banner = dataUrl;
+          showToast('🎨 Баннер установлен');
+          vibrate([50, 30, 50]);
+        } else {
+          showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+          // Откат
+          if (!state.me.banner) {
+            bannerPreview.style.display = 'none';
+          }
+        }
+      });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function removeMyBanner(event) {
+  if (event) event.stopPropagation();
+  if (!state.me.banner) return;
+  if (!confirm('Убрать баннер?')) return;
+
+  const bannerPreview = $('profile-banner-preview');
+  if (bannerPreview) bannerPreview.classList.add('removing');
+
+  socket.emit('remove banner', function (res) {
+    if (res && res.ok) {
+      state.me.banner = null;
+      setTimeout(function () {
+        if (bannerPreview) {
+          bannerPreview.style.display = 'none';
+          bannerPreview.classList.remove('removing');
+        }
+      }, 400);
+      showToast('🎨 Баннер убран');
+      vibrate(15);
+    } else {
+      if (bannerPreview) bannerPreview.classList.remove('removing');
+      showToast('❌ Не удалось убрать');
+    }
+  });
 }
 
 function saveProfile() {
@@ -1366,7 +1474,6 @@ function openContactProfile(username) {
       giftsHtml += '</div></div>';
     }
 
-    // Команды бота
     let botCmdsHtml = '';
     if (isBotUser && data.botCommands && data.botCommands.length > 0) {
       botCmdsHtml = '<div class="bot-commands-preview"><div class="bcp-title">🤖 Команды</div>';
@@ -1376,7 +1483,19 @@ function openContactProfile(username) {
       botCmdsHtml += '</div>';
     }
 
-    box.innerHTML = '<div class="profile-header">' +
+    // 🎨 Баннер профиля
+    let bannerHtml = '';
+    const hasBanner = !!data.banner && !isBotUser;
+    if (hasBanner) {
+      bannerHtml = '<div class="contact-banner"><img src="' + data.banner + '" alt="" /></div>';
+    }
+
+    const profileHeaderOpen = hasBanner
+      ? '<div class="contact-profile-with-banner">'
+      : '<div class="profile-header">';
+
+    box.innerHTML = bannerHtml +
+      profileHeaderOpen +
       '<div class="profile-avatar-big' + (isBotUser ? ' bot' : '') + '" style="' + avStyle + '">' + avContent + '</div>' +
       '<div class="profile-name">' + escapeHtml(displayName) + emojiStr + botMark + ' ' + badges + '</div>' +
       '<div class="profile-nick">@' + escapeHtml(username) + '</div>' +
@@ -2346,12 +2465,10 @@ function openChat(name) {
   }
 
   $('chat-actions').style.display = 'flex';
-  // У ботов нет звонков
   $('callBtn1').style.display = state.isBotChat ? 'none' : 'block';
   $('callBtn2').style.display = state.isBotChat ? 'none' : 'block';
   $('chat-top-info').onclick = function () { openContactProfile(name); };
 
-  // 🤖 Подсказка команд бота
   if (state.isBotChat) {
     socket.emit('find bot', { username: name }, function (res) {
       if (res && res.ok && res.bot.commands.length > 0) {
@@ -4969,6 +5086,7 @@ socket.on('me updated', function (data) {
   if (data.hammer !== undefined) state.me.hammer = !!data.hammer;
   if (data.scam !== undefined) state.me.scam = !!data.scam;
   if (data.avatar) state.me.avatar = data.avatar;
+  if (data.banner !== undefined) state.me.banner = data.banner;
   if (data.bio !== undefined) state.me.bio = data.bio;
   if (data.firstName !== undefined) state.me.firstName = data.firstName;
   if (data.lastName !== undefined) state.me.lastName = data.lastName;
@@ -4988,6 +5106,7 @@ socket.on('friend updated', function (data) {
     if (data.hammer !== undefined) c.hammer = !!data.hammer;
     if (data.scam !== undefined) c.scam = !!data.scam;
     if (data.avatar !== undefined) c.avatar = data.avatar;
+    if (data.banner !== undefined) c.banner = data.banner;
     saveJson(STORAGE.CONTACTS_CACHE, state.contacts);
     renderChatList();
     if (state.activeTab === 'contacts') renderContactsTab();
@@ -5118,7 +5237,8 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Azerta v13.0 — Client загружен');
+console.log('✅ Azerta v13.2 — Client загружен');
+console.log('🎨 Баннеры профиля: ВКЛЮЧЕНЫ');
 console.log('🤖 Боты: создание, чат, команды');
 console.log('✨ Плавность: ripple, skeleton, spring, stagger');
 console.log('✓ ГОТОВО');
