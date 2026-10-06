@@ -1,13 +1,13 @@
 {
-  "name": "azerta",
-  "short_name": "azerta",
-  "description": "Семейный мессенджер azerta",
+  "name": "Azerta",
+  "short_name": "Azerta",
+  "description": "Семейный мессенджер Azerta",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a84ff",
+  "background_color": "#0e0e10",
+  "theme_color": "#8b7fff",
   "lang": "ru",
   "dir": "ltr",
   "categories": ["social", "communication"],
@@ -37,6 +37,12 @@
       "short_name": "Чаты",
       "url": "/",
       "description": "Открыть список чатов"
+    },
+    {
+      "name": "Контакты",
+      "short_name": "Контакты",
+      "url": "/?tab=contacts",
+      "description": "Открыть список контактов"
     }
   ]
 }
