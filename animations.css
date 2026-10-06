@@ -1,0 +1,861 @@
+/* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA v13.0 — animations.css
+   Плавность x100000000: ripple, skeleton, stagger, spring,
+   View Transitions, живой градиент, 3D-tap, glow, morph
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── БАЗОВЫЕ SPRING-КРИВЫЕ ─── */
+:root {
+  --spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring-bouncy: cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  --spring-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --spring-snappy: cubic-bezier(0.25, 1.4, 0.5, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+
+  --dur-ultra-fast: 100ms;
+  --dur-instant: 180ms;
+  --dur-quick: 280ms;
+  --dur-smooth: 420ms;
+  --dur-breathe: 700ms;
+  --dur-slow: 1100ms;
+}
+
+body.no-anim *,
+body.no-anim *::before,
+body.no-anim *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   1. RIPPLE НА КНОПКАХ
+   ═══════════════════════════════════════════════════════════ */
+
+.ripple-container {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  animation: rippleExpand 700ms var(--ease-out-quart);
+  will-change: transform, opacity;
+}
+body.light .ripple { background: rgba(0, 0, 0, 0.15); }
+@keyframes rippleExpand {
+  0% { transform: scale(0); opacity: 1; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2. SKELETON-ЗАГРУЗКА
+   ═══════════════════════════════════════════════════════════ */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+body.light .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 0%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(0, 0, 0, 0.04) 100%
+  );
+  background-size: 200% 100%;
+}
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-chat-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+}
+.skeleton-chat-item .sk-avatar {
+  width: 54px; height: 54px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skeleton-chat-item .sk-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skeleton-chat-item .sk-line {
+  height: 12px;
+  border-radius: 6px;
+}
+.skeleton-chat-item .sk-line.short { width: 40%; }
+.skeleton-chat-item .sk-line.long { width: 80%; }
+
+/* ═══════════════════════════════════════════════════════════
+   3. STAGGER ПОЯВЛЕНИЕ СООБЩЕНИЙ
+   ═══════════════════════════════════════════════════════════ */
+
+.msg-wrap {
+  animation: msgStagger 0.45s var(--spring-smooth) backwards;
+}
+@keyframes msgStagger {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+    filter: blur(3px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Когда сообщений > 10 — быстрее, чтобы не тормозило */
+.msg-wrap:nth-last-child(n+10) {
+  animation-duration: 0.3s;
+}
+
+/* Свежее сообщение — увеличенная пружина */
+.msg-wrap.just-sent {
+  animation: msgSent 0.7s var(--spring-bouncy) !important;
+}
+@keyframes msgSent {
+  0% { transform: scale(0.7) translateY(20px); opacity: 0; }
+  50% { transform: scale(1.05) translateY(-4px); opacity: 1; }
+  75% { transform: scale(0.98) translateY(2px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   4. ПЛАВНЫЕ ПОЯВЛЕНИЯ ЧАТ-ЛИСТА
+   ═══════════════════════════════════════════════════════════ */
+
+.chat-item {
+  animation: chatItemIn 0.4s var(--spring-smooth) backwards;
+}
+@keyframes chatItemIn {
+  0% { opacity: 0; transform: translateX(-16px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.chat-item:nth-child(1) { animation-delay: 0ms; }
+.chat-item:nth-child(2) { animation-delay: 30ms; }
+.chat-item:nth-child(3) { animation-delay: 60ms; }
+.chat-item:nth-child(4) { animation-delay: 90ms; }
+.chat-item:nth-child(5) { animation-delay: 120ms; }
+.chat-item:nth-child(6) { animation-delay: 150ms; }
+.chat-item:nth-child(n+7) { animation-delay: 180ms; }
+
+/* ═══════════════════════════════════════════════════════════
+   5. RIPPLE-КНОПКИ (классы .btn-touch)
+   ═══════════════════════════════════════════════════════════ */
+
+.auth-btn-primary,
+.modal-primary,
+.modal-secondary,
+.modal-danger,
+.create-menu-btn,
+.nav-btn,
+.settings-item,
+.chat-item,
+.attach,
+.mic,
+.camera,
+#send-btn,
+.back-btn,
+.icon-btn,
+#burger,
+.nav-btn .nav-icon,
+.reaction-option,
+.reaction-chip,
+.action-item {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform var(--dur-quick) var(--spring-soft),
+              background var(--dur-instant) var(--ease-out-quart),
+              box-shadow var(--dur-quick) var(--ease-out-quart);
+}
+
+/* Единое 3D-нажатие */
+.auth-btn-primary:active,
+.modal-primary:active,
+.modal-danger:active,
+#send-btn:active,
+.back-btn:active {
+  transform: scale(0.94) translateZ(0);
+  transition-duration: var(--dur-ultra-fast);
+}
+
+.auth-btn-primary {
+  box-shadow: 0 4px 14px rgba(139, 127, 255, 0.15);
+  transition: transform var(--dur-quick) var(--spring-soft),
+              box-shadow var(--dur-quick) var(--ease-out-quart),
+              background var(--dur-instant);
+}
+.auth-btn-primary:hover {
+  box-shadow: 0 8px 24px rgba(139, 127, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   6. ПЛАВНОЕ ПОЯВЛЕНИЕ / ЗАКРЫТИЕ МОДАЛОК
+   ═══════════════════════════════════════════════════════════ */
+
+.modal {
+  transition: opacity var(--dur-quick) var(--ease-out-quart),
+              backdrop-filter var(--dur-quick) var(--ease-out-quart);
+  backdrop-filter: blur(0px);
+}
+.modal.active {
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.modal-box {
+  animation: modalBoxIn 0.5s var(--spring-bouncy);
+  will-change: transform, opacity;
+}
+@keyframes modalBoxIn {
+  0% { opacity: 0; transform: scale(0.85) translateY(24px); }
+  60% { opacity: 1; transform: scale(1.02) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   7. VIEW TRANSITIONS API
+   ═══════════════════════════════════════════════════════════ */
+
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root) {
+  animation: vtFadeOut var(--dur-quick) var(--ease-out-quart);
+}
+::view-transition-new(root) {
+  animation: vtFadeIn var(--dur-smooth) var(--spring-smooth);
+}
+@keyframes vtFadeOut {
+  to { opacity: 0; transform: scale(0.98); }
+}
+@keyframes vtFadeIn {
+  from { opacity: 0; transform: scale(1.02); }
+}
+
+/* Переход чат→чат */
+#chat-screen.active {
+  animation: chatScreenIn 0.4s var(--spring-smooth);
+}
+@keyframes chatScreenIn {
+  0% { opacity: 0; transform: translateX(30px) scale(0.98); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* Переход в настройки */
+#settings-screen.active {
+  animation: settingsIn 0.4s var(--spring-smooth);
+}
+@keyframes settingsIn {
+  0% { opacity: 0; transform: translateY(40px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Переход между табами */
+.app-tab.active {
+  animation: tabIn 0.35s var(--spring-smooth);
+}
+@keyframes tabIn {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   8. ЖИВОЙ ГРАДИЕНТ (splash, лого)
+   ═══════════════════════════════════════════════════════════ */
+
+#splash-logo,
+.auth-logo {
+  background-size: 300% 300%;
+  animation: splashPulse 2s ease-in-out infinite alternate,
+             gradientShift 6s ease-in-out infinite;
+}
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   9. GLOW-ЭФФЕКТ НА АКТИВНОМ ТАБЕ
+   ═══════════════════════════════════════════════════════════ */
+
+.nav-btn.active .nav-icon {
+  animation: navGlow 2.4s ease-in-out infinite;
+}
+@keyframes navGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 127, 255, 0.5); }
+  50% { box-shadow: 0 0 20px 4px rgba(139, 127, 255, 0.4); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   10. ПЛАВНАЯ ПУЛЬСАЦИЯ ON-LINE ТОЧКИ
+   ═══════════════════════════════════════════════════════════ */
+
+.avatar .online-dot {
+  animation: onlineDotPulse 2.5s ease-in-out infinite;
+}
+@keyframes onlineDotPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.85; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   11. МИКРО-ПОДЪЁМ ПРИ HOVER (десктоп)
+   ═══════════════════════════════════════════════════════════ */
+
+@media (hover: hover) {
+  .chat-item:hover {
+    background: var(--bg-hover);
+    transform: translateX(2px);
+  }
+  .settings-item:hover {
+    background: var(--bg-hover);
+    padding-left: 24px;
+  }
+  .settings-item {
+    transition: background var(--dur-instant),
+                padding-left var(--dur-quick) var(--ease-out-quart);
+  }
+  .create-menu-btn:hover {
+    background: var(--bg-active);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  }
+  .gift-card.affordable:hover {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 10px 24px rgba(251, 191, 36, 0.25);
+  }
+  .sticker-item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(139, 127, 255, 0.25);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   12. ПЛАВНАЯ СМЕНА ПРЕВЬЮ ОТВЕТА (reply-preview)
+   ═══════════════════════════════════════════════════════════ */
+
+#reply-preview {
+  transition: max-height var(--dur-quick) var(--spring-smooth),
+              opacity var(--dur-quick),
+              padding var(--dur-quick);
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+#reply-preview.active {
+  max-height: 80px;
+  opacity: 1;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   13. ПЛАВНАЯ ПАНЕЛЬ СТИКЕРОВ
+   ═══════════════════════════════════════════════════════════ */
+
+#stickers-panel {
+  transition: transform var(--dur-smooth) var(--spring-smooth),
+              opacity var(--dur-quick);
+}
+#stickers-panel.active {
+  transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   14. ПЛАВНАЯ ЗАПИСЬ ГОЛОСОВОГО
+   ═══════════════════════════════════════════════════════════ */
+
+#recording-bar {
+  animation: recBarIn 0.4s var(--spring-bouncy);
+}
+@keyframes recBarIn {
+  0% { transform: translateY(100%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+#recording-dot {
+  animation: recPulse 1s ease-in-out infinite,
+             recGlow 2s ease-in-out infinite;
+}
+@keyframes recGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6); }
+  50% { box-shadow: 0 0 12px 4px rgba(255, 255, 255, 0.4); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   15. ПЛАВНАЯ ВОЛНА ГОЛОСОВОГО
+   ═══════════════════════════════════════════════════════════ */
+
+.voice-wave span {
+  animation: voiceWaveIdle 2.4s ease-in-out infinite;
+}
+@keyframes voiceWaveIdle {
+  0%, 100% { transform: scaleY(1); opacity: 0.5; }
+  50% { transform: scaleY(0.7); opacity: 0.7; }
+}
+.voice-wave span:nth-child(3n) { animation-delay: 0.2s; }
+.voice-wave span:nth-child(5n) { animation-delay: 0.5s; }
+.voice-wave span:nth-child(7n) { animation-delay: 0.8s; }
+
+.voice-msg.playing .voice-wave span {
+  animation: waveAnim 0.6s ease-in-out infinite alternate !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   16. ПЛАВНЫЕ РЕАКЦИИ
+   ═══════════════════════════════════════════════════════════ */
+
+.reaction-chip {
+  transition: transform var(--dur-instant) var(--spring-soft),
+              background var(--dur-instant),
+              border-color var(--dur-instant);
+}
+.reaction-chip:hover {
+  transform: scale(1.12);
+}
+.reaction-chip.mine {
+  animation: reactionPop 0.4s var(--spring-bouncy);
+}
+@keyframes reactionPop {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+#reaction-menu.active {
+  animation: reactionMenuIn 0.3s var(--spring-bouncy);
+}
+@keyframes reactionMenuIn {
+  0% { opacity: 0; transform: scale(0.8) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.reaction-option {
+  transition: transform var(--dur-instant) var(--spring-soft);
+}
+.reaction-option:hover {
+  transform: scale(1.3) rotate(8deg);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   17. ПЛАВНЫЕ СТОРИС
+   ═══════════════════════════════════════════════════════════ */
+
+.story-ring {
+  transition: transform var(--dur-quick) var(--spring-bouncy),
+              background var(--dur-quick);
+}
+.story-bubble:active .story-ring {
+  transform: scale(0.92);
+}
+.story-ring.mine.has-story {
+  animation: storyRingPulse 2.8s ease-in-out infinite;
+}
+@keyframes storyRingPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 127, 255, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(139, 127, 255, 0); }
+}
+
+#story-viewer.active {
+  animation: storyViewerIn 0.4s var(--spring-smooth);
+}
+@keyframes storyViewerIn {
+  0% { opacity: 0; transform: scale(0.94); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+#story-image {
+  transition: transform var(--dur-slow) var(--ease-out-expo);
+}
+#story-image-wrap:active #story-image {
+  transform: scale(1.02);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   18. GLOW НА ONLINE / ACTIVE ЭЛЕМЕНТАХ
+   ═══════════════════════════════════════════════════════════ */
+
+.chat-item.active {
+  animation: chatActiveGlow 1.6s ease-out;
+}
+@keyframes chatActiveGlow {
+  0% { box-shadow: inset 0 0 0 0 rgba(139, 127, 255, 0.4); }
+  100% { box-shadow: inset 0 0 0 0 rgba(139, 127, 255, 0); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   19. ПЛАВНОЕ ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК В STICKERS
+   ═══════════════════════════════════════════════════════════ */
+
+.sticker-tab {
+  transition: background var(--dur-instant) var(--ease-out-quart),
+              color var(--dur-instant),
+              transform var(--dur-instant) var(--spring-soft);
+}
+.sticker-tab.active {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(139, 127, 255, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   20. ПЛАВНЫЕ УВЕДОМЛЕНИЯ / TOAST
+   ═══════════════════════════════════════════════════════════ */
+
+#aurora-toast {
+  transition: opacity var(--dur-quick) var(--ease-out-quart),
+              transform var(--dur-smooth) var(--spring-bouncy);
+}
+#aurora-toast.show {
+  animation: toastIn 0.5s var(--spring-bouncy);
+}
+@keyframes toastIn {
+  0% { transform: translateX(-50%) translateY(30px) scale(0.9); opacity: 0; }
+  60% { transform: translateX(-50%) translateY(-4px) scale(1.02); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+
+/* Карточка достижения */
+.achievement-card {
+  animation: achIn 0.5s var(--spring-bouncy) backwards;
+}
+@keyframes achIn {
+  0% { opacity: 0; transform: translateY(20px) scale(0.9) rotateX(-10deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0); }
+}
+.achievement-card.unlocked .achievement-emoji {
+  animation: achGlow 2.4s ease-in-out infinite;
+}
+@keyframes achGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(139, 127, 255, 0.3); }
+  50% { box-shadow: 0 0 32px rgba(139, 127, 255, 0.6); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   21. 🤖 BOTS — ПЛАВНОСТЬ
+   ═══════════════════════════════════════════════════════════ */
+
+.bot-mark {
+  animation: botMarkPulse 3s ease-in-out infinite;
+}
+@keyframes botMarkPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.5); }
+  50% { box-shadow: 0 0 10px 2px rgba(6, 182, 212, 0.3); }
+}
+
+.my-bot-card {
+  animation: botCardIn 0.4s var(--spring-smooth) backwards;
+}
+@keyframes botCardIn {
+  0% { opacity: 0; transform: scale(0.92) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.bot-command-row {
+  animation: botCmdIn 0.3s var(--spring-soft);
+}
+@keyframes botCmdIn {
+  0% { opacity: 0; transform: translateX(-10px) scaleY(0.8); }
+  100% { opacity: 1; transform: translateX(0) scaleY(1); }
+}
+
+.bot-commands-hint .bch-chip {
+  transition: transform var(--dur-quick) var(--spring-soft),
+              background var(--dur-instant),
+              border-color var(--dur-instant);
+  animation: bchChipIn 0.4s var(--spring-bouncy) backwards;
+}
+.bot-commands-hint .bch-chip:nth-child(1) { animation-delay: 0ms; }
+.bot-commands-hint .bch-chip:nth-child(2) { animation-delay: 60ms; }
+.bot-commands-hint .bch-chip:nth-child(3) { animation-delay: 120ms; }
+.bot-commands-hint .bch-chip:nth-child(4) { animation-delay: 180ms; }
+.bot-commands-hint .bch-chip:nth-child(n+5) { animation-delay: 240ms; }
+
+@keyframes bchChipIn {
+  0% { opacity: 0; transform: translateY(8px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bot-commands-hint .bch-chip:hover {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: var(--bot);
+  transform: translateY(-2px);
+}
+.bot-commands-hint .bch-chip:active {
+  transform: scale(0.93);
+}
+
+/* Сообщение от бота — особый оттенок */
+.msg-wrap[data-from$="_bot"] .msg.other {
+  background: linear-gradient(135deg, #1e1e24, #1a2a2e);
+  border-left: 3px solid var(--bot);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   22. ПЛАВНАЯ ПРОКРУТКА СПИСКОВ
+   ═══════════════════════════════════════════════════════════ */
+
+#chat-list,
+#messages,
+#contacts-list,
+#channel-posts,
+#stickers-content,
+#gallery-content {
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   23. ПЛАВНОЕ ПОЯВЛЕНИЕ INPUT ПРИ ОТВЕТЕ
+   ═══════════════════════════════════════════════════════════ */
+
+#msgInput:focus {
+  transform: scale(1.005);
+  box-shadow: 0 0 0 3px rgba(139, 127, 255, 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   24. ПЛАВНЫЕ СВИТЧИ (settings)
+   ═══════════════════════════════════════════════════════════ */
+
+.switch .slider {
+  transition: background var(--dur-quick) var(--ease-out-quart);
+}
+.switch .slider::before {
+  transition: transform var(--dur-quick) var(--spring-bouncy),
+              box-shadow var(--dur-quick);
+}
+.switch input:checked + .slider::before {
+  box-shadow: 0 0 12px rgba(139, 127, 255, 0.6);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   25. ПЛАВНЫЕ АВАТАРКИ (плавный вход)
+   ═══════════════════════════════════════════════════════════ */
+
+.avatar {
+  transition: transform var(--dur-quick) var(--spring-soft);
+}
+.chat-item:active .avatar {
+  transform: scale(0.94);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   26. ПЛАВНЫЙ CREDIT-BADGE (verified и т.д.)
+   ═══════════════════════════════════════════════════════════ */
+
+.verified-badge,
+.hammer-badge,
+.scam-badge {
+  transition: transform var(--dur-quick) var(--spring-bouncy);
+}
+.chat-item:hover .verified-badge,
+.chat-item:hover .hammer-badge,
+.chat-item:hover .scam-badge {
+  transform: scale(1.15);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   27. ПЛАВНАЯ ЗАГРУЗКА КАНАЛОВ / ПОСТОВ
+   ═══════════════════════════════════════════════════════════ */
+
+#channel-posts > div {
+  animation: postIn 0.5s var(--spring-smooth) backwards;
+}
+#channel-posts > div:nth-child(1) { animation-delay: 0ms; }
+#channel-posts > div:nth-child(2) { animation-delay: 80ms; }
+#channel-posts > div:nth-child(3) { animation-delay: 160ms; }
+#channel-posts > div:nth-child(n+4) { animation-delay: 220ms; }
+@keyframes postIn {
+  0% { opacity: 0; transform: translateY(24px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   28. ПЛАВНАЯ ЗАПИСЬ КРУЖКА
+   ═══════════════════════════════════════════════════════════ */
+
+#circle-preview.active {
+  animation: circleIn 0.5s var(--spring-bouncy);
+}
+@keyframes circleIn {
+  0% { opacity: 0; transform: scale(0.7); }
+  100% { opacity: 1; transform: scale(1); }
+}
+#circle-video-preview {
+  animation: circlePulse 2.4s ease-in-out infinite;
+}
+@keyframes circlePulse {
+  0%, 100% { box-shadow: 0 0 60px rgba(139, 127, 255, 0.4); }
+  50% { box-shadow: 0 0 80px rgba(139, 127, 255, 0.7); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   29. ПЛАВНОЕ ПОЯВЛЕНИЕ ЗВОНКА
+   ═══════════════════════════════════════════════════════════ */
+
+#call-screen.active {
+  animation: callIn 0.5s var(--spring-smooth);
+}
+@keyframes callIn {
+  0% { opacity: 0; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+#incoming-screen.active {
+  animation: incomingIn 0.5s var(--spring-bouncy);
+}
+@keyframes incomingIn {
+  0% { opacity: 0; transform: scale(0.9) translateY(40px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   30. ПЛАВНАЯ ПОДСВЕТКА ССЫЛОК (@упоминания)
+   ═══════════════════════════════════════════════════════════ */
+
+.mention {
+  transition: background var(--dur-instant),
+              transform var(--dur-instant) var(--spring-soft);
+}
+.mention:hover {
+  background: rgba(139, 127, 255, 0.3);
+  transform: scale(1.02);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   31. ПЛАВНАЯ СМЕНА ЦВЕТА ПРИ LOADING
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+.breathing { animation: breathe 2.4s ease-in-out infinite; }
+
+/* ═══════════════════════════════════════════════════════════
+   32. ПОДСКАЗКА "ПЕЧАТАЕТ…" — ПЛАВНАЯ ВОЛНА
+   ═══════════════════════════════════════════════════════════ */
+
+#chat-top-status.typing {
+  animation: typingPulse 1.4s ease-in-out infinite;
+}
+@keyframes typingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   33. ПЛАВНОЕ СКРЫТИЕ/ПОКАЗ МОДАЛОК
+   ═══════════════════════════════════════════════════════════ */
+
+.modal {
+  transition: opacity var(--dur-quick) var(--ease-out-quart);
+}
+.modal:not(.active) .modal-box {
+  animation: modalBoxOut 0.25s var(--ease-out-quart) forwards;
+}
+@keyframes modalBoxOut {
+  to { opacity: 0; transform: scale(0.94) translateY(12px); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   34. ПЛАВНОЕ ПОЯВЛЕНИЕ АВТОРИЗАЦИИ
+   ═══════════════════════════════════════════════════════════ */
+
+.auth-card {
+  animation: authCardIn 0.6s var(--spring-bouncy);
+}
+@keyframes authCardIn {
+  0% { opacity: 0; transform: translateY(30px) scale(0.92); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.auth-blob {
+  animation-duration: 20s, 25s, 22s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   35. ПЛАВНЫЙ ФОКУС НА ПОЛЯХ ВВОДА
+   ═══════════════════════════════════════════════════════════ */
+
+.auth-input:focus,
+.modal-box input:focus,
+.modal-box textarea:focus,
+#search:focus,
+#msgInput:focus,
+#stickers-search:focus,
+#channel-post-input:focus,
+#channel-comment-input:focus {
+  box-shadow: 0 0 0 4px rgba(139, 127, 255, 0.08);
+  transition: border-color var(--dur-quick) var(--ease-out-quart),
+              box-shadow var(--dur-quick) var(--ease-out-quart),
+              background var(--dur-quick);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   36. REDUCED MOTION — уважение к ОС
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   37. GPU-УСКОРЕНИЕ для тяжёлых элементов
+   ═══════════════════════════════════════════════════════════ */
+
+.modal-box,
+#chat-screen,
+#settings-screen,
+#story-viewer,
+#call-screen,
+#incoming-screen,
+.msg-wrap,
+.avatar,
+.chat-item {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
