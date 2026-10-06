@@ -6,6 +6,8 @@
    ✓ Закреплённые чаты
    ✓ Упоминания @ник
    ✓ Очистка истории
+   ✓ Достижения
+   ✓ Статистика
    ═══════════════════════════════════════════════════════════ */
 
 const express = require('express');
@@ -17,6 +19,7 @@ const bcrypt = require('bcryptjs');
 const { Server } = require('socket.io');
 const { createClient } = require('@libsql/client');
 
+/* ─── CONFIG ─── */
 const CONFIG = {
   PORT: process.env.PORT || 3000,
   ADMIN_USERNAME: 'moroz',
@@ -38,6 +41,7 @@ const CONFIG = {
   MESSAGE_WINDOW: 10_000,
 };
 
+/* ─── КАТАЛОГ ПОДАРКОВ ─── */
 const TWEMOJI = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/';
 
 const GIFTS_CATALOG = {
@@ -83,6 +87,7 @@ const GIFTS_CATALOG = {
   azerta:    { emoji: '🌠', name: 'Сияние Azerta',   price: 10000, url: TWEMOJI + '1f320.png' },
 };
 
+/* ─── КАТАЛОГ ДОСТИЖЕНИЙ ─── */
 const ACHIEVEMENTS_CATALOG = {
   first_message:    { emoji: '💬', name: 'Первое слово',       desc: 'Отправь первое сообщение',       target: 1,     stat: 'messages_sent' },
   msg_10:           { emoji: '📝', name: 'Разговорчивый',      desc: 'Отправь 10 сообщений',           target: 10,    stat: 'messages_sent' },
@@ -123,6 +128,7 @@ const ACHIEVEMENTS_CATALOG = {
   stickers_100:     { emoji: '🎨', name: 'Стикероман',         desc: 'Отправь 100 стикеров',           target: 100,   stat: 'stickers_sent' },
 };
 
+/* ─── EXPRESS + SOCKET.IO ─── */
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -146,11 +152,13 @@ console.log('🚀 Azerta v12.6: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? '✓ задан' : '✗ НЕ ЗАДАН');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? '✓ задан' : '✗ НЕ ЗАДАН');
 
+/* ─── БД ─── */
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
+/* ─── ИНИЦИАЛИЗАЦИЯ СХЕМЫ ─── */
 async function initDB() {
   console.log('📦 Инициализация базы...');
   const start = Date.now();
@@ -434,8 +442,15 @@ async function initDB() {
   console.log(`✅ Схема БД готова за ${Date.now() - start}мс`);
 }
 
+/* ─── КОНЕЦ ЧАСТИ 5.1 ─── */
+/* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA v12.6 — Server
+   Часть 5.2: helpers
+   ═══════════════════════════════════════════════════════════ */
+
 function now() { return Date.now(); }
 
+/* ─── ПОЛЬЗОВАТЕЛИ ─── */
 async function getUser(username) {
   const r = await db.execute({ sql: 'SELECT * FROM users WHERE username = ?', args: [username] });
   return r.rows[0] || null;
@@ -453,6 +468,7 @@ async function getMessageById(id) {
   const r = await db.execute({ sql: 'SELECT * FROM messages WHERE id = ?', args: [id] });
   return r.rows[0] || null;
 }
+
 async function getGroupMessageById(id) {
   const r = await db.execute({ sql: 'SELECT * FROM group_messages WHERE id = ?', args: [id] });
   return r.rows[0] || null;
@@ -466,6 +482,7 @@ function safeParseReactions(raw) {
   } catch (e) { return {}; }
 }
 
+/* ─── ВАЛИДАЦИЯ ─── */
 function validImage(s) { return typeof s === 'string' && s.startsWith('data:image/') && s.length <= CONFIG.MAX_IMAGE; }
 function validVoice(s) { return typeof s === 'string' && s.startsWith('data:audio/') && s.length <= CONFIG.MAX_VOICE; }
 function validVideo(s) { return typeof s === 'string' && s.startsWith('data:video/') && s.length <= CONFIG.MAX_VIDEO; }
@@ -476,7 +493,7 @@ function validStickerData(s) {
 
 function generateSessionId() { return crypto.randomBytes(32).toString('hex'); }
 
-// 👥 Извлечение упоминаний @ник
+/* ─── УПОМИНАНИЯ ─── */
 function extractMentions(text) {
   if (!text) return [];
   const matches = text.match(/@([a-z0-9_]{3,20})/gi);
@@ -493,6 +510,7 @@ function extractMentions(text) {
   return result;
 }
 
+/* ─── RATE LIMIT ─── */
 const rateBuckets = new Map();
 function rateLimit(key, max, windowMs) {
   const t = now();
@@ -506,6 +524,7 @@ setInterval(() => {
   for (const [k, b] of rateBuckets) if (t > b.resetAt) rateBuckets.delete(k);
 }, 10 * 60 * 1000);
 
+/* ─── КЭШ НАСТРОЕК ─── */
 const settingsCache = new Map();
 function cacheGet(map, key) {
   const entry = map.get(key);
@@ -516,6 +535,7 @@ function cacheGet(map, key) {
 function cacheSet(map, key, value) { map.set(key, { value, expires: now() + CONFIG.CACHE_TTL }); }
 function cacheInvalidate(map, key) { map.delete(key); }
 
+/* ─── ONLINE ─── */
 const onlineUsers = {};
 function findSocketsByUsername(username) {
   const result = [];
@@ -527,6 +547,7 @@ function isOnline(username) {
   return false;
 }
 
+/* ─── СИСТЕМНЫЕ СООБЩЕНИЯ О ЗВОНКАХ ─── */
 async function createCallSystemMessage(fromUser, toUser, type, duration) {
   try {
     const t = now();
@@ -564,6 +585,7 @@ async function createCallSystemMessage(fromUser, toUser, type, duration) {
   }
 }
 
+/* ─── СТАТИСТИКА ─── */
 async function getUserStats(username) {
   let r = await db.execute({ sql: 'SELECT * FROM user_stats WHERE username = ?', args: [username] });
   if (r.rows.length === 0) {
@@ -592,6 +614,7 @@ async function incrementStat(username, statName, amount) {
   } catch (e) { console.error('incrementStat:', e); }
 }
 
+/* ─── ДОСТИЖЕНИЯ ─── */
 async function checkAchievements(username, statName) {
   try {
     const stats = await getUserStats(username);
@@ -634,6 +657,7 @@ async function getUserAchievements(username) {
   return { unlocked, stats };
 }
 
+/* ─── ДНИ ПОДРЯД (STREAK) ─── */
 async function updateDayStreak(username) {
   try {
     const stats = await getUserStats(username);
@@ -652,6 +676,7 @@ async function updateDayStreak(username) {
   } catch (e) { console.error('updateDayStreak:', e); }
 }
 
+/* ─── ЗВЁЗДЫ ─── */
 async function getStars(username) {
   if (username === CONFIG.ADMIN_USERNAME) return 999999;
   const r = await db.execute({ sql: 'SELECT stars FROM user_settings WHERE username = ?', args: [username] });
@@ -670,6 +695,7 @@ async function addStars(username, amount, reason, fromUser) {
   });
 }
 
+/* ─── ПОДАРКИ ─── */
 async function getGiftsOfUser(username) {
   const r = await db.execute({
     sql: 'SELECT * FROM gifts WHERE to_user = ? AND sold = 0 ORDER BY time DESC',
@@ -687,6 +713,7 @@ async function countGiftsToday(fromUser) {
   return Number(r.rows[0]?.c || 0);
 }
 
+/* ─── НАСТРОЙКИ ─── */
 async function getSettings(username) {
   const cached = cacheGet(settingsCache, username);
   if (cached) return cached;
@@ -697,6 +724,7 @@ async function getSettings(username) {
   return result;
 }
 
+/* ─── СЕССИИ ─── */
 async function createSession(username, device, ip) {
   const id = generateSessionId();
   const t = now();
@@ -743,6 +771,7 @@ async function cleanupExpiredSessions() {
   } catch (e) {}
 }
 
+/* ─── КОНТАКТЫ ─── */
 async function getContactsOf(username) {
   const r = await db.execute({
     sql: 'SELECT contact, display_name FROM contacts WHERE owner = ? ORDER BY added_at ASC',
@@ -751,6 +780,7 @@ async function getContactsOf(username) {
   return r.rows.map(row => ({ contact: row.contact, display_name: row.display_name }));
 }
 
+/* ─── ИСТОРИЯ СООБЩЕНИЙ ─── */
 async function getHistory(me, withUser) {
   const r = await db.execute({
     sql: `SELECT * FROM messages 
@@ -791,6 +821,7 @@ async function enrichHistoryWithReplies(rows, isGroup) {
   });
 }
 
+/* ─── БЛОКИРОВКИ ─── */
 async function isBlocked(blocker, blocked) {
   const r = await db.execute({ sql: 'SELECT 1 FROM blocks WHERE blocker = ? AND blocked = ?', args: [blocker, blocked] });
   return r.rows.length > 0;
@@ -801,6 +832,7 @@ async function isBlockedEither(a, b) {
   return false;
 }
 
+/* ─── ГРУППЫ ─── */
 async function getGroupById(id) {
   const r = await db.execute({ sql: 'SELECT * FROM groups_table WHERE id = ?', args: [id] });
   return r.rows[0] || null;
@@ -841,6 +873,7 @@ async function getGroupsUserIsIn(username) {
   return r.rows.map(row => row.group_id);
 }
 
+/* ─── КАНАЛЫ ─── */
 async function getChannelById(id) {
   const r = await db.execute({ sql: 'SELECT * FROM channels WHERE id = ?', args: [id] });
   return r.rows[0] || null;
@@ -885,6 +918,7 @@ async function getChannelsUserIsIn(username) {
   return r.rows.map(row => row.channel_id);
 }
 
+/* ─── НАСТРОЙКИ ЧАТА (архив/мьют/пин) ─── */
 async function getChatSettings(owner, chatKey) {
   const r = await db.execute({
     sql: 'SELECT * FROM chat_settings WHERE owner = ? AND chat_key = ?',
@@ -906,6 +940,7 @@ async function setChatSetting(owner, chatKey, field, value) {
   });
 }
 
+/* ─── ИСТОРИИ ─── */
 async function getActiveStories(viewer) {
   const t = now();
   const contactsR = await db.execute({ sql: 'SELECT contact FROM contacts WHERE owner = ?', args: [viewer] });
@@ -969,6 +1004,7 @@ async function deleteStory(storyId, username) {
   return { ok: true };
 }
 
+/* ─── СТИКЕРЫ ─── */
 async function getUserStickers(username) {
   const r = await db.execute({ sql: 'SELECT * FROM stickers WHERE username = ? ORDER BY time DESC', args: [username] });
   return r.rows;
@@ -995,6 +1031,7 @@ async function deleteSticker(id, username) {
   await db.execute({ sql: 'DELETE FROM stickers WHERE id = ? AND username = ?', args: [id, username] });
 }
 
+/* ─── CLEANUP ─── */
 async function cleanupExpiredStories() {
   try {
     const t = now();
@@ -1044,6 +1081,7 @@ async function cleanupOldMessages() {
   } catch (e) {}
 }
 
+/* ─── РАССЫЛКА КОНТАКТОВ ─── */
 async function sendContactsTo(username) {
   const sockets = findSocketsByUsername(username);
   if (sockets.length === 0) return;
@@ -1106,6 +1144,7 @@ async function sendContactsTo(username) {
   sockets.forEach(sid => io.to(sid).emit('contacts', list));
 }
 
+/* ─── РАССЫЛКА ГРУПП ─── */
 async function sendGroupsTo(username) {
   const sockets = findSocketsByUsername(username);
   if (sockets.length === 0) return;
@@ -1155,6 +1194,7 @@ async function sendGroupsTo(username) {
   sockets.forEach(sid => io.to(sid).emit('groups', list, { canCreate: true, createdCount }));
 }
 
+/* ─── РАССЫЛКА КАНАЛОВ ─── */
 async function sendChannelsTo(username) {
   const sockets = findSocketsByUsername(username);
   if (sockets.length === 0) return;
@@ -1193,6 +1233,7 @@ async function sendChannelsTo(username) {
   sockets.forEach(sid => io.to(sid).emit('channels', list, { canCreate: true, createdCount }));
 }
 
+/* ─── РАССЫЛКА ДРУЗЬЯМ ─── */
 async function refreshForFriends(username) {
   const r = await db.execute({ sql: 'SELECT owner FROM contacts WHERE contact = ?', args: [username] });
   for (const row of r.rows) sendContactsTo(row.owner).catch(() => {});
@@ -1213,7 +1254,7 @@ async function notifyChannelMembers(channelId, event, payload) {
   for (const u of members) findSocketsByUsername(u).forEach(sid => io.to(sid).emit(event, payload));
 }
 
-// 👥 Уведомить упомянутых
+/* ─── УВЕДОМЛЕНИЯ УПОМЯНУТЫМ ─── */
 async function notifyMentions(text, fromUser, groupId, groupName) {
   const mentions = extractMentions(text);
   if (mentions.length === 0) return;
@@ -1240,6 +1281,7 @@ async function notifyMentions(text, fromUser, groupId, groupName) {
   }
 }
 
+/* ─── БЕЙДЖИ ─── */
 async function broadcastBadgeChange(username, badgeType, value) {
   try {
     const payload = { username };
@@ -1290,13 +1332,17 @@ async function removeBadge(username, badgeType) {
   return { ok: true };
 }
 
-// ═══════════════════════════════════════════════════════════
-// 🔌 SOCKET.IO
-// ═══════════════════════════════════════════════════════════
+/* ─── КОНЕЦ ЧАСТИ 5.2 ─── */
+/* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA v12.6 — Server
+   Часть 5.3: socket — auth + contacts + profile + sessions +
+              badges + clear history + achievements
+   ═══════════════════════════════════════════════════════════ */
 
 io.on('connection', (socket) => {
   console.log('🔗 Подключился:', socket.id);
 
+  /* ─── ПРОВЕРКА НИКА ─── */
   socket.on('check username', async ({ username }, cb) => {
     try {
       if (!rateLimit('check:' + socket.handshake.address, 60, CONFIG.RATE_WINDOW)) {
@@ -1315,6 +1361,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  /* ─── РЕГИСТРАЦИЯ ─── */
   socket.on('register', async ({ username, password, displayName }, cb) => {
     try {
       if (!rateLimit('reg:' + socket.handshake.address, 5, CONFIG.RATE_WINDOW)) {
@@ -1371,6 +1418,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  /* ─── АВТО-ЛОГИН ПО СЕССИИ ─── */
   socket.on('login with session', async ({ sessionId }, cb) => {
     try {
       if (!rateLimit('autologin:' + socket.handshake.address, 30, CONFIG.RATE_WINDOW)) {
@@ -1411,6 +1459,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  /* ─── ОБЫЧНЫЙ ЛОГИН ─── */
   socket.on('login', async ({ username, password, device, sessionId }, cb) => {
     try {
       if (!rateLimit('login:' + socket.handshake.address, 10, CONFIG.RATE_WINDOW)) {
@@ -1461,6 +1510,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  /* ─── АВАТАР ─── */
   socket.on('set avatar', async ({ avatar }) => {
     if (!socket.username || !avatar || !validImage(avatar)) return;
     await db.execute({ sql: 'UPDATE users SET avatar = ? WHERE username = ?', args: [avatar, socket.username] });
@@ -1468,6 +1518,7 @@ io.on('connection', (socket) => {
     notifyAllFriends(socket.username, 'friend updated', { username: socket.username, avatar }).catch(() => {});
   });
 
+  /* ─── ПРОФИЛЬ ─── */
   socket.on('update profile', async ({ firstName, lastName, bio, birthday, emojiStatus }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -1506,6 +1557,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  /* ─── НАСТРОЙКИ ─── */
   socket.on('get settings', async () => {
     if (socket.username) socket.emit('settings', await getSettings(socket.username));
   });
@@ -1532,6 +1584,7 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
+  /* ─── PASSCODE ─── */
   socket.on('set passcode', async ({ passcode }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -1558,6 +1611,7 @@ io.on('connection', (socket) => {
     cb && cb(!!s.passcode);
   });
 
+  /* ─── КОНТАКТЫ ─── */
   socket.on('get contacts', async (cb) => {
     try {
       if (!socket.username) return cb && cb([]);
@@ -1637,9 +1691,9 @@ io.on('connection', (socket) => {
       await incrementStat(socket.username, 'friends_added');
       sendContactsTo(socket.username).catch(() => {});
       cb && cb({ ok: true });
-    } catch (e) { 
+    } catch (e) {
       console.error('add contact:', e);
-      cb && cb({ ok: false, error: 'Ошибка сервера' }); 
+      cb && cb({ ok: false, error: 'Ошибка сервера' });
     }
   });
 
@@ -1650,6 +1704,7 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
+  /* ─── ПРОФИЛЬ ДРУГОГО ЮЗЕРА ─── */
   socket.on('get profile', async ({ username }, cb) => {
     if (!socket.username) return cb && cb(null);
     const info = await getContactInfo(username);
@@ -1681,6 +1736,7 @@ io.on('connection', (socket) => {
     });
   });
 
+  /* ─── БЛОКИРОВКИ ─── */
   socket.on('block user', async ({ username }, cb) => {
     try {
       if (!socket.username || username === socket.username) return cb && cb({ ok: false });
@@ -1706,6 +1762,7 @@ io.on('connection', (socket) => {
     cb && cb(r.rows.map(row => row.blocked));
   });
 
+  /* ─── СЕССИИ УСТРОЙСТВ ─── */
   socket.on('get sessions', async (cb) => {
     if (!socket.username) return cb && cb([]);
     cb && cb(await getUserSessions(socket.username));
@@ -1741,6 +1798,7 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
+  /* ─── НАСТРОЙКИ ЧАТА ─── */
   socket.on('toggle archive', async ({ chatKey }, cb) => {
     if (!socket.username) return;
     const settings = await getChatSettings(socket.username, chatKey);
@@ -1761,7 +1819,6 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true, muted: !!newVal });
   });
 
-  // 📌 Закрепить/открепить чат
   socket.on('toggle pin', async ({ chatKey }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -1779,7 +1836,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🗑 Очистить историю
+  /* ─── ОЧИСТКА ИСТОРИИ ─── */
   socket.on('clear history', async ({ withUser }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
@@ -1806,6 +1863,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  /* ─── АДМИН-ПРОВЕРКА ─── */
   async function checkAdmin(cb) {
     if (!socket.username || socket.username !== CONFIG.ADMIN_USERNAME) {
       cb && cb({ ok: false, error: 'Только ' + CONFIG.ADMIN_USERNAME });
@@ -1814,6 +1872,7 @@ io.on('connection', (socket) => {
     return true;
   }
 
+  /* ─── ВЫДАЧА/СНЯТИЕ БЕЙДЖЕЙ ─── */
   socket.on('verify', async ({ username }, cb) => {
     try {
       if (!(await checkAdmin(cb))) return;
@@ -1920,6 +1979,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── УДАЛЕНИЕ АККАУНТА ─── */
   socket.on('delete account', async ({ password }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -1977,6 +2037,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
+  /* ─── ДОСТИЖЕНИЯ ─── */
   socket.on('get achievements', async (cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, achievements: [], stats: {} });
@@ -1994,7 +2055,15 @@ io.on('connection', (socket) => {
       cb && cb({ ok: false, achievements: [], stats: {} });
     }
   });
-     socket.on('load history', async ({ withUser }) => {
+
+  /* ─── КОНЕЦ ЧАСТИ 5.3 ─── */
+      /* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA v12.6 — Server
+   Часть 5.4: socket — messages + groups + search
+   ═══════════════════════════════════════════════════════════ */
+
+  /* ─── ИСТОРИЯ ЛИЧНОГО ЧАТА ─── */
+  socket.on('load history', async ({ withUser }) => {
     if (!socket.username) return;
     try {
       const rows = await getHistory(socket.username, withUser);
@@ -2003,6 +2072,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('load history:', e); }
   });
 
+  /* ─── ИСТОРИЯ ИЗБРАННОГО ─── */
   socket.on('load saved history', async () => {
     if (!socket.username) return;
     try {
@@ -2020,6 +2090,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('load saved history:', e); }
   });
 
+  /* ─── СОХРАНИТЬ В ИЗБРАННОЕ ─── */
   socket.on('save to saved', async ({ originalMessageId, isGroup }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2051,6 +2122,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('save to saved:', e); cb && cb({ ok: false }); }
   });
 
+  /* ─── ЛИЧНОЕ СООБЩЕНИЕ ─── */
   socket.on('private message', async ({ to, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo, sticker }) => {
     if (!socket.username) return;
 
@@ -2108,6 +2180,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('private message:', e); }
   });
 
+  /* ─── РЕДАКТИРОВАНИЕ ─── */
   socket.on('edit message', async ({ messageId, text, isGroup }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2131,6 +2204,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── УДАЛЕНИЕ ─── */
   socket.on('delete message', async ({ messageId, forAll, isGroup }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2162,6 +2236,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ПРОЧИТАНО ─── */
   socket.on('mark read', async ({ withUser }) => {
     if (!socket.username) return;
     await db.execute({
@@ -2171,11 +2246,13 @@ io.on('connection', (socket) => {
     findSocketsByUsername(withUser).forEach(sid => io.to(sid).emit('messages read', { by: socket.username }));
   });
 
+  /* ─── TYPING ─── */
   socket.on('typing', ({ to, isTyping }) => {
     if (!socket.username) return;
     findSocketsByUsername(to).forEach(sid => io.to(sid).emit('typing', { from: socket.username, isTyping }));
   });
 
+  /* ─── РЕАКЦИЯ ─── */
   socket.on('react', async ({ messageId, emoji }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2206,6 +2283,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── СОЗДАНИЕ ГРУППЫ ─── */
   socket.on('create group', async ({ name, members }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2242,6 +2320,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('create group:', e); cb && cb({ ok: false }); }
   });
 
+  /* ─── ДОБАВИТЬ УЧАСТНИКОВ ─── */
   socket.on('add group members', async ({ groupId, members }, cb) => {
     try {
       if (!socket.username || !await isGroupMember(groupId, socket.username)) return cb && cb({ ok: false });
@@ -2265,6 +2344,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ВЫЙТИ ИЗ ГРУППЫ ─── */
   socket.on('leave group', async ({ groupId }, cb) => {
     if (!socket.username) return cb && cb({ ok: false });
     await db.execute({ sql: 'DELETE FROM group_members WHERE group_id = ? AND username = ?', args: [groupId, socket.username] });
@@ -2275,6 +2355,7 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
+  /* ─── УДАЛИТЬ ГРУППУ ─── */
   socket.on('delete group', async ({ groupId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2292,6 +2373,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ОБНОВИТЬ ГРУППУ ─── */
   socket.on('update group', async ({ groupId, name, description }, cb) => {
     if (!socket.username || !await isGroupMember(groupId, socket.username)) return cb && cb({ ok: false });
     if (name) await db.execute({ sql: 'UPDATE groups_table SET name = ? WHERE id = ?', args: [String(name).slice(0, 60), groupId] });
@@ -2301,6 +2383,7 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
+  /* ─── ЗАКРЕПИТЬ СООБЩЕНИЕ ─── */
   socket.on('pin message', async ({ groupId, messageId }, cb) => {
     if (!socket.username || !await isGroupMember(groupId, socket.username)) return cb && cb({ ok: false });
     await db.execute({ sql: 'UPDATE groups_table SET pinned_message_id = ? WHERE id = ?', args: [messageId, groupId] });
@@ -2310,6 +2393,7 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
+  /* ─── ИСТОРИЯ ГРУППЫ ─── */
   socket.on('load group history', async ({ groupId }) => {
     if (!socket.username || !await isGroupMember(groupId, socket.username)) return;
     try {
@@ -2319,6 +2403,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('load group history:', e); }
   });
 
+  /* ─── СООБЩЕНИЕ В ГРУППУ ─── */
   socket.on('group message', async ({ groupId, text, image, voice, voiceDuration, videoCircle, videoDuration, replyTo, sticker }) => {
     if (!socket.username || !await isGroupMember(groupId, socket.username)) return;
 
@@ -2373,6 +2458,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('group message:', e); }
   });
 
+  /* ─── TYPING В ГРУППЕ ─── */
   socket.on('group typing', ({ groupId, isTyping }) => {
     if (!socket.username) return;
     getGroupMembers(groupId).then(members => {
@@ -2383,6 +2469,7 @@ io.on('connection', (socket) => {
     }).catch(() => {});
   });
 
+  /* ─── РЕАКЦИЯ В ГРУППЕ ─── */
   socket.on('group react', async ({ groupId, messageId, emoji }, cb) => {
     try {
       if (!socket.username || !await isGroupMember(groupId, socket.username)) return cb && cb({ ok: false });
@@ -2408,6 +2495,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ПОИСК В ЧАТЕ ─── */
   socket.on('search messages', async ({ query, withUser, groupId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, results: [] });
@@ -2434,6 +2522,14 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false, results: [] }); }
   });
 
+/* ─── КОНЕЦ ЧАСТИ 5.4 ─── */
+      /* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA v12.6 — Server
+   Часть 5.5: socket — channels + gifts + stories + stickers +
+              calls + disconnect
+   ═══════════════════════════════════════════════════════════ */
+
+  /* ─── СОЗДАТЬ КАНАЛ ─── */
   socket.on('create channel', async ({ slug, name, description }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2465,6 +2561,7 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('create channel:', e); cb && cb({ ok: false }); }
   });
 
+  /* ─── УДАЛИТЬ КАНАЛ ─── */
   socket.on('delete channel', async ({ channelId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2483,6 +2580,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ОБНОВИТЬ КАНАЛ ─── */
   socket.on('update channel', async ({ channelId, name, description }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2496,6 +2594,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ПОДПИСАТЬСЯ ─── */
   socket.on('subscribe channel', async ({ channelId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2513,6 +2612,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ОТПИСАТЬСЯ ─── */
   socket.on('unsubscribe channel', async ({ channelId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2527,6 +2627,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ПОСТЫ КАНАЛА ─── */
   socket.on('load channel posts', async ({ channelId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, posts: [] });
@@ -2547,6 +2648,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false, posts: [] }); }
   });
 
+  /* ─── СОЗДАТЬ ПОСТ ─── */
   socket.on('create channel post', async ({ channelId, text, image, voice, voiceDuration }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2570,6 +2672,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── УДАЛИТЬ ПОСТ ─── */
   socket.on('delete channel post', async ({ postId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2584,6 +2687,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ПРОСМОТР ПОСТА ─── */
   socket.on('view channel post', async ({ postId }) => {
     try {
       if (!socket.username) return;
@@ -2591,6 +2695,7 @@ io.on('connection', (socket) => {
     } catch (e) {}
   });
 
+  /* ─── КОММЕНТАРИИ ─── */
   socket.on('load channel comments', async ({ postId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, comments: [] });
@@ -2626,6 +2731,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── РЕАКЦИЯ НА ПОСТ ─── */
   socket.on('react channel post', async ({ postId, emoji }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2645,6 +2751,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ИНВАЙТ-ССЫЛКА ─── */
   socket.on('create channel invite', async ({ channelId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2687,6 +2794,10 @@ io.on('connection', (socket) => {
       cb && cb({ ok: true, channel: { id: ch.id, slug: ch.slug, name: ch.name, avatar: ch.avatar, verified: !!ch.verified, description: ch.description, memberCount: members.length } });
     } catch (e) { cb && cb({ ok: false }); }
   });
+
+  /* ═══════════════════════════════════════════════════════════
+     ЗВОНКИ (WebRTC-сигналинг)
+     ═══════════════════════════════════════════════════════════ */
 
   socket.on('call-user', async ({ to, offer, video }) => {
     if (!socket.username) return;
@@ -2734,6 +2845,10 @@ io.on('connection', (socket) => {
       }
     }
   });
+
+  /* ═══════════════════════════════════════════════════════════
+     ИСТОРИИ (STORIES)
+     ═══════════════════════════════════════════════════════════ */
 
   socket.on('load stories', async (cb) => {
     if (!socket.username) return cb && cb({ ok: false, users: [] });
@@ -2825,6 +2940,10 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false, viewers: [] }); }
   });
 
+  /* ═══════════════════════════════════════════════════════════
+     СТИКЕРЫ
+     ═══════════════════════════════════════════════════════════ */
+
   socket.on('load stickers', async (cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, stickers: [] });
@@ -2915,6 +3034,10 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('send sticker:', e); cb && cb({ ok: false }); }
   });
 
+  /* ═══════════════════════════════════════════════════════════
+     ЗВЁЗДЫ / ПОДАРКИ
+     ═══════════════════════════════════════════════════════════ */
+
   socket.on('get stars', async (cb) => {
     if (!socket.username) return cb && cb({ ok: false, stars: 0, transactions: [] });
     const stars = await getStars(socket.username);
@@ -2944,6 +3067,7 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true, gifts });
   });
 
+  /* ─── ОТПРАВИТЬ ПОДАРОК (с описанием) ─── */
   socket.on('send gift', async ({ to, giftKey, message }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
@@ -3027,6 +3151,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  /* ─── ПРОДАТЬ ПОДАРОК ─── */
   socket.on('sell gift', async ({ giftId }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -3050,6 +3175,7 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ─── ПОДАРОЧНЫЕ КОДЫ (admin) ─── */
   socket.on('generate gift code', async (cb) => {
     try {
       if (!socket.username || socket.username !== CONFIG.ADMIN_USERNAME) {
@@ -3086,8 +3212,6 @@ io.on('connection', (socket) => {
       if (!row) return cb && cb({ ok: false, error: 'Код не найден' });
       if (row.used_by) return cb && cb({ ok: false, error: 'Код уже использован' });
 
-      await db.execute({ sql: 'UPDATE user_settings SET premium = 1 WHERE username = ?', args: [socket.username] });
-      cacheInvalidate(settingsCache, socket.username);
       await db.execute({
         sql: 'UPDATE gift_codes SET used_by = ?, used_at = ? WHERE code = ?',
         args: [socket.username, now(), code]
@@ -3100,6 +3224,10 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ═══════════════════════════════════════════════════════════
+     ОТКЛЮЧЕНИЕ
+     ═══════════════════════════════════════════════════════════ */
+
   socket.on('disconnect', async () => {
     const u = socket.username;
     delete onlineUsers[socket.id];
@@ -3111,18 +3239,35 @@ io.on('connection', (socket) => {
       });
     }
   });
-});
 
+/* ─── КОНЕЦ ЧАСТИ 5.5 ─── */
+      /* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA v12.6 — Server
+   Часть 5.6: финал — init, cleanup, запуск
+   ═══════════════════════════════════════════════════════════ */
+
+});  // ← закрытие io.on('connection', ...)
+
+/* ─── ЗАПУСК ─── */
 console.log('⚙️  Запускаю initDB...');
 
 initDB()
   .then(() => {
     console.log('✅ initDB завершён успешно');
-    cleanupOldMessages().catch(() => {});
-    setInterval(cleanupOldMessages, 10 * 60 * 1000);
 
+    // Первый запуск cleanup + планировщик
+    cleanupOldMessages().catch(() => {});
+    setInterval(cleanupOldMessages, 10 * 60 * 1000); // каждые 10 минут
+
+    // Отдельные планировщики для чистоты
+    setInterval(cleanupExpiredStories, 60 * 60 * 1000);       // раз в час
+    setInterval(cleanupExpiredInvites, 30 * 60 * 1000);       // каждые 30 минут
+    setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);  // каждые 6 часов
+
+    // Запуск HTTP-сервера
     server.listen(CONFIG.PORT, () => {
       console.log('🌌 Azerta v12.6 запущена на порту ' + CONFIG.PORT);
+      console.log('👉 http://localhost:' + CONFIG.PORT);
     });
   })
   .catch(err => {
@@ -3130,6 +3275,7 @@ initDB()
     process.exit(1);
   });
 
+/* ─── ГЛОБАЛЬНЫЕ ОБРАБОТЧИКИ ОШИБОК ─── */
 process.on('uncaughtException', (err) => {
   console.error('💥 uncaughtException:', err);
 });
@@ -3137,3 +3283,22 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   console.error('💥 unhandledRejection:', reason);
 });
+
+/* ─── GRACEFUL SHUTDOWN ─── */
+process.on('SIGTERM', () => {
+  console.log('📴 SIGTERM: завершаю работу...');
+  server.close(() => {
+    console.log('✅ HTTP-сервер закрыт');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('📴 SIGINT (Ctrl+C): завершаю работу...');
+  server.close(() => {
+    console.log('✅ HTTP-сервер закрыт');
+    process.exit(0);
+  });
+});
+
+/* ─── КОНЕЦ ФАЙЛА server.js ─── */
