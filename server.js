@@ -6,8 +6,9 @@
    ✓ Описание к подаркам
    ✓ Закреплённые чаты
    ✓ Упоминания @ник
-   ✓ Очистка истории
+   ✓ Очистка истории (вручную)
    ✓ Достижения и статистика
+   ✗ Автоудаление сообщений — УБРАНО
    ═══════════════════════════════════════════════════════════ */
 
 const express = require('express');
@@ -265,7 +266,6 @@ async function initDB() {
     vibration INTEGER DEFAULT 1,
     notif_private INTEGER DEFAULT 1,
     notif_groups INTEGER DEFAULT 1,
-    auto_delete TEXT DEFAULT 'off',
     passcode TEXT,
     profile_color TEXT DEFAULT '#8b7fff',
     chat_wallpaper TEXT DEFAULT '',
@@ -1208,7 +1208,7 @@ async function deleteSticker(id, username) {
   await db.execute({ sql: 'DELETE FROM stickers WHERE id = ? AND username = ?', args: [id, username] });
 }
 
-/* ─── CLEANUP ─── */
+/* ─── CLEANUP (без автоудаления сообщений) ─── */
 async function cleanupExpiredStories() {
   try {
     const t = now();
@@ -1227,34 +1227,6 @@ async function cleanupExpiredStories() {
 async function cleanupExpiredInvites() {
   try {
     await db.execute({ sql: 'DELETE FROM channel_invites WHERE expires_at < ?', args: [now()] });
-  } catch (e) {}
-}
-
-async function cleanupOldMessages() {
-  try {
-    const r = await db.execute("SELECT username, auto_delete FROM user_settings WHERE auto_delete != 'off'");
-    const t = now();
-    const DAY = 24 * 60 * 60 * 1000;
-    for (const row of r.rows) {
-      const ttl = row.auto_delete === '24h' ? DAY : row.auto_delete === '7d' ? 7 * DAY : row.auto_delete === '30d' ? 30 * DAY : 0;
-      if (ttl === 0) continue;
-      const cutoff = t - ttl;
-      await db.execute({
-        sql: `UPDATE messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, 
-              video_circle = NULL, sticker = NULL 
-              WHERE from_user = ? AND to_user != ? AND time < ? AND deleted = 0`,
-        args: [row.username, row.username, cutoff]
-      });
-      await db.execute({
-        sql: `UPDATE group_messages SET deleted = 1, text = NULL, image = NULL, voice = NULL, 
-              video_circle = NULL, sticker = NULL 
-              WHERE from_user = ? AND time < ? AND deleted = 0`,
-        args: [row.username, cutoff]
-      });
-    }
-    await cleanupExpiredStories();
-    await cleanupExpiredInvites();
-    await cleanupExpiredSessions();
   } catch (e) {}
 }
 
@@ -1764,7 +1736,7 @@ io.on('connection', (socket) => {
       const allowed = [
         'theme', 'language', 'font_size', 'accent_color', 'animations',
         'sound', 'vibration', 'notif_private', 'notif_groups',
-        'auto_delete', 'profile_color', 'chat_wallpaper'
+        'profile_color', 'chat_wallpaper'
       ];
       if (!allowed.includes(key)) return cb && cb({ ok: false });
       await db.execute({ sql: `UPDATE user_settings SET ${key} = ? WHERE username = ?`, args: [value, socket.username] });
@@ -1925,7 +1897,6 @@ io.on('connection', (socket) => {
   socket.on('get profile', async ({ username }, cb) => {
     if (!socket.username) return cb && cb(null);
 
-    // 🤖 Бот?
     const bot = await getBot(username);
     if (bot) {
       return cb && cb({
@@ -2562,7 +2533,6 @@ io.on('connection', (socket) => {
       if (videoCircle) await incrementStat(from, 'circles_sent');
       if (sticker) await incrementStat(from, 'stickers_sent');
 
-      // 🤖 Если получатель — бот, отвечаем
       if (await isBot(to)) {
         const reply = await tryBotReply(to, from, text);
         if (reply) {
@@ -3587,15 +3557,20 @@ initDB()
   .then(() => {
     console.log('✅ initDB завершён успешно');
 
-    cleanupOldMessages().catch(() => {});
-    setInterval(cleanupOldMessages, 10 * 60 * 1000);
+    // Планировщики (без автоудаления сообщений)
     setInterval(cleanupExpiredStories, 60 * 60 * 1000);
     setInterval(cleanupExpiredInvites, 30 * 60 * 1000);
     setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);
 
+    // Первый прогон
+    cleanupExpiredStories().catch(() => {});
+    cleanupExpiredInvites().catch(() => {});
+    cleanupExpiredSessions().catch(() => {});
+
     server.listen(CONFIG.PORT, () => {
       console.log('🌌 Azerta v13.0 запущена на порту ' + CONFIG.PORT);
       console.log('👉 http://localhost:' + CONFIG.PORT);
+      console.log('🗑 Автоудаление сообщений: ВЫКЛЮЧЕНО');
     });
   })
   .catch(err => {
