@@ -1,7 +1,7 @@
 {
-  "name": "Azerta Messenger",
-  "version": "10.0.0",
-  "description": "Azerta — премиум-мессенджер",
+  "name": "azerta",
+  "version": "12.6.0",
+  "description": "Azerta — семейный мессенджер",
   "main": "server.js",
   "private": true,
   "engines": {
