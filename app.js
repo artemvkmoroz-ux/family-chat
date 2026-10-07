@@ -1,16 +1,13 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.4 — Client
-   ✓ ⭐ Premium (звёздочка, золотая рамка, градиент)
-   ✓ 🎨 Новые бейджи (синяя галочка, SCAM-плашка)
-   ✓ ТГ-стиль настроек
-   ✓ Баннеры профиля
-   ✓ Боты (создание, чат, команды)
-   ✓ Ripple + Skeleton + Spring
-   ✓ Достижения, статистика, упоминания
-   ✓ Закреплённые чаты, очистка истории
-   ✓ Описание к подаркам
+   🌌 AZERTA v13.6 — Client
+   ✓ ⭐ Premium + бейджи + баннеры
+   ✓ 🎨 ТГ-стиль настроек
+   ✓ 🤖 Боты, достижения, подарки
+   ✓ 📍 Геолокация (NEW)
+   ✓ 🚨 Жалобы (NEW)
+   ✓ 🛡️ Модерация: панель, баны, муты, логи (NEW)
    ═══════════════════════════════════════════════════════════ */
 
 var contactProfileCurrent = null;
@@ -22,7 +19,8 @@ const state = {
     username: null, avatar: null, banner: null,
     premium: false, verified: false, bio: '',
     firstName: '', lastName: '', birthday: '', emoji: '',
-    stars: 0, sessionId: null, hammer: false, scam: false
+    stars: 0, sessionId: null, hammer: false, scam: false,
+    isModerator: false, mute: null
   },
   contacts: [], groups: [], channels: [],
   unread: {}, typingUsers: {}, blockedList: [], giftsCatalog: {},
@@ -55,7 +53,19 @@ const state = {
   currentColorTarget: null, toastTimeout: null, isLoggedIn: false,
   chatWallpapers: {}, contactProfileCurrent: null,
   myBots: [], editingBotUsername: null, tempBotAvatar: null,
-  tempBanner: null
+  tempBanner: null,
+  /* Модерация */
+  modPanelOpen: false,
+  modTab: 'reports',
+  modReportsFilter: 'new',
+  modReports: [],
+  modPunishments: [],
+  modLogs: [],
+  modStats: {},
+  reportTarget: null,
+  reportTargetMessageId: null,
+  reportIsGroup: false,
+  geoVisibility: 'contacts',
 };
 
 const STORAGE = {
@@ -91,6 +101,21 @@ const BUILTIN_GIFS = [
   { emoji: '🍕', url: 'https://media.giphy.com/media/3o7abAHdYvZdBNnGZq/giphy.gif' },
   { emoji: '👏', url: 'https://media.giphy.com/media/7rj2ZgttvgomY/giphy.gif' },
 ];
+
+const REPORT_REASONS = {
+  spam:   '🚫 Спам',
+  abuse:  '🤬 Оскорбления',
+  nsfw:   '🔞 18+',
+  scam:   '💀 Мошенничество',
+  ads:    '📢 Реклама',
+  other:  '❓ Другое',
+};
+
+const PUNISH_LABELS = {
+  ban: '🚫 Бан',
+  mute: '🔇 Мут',
+  warn: '⚠️ Предупреждение',
+};
 
 /* ─── УТИЛИТЫ ─── */
 function $(id) { return document.getElementById(id); }
@@ -132,16 +157,25 @@ function timeAgo(ms) {
   return Math.floor(h / 24) + ' дн назад';
 }
 
+function formatDuration(expiresAt) {
+  if (!expiresAt) return 'навсегда';
+  const ms = expiresAt - now();
+  if (ms <= 0) return 'истёк';
+  const m = Math.floor(ms / 60000);
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  if (d > 0) return d + ' д ' + (h % 24) + ' ч';
+  if (h > 0) return h + ' ч ' + (m % 60) + ' мин';
+  return m + ' мин';
+}
+
 function displayNameForUser(username) {
   if (username === state.me.username) return 'Я';
   const c = state.contacts.find(function (c) { return c.name === username; });
   return c && c.displayName ? c.displayName : username;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   🎨 БЕЙДЖИ
-   ═══════════════════════════════════════════════════════════ */
-
+/* ─── БЕЙДЖИ ─── */
 function renderBadges(user) {
   if (!user) return '';
   let html = '';
@@ -201,7 +235,7 @@ function attachRipple(el) {
 }
 
 function bindRipples(root) {
-  const sel = '.auth-btn-primary, .modal-primary, .modal-secondary, .modal-danger, .create-menu-btn, .nav-btn, .settings-item, .settings-tg-row, .chat-item, .back-btn, .icon-btn, #burger, #send-btn, .attach, .mic, .camera, .reaction-chip, .action-item, .my-bot-card, .bch-chip';
+  const sel = '.auth-btn-primary, .modal-primary, .modal-secondary, .modal-danger, .create-menu-btn, .nav-btn, .settings-item, .settings-tg-row, .chat-item, .back-btn, .icon-btn, #burger, #send-btn, .attach, .mic, .camera, .reaction-chip, .action-item, .my-bot-card, .bch-chip, .mod-tab, .report-reason-btn, .punish-duration-btn';
   (root || document).querySelectorAll(sel).forEach(attachRipple);
 }
 
@@ -398,6 +432,7 @@ function playLoginTransition(username, firstName, isAutoLogin) {
     renderStoriesBar();
     applyChatWallpaper();
     bindRipples();
+    applyMuteLock();
   }, 200);
 }
 
@@ -607,6 +642,10 @@ function doLogin() {
   }, function (res) {
     hideBtnSpinner('login-btn', 'Войти');
     if (!res || !res.ok) {
+      if (res && res.banned) {
+        showBanScreen(res.ban);
+        return;
+      }
       errEl.textContent = res && res.error ? res.error : 'Ошибка входа';
       vibrate([30, 20, 30]);
       return;
@@ -631,6 +670,8 @@ function onLoggedIn(res, isAutoLogin) {
   state.me.emoji = res.emojiStatus || '';
   state.me.sessionId = res.sessionId;
   state.me.stars = Number(res.stars || 0);
+  state.me.isModerator = !!res.is_moderator;
+  state.me.mute = res.mute || null;
   state.chatWallpapers = loadJson(STORAGE.WALLPAPERS, {}) || {};
   playLoginTransition(res.username, res.firstName, !!isAutoLogin);
   setTimeout(function () {
@@ -638,6 +679,82 @@ function onLoggedIn(res, isAutoLogin) {
       if (r && r.ok) state.giftsCatalog = r.catalog || {};
     });
   }, 200);
+}
+
+function showBanScreen(ban) {
+  hideSplash();
+  const app = $('app'); if (app) app.classList.remove('active');
+  const auth = $('auth'); if (auth) auth.classList.remove('active');
+  let screen = $('ban-screen');
+  if (!screen) {
+    screen = document.createElement('div');
+    screen.id = 'ban-screen';
+    document.body.appendChild(screen);
+  }
+  const until = ban.expires_at
+    ? new Date(ban.expires_at).toLocaleString('ru-RU')
+    : 'никогда (навсегда)';
+  screen.innerHTML =
+    '<div class="ban-screen-inner">' +
+      '<div class="ban-emoji">🚫</div>' +
+      '<h2>Ты забанен</h2>' +
+      '<div class="ban-reason">' +
+        '<div class="ban-label">Причина:</div>' +
+        '<div class="ban-value">' + escapeHtml(ban.reason || 'Не указана') + '</div>' +
+      '</div>' +
+      '<div class="ban-until">' +
+        '<div class="ban-label">До:</div>' +
+        '<div class="ban-value">' + escapeHtml(until) + '</div>' +
+        '<div class="ban-sub">(' + escapeHtml(ban.duration_text || 'навсегда') + ')</div>' +
+      '</div>' +
+      '<button class="modal-secondary" onclick="location.reload()">🔄 Проверить снова</button>' +
+    '</div>';
+  screen.classList.add('active');
+}
+
+function applyMuteLock() {
+  const mute = state.me.mute;
+  const input = $('msgInput');
+  const sendBtn = $('send-btn');
+  const mic = $('micBtnInput');
+  const circle = $('circleBtn');
+  const attach = document.querySelector('#input-area .attach');
+  const cam = document.querySelector('#input-area .camera');
+  if (!mute) {
+    if (input) input.disabled = false;
+    if (sendBtn) sendBtn.disabled = false;
+    if (mic) mic.disabled = false;
+    if (circle) circle.disabled = false;
+    if (attach) attach.disabled = false;
+    if (cam) cam.disabled = false;
+    const existing = $('mute-banner');
+    if (existing) existing.remove();
+    return;
+  }
+  const until = mute.expires_at
+    ? new Date(mute.expires_at).toLocaleString('ru-RU')
+    : '';
+  if (input) { input.disabled = true; input.placeholder = '🔇 Ты в муте'; }
+  if (sendBtn) sendBtn.disabled = true;
+  if (mic) mic.disabled = true;
+  if (circle) circle.disabled = true;
+  if (attach) attach.disabled = true;
+  if (cam) cam.disabled = true;
+  let banner = $('mute-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'mute-banner';
+    const chatScreen = $('chat-screen');
+    if (chatScreen) {
+      const inputArea = $('input-area');
+      if (inputArea) inputArea.parentNode.insertBefore(banner, inputArea);
+      else chatScreen.appendChild(banner);
+    }
+  }
+  banner.innerHTML =
+    '🔇 Ты в муте' +
+    (mute.reason ? ' · ' + escapeHtml(mute.reason) : '') +
+    (until ? ' · до ' + escapeHtml(until) : '');
 }
 
 function tryPasscode() {
@@ -672,6 +789,11 @@ async function tryAutoLogin() {
       resolved = true;
       clearTimeout(timeoutId);
       if (!res || !res.ok) {
+        if (res && res.banned) {
+          showBanScreen(res.ban);
+          resolve(true);
+          return;
+        }
         localStorage.removeItem(STORAGE.SESSION);
         forceShowAuth('Сессия истекла — войди заново');
         resolve(false);
@@ -692,6 +814,8 @@ async function tryAutoLogin() {
       state.me.emoji = res.emojiStatus || '';
       state.me.sessionId = res.sessionId;
       state.me.stars = Number(res.stars || 0);
+      state.me.isModerator = !!res.is_moderator;
+      state.me.mute = res.mute || null;
       state.chatWallpapers = loadJson(STORAGE.WALLPAPERS, {}) || {};
       socket.emit('get gifts catalog', function (r) {
         if (r && r.ok) state.giftsCatalog = r.catalog || {};
@@ -750,6 +874,68 @@ socket.on('server toast', function (data) {
   if (data && data.text) showToast(data.text);
 });
 
+/* ─── НАКАЗАНИЯ (уведомления) ─── */
+socket.on('punishment issued', function (data) {
+  const title = data.title || (data.type === 'ban' ? 'Ты забанен' : (data.type === 'mute' ? 'Ты в муте' : 'Предупреждение'));
+  const emoji = data.emoji || '⚠️';
+  const until = data.expires_at
+    ? new Date(data.expires_at).toLocaleString('ru-RU')
+    : 'навсегда';
+  let modal = $('punishment-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'punishment-modal';
+    modal.className = 'modal';
+    modal.innerHTML = '<div class="modal-box punishment-box"></div>';
+    document.body.appendChild(modal);
+  }
+  const box = modal.querySelector('.punishment-box');
+  box.innerHTML =
+    '<div class="punishment-emoji">' + emoji + '</div>' +
+    '<h3>' + escapeHtml(title) + '</h3>' +
+    (data.reason ? '<div class="modal-desc">Причина: ' + escapeHtml(data.reason) + '</div>' : '') +
+    '<div class="modal-desc">До: ' + escapeHtml(until) + (data.duration_text ? ' (' + escapeHtml(data.duration_text) + ')' : '') + '</div>' +
+    (data.type === 'ban'
+      ? '<button class="modal-danger" onclick="location.reload()">Понятно</button>'
+      : '<button class="modal-primary" onclick="closeModal(\'punishment-modal\')">Понятно</button>');
+  modal.classList.add('active');
+
+  if (data.type === 'mute') {
+    state.me.mute = {
+      reason: data.reason,
+      expires_at: data.expires_at,
+      duration_text: data.duration_text
+    };
+    applyMuteLock();
+  }
+  if (data.type === 'ban') {
+    setTimeout(function () {
+      state.me.username = null;
+      state.me.sessionId = null;
+      isLoggedInOnServer = false;
+      location.reload();
+    }, 4000);
+  }
+});
+
+socket.on('punishment lifted', function (data) {
+  if (data.type === 'mute') {
+    state.me.mute = null;
+    applyMuteLock();
+  }
+  showToast('✅ Наказание снято: ' + (data.type || ''));
+});
+
+socket.on('new report', function (data) {
+  if (!state.me.isModerator) return;
+  if (state.modPanelOpen) {
+    if (state.modTab === 'reports') loadModReports();
+  }
+  playPing();
+  vibrate([30, 20, 30]);
+});
+
+/* ─── УВЕДОМЛЕНИЯ ─── */
 function initNotifications() {
   if (!('Notification' in window)) return;
   if (Notification.permission === 'granted') state.notificationsAllowed = true;
@@ -897,7 +1083,6 @@ function renderSettingsTab() {
   }
 }
 
-/* ─── ТГ-строка ─── */
 function renderTgRow(opts) {
   const type = opts.type || 'arrow';
   const danger = opts.type === 'danger' ? ' danger' : '';
@@ -929,7 +1114,6 @@ function renderTgRow(opts) {
     '</div>';
 }
 
-/* ─── ГЛАВНАЯ ФУНКЦИЯ РЕНДЕРА НАСТРОЕК ─── */
 function renderSettings() {
   const box = $('settings-content');
   if (!box) return;
@@ -973,6 +1157,23 @@ function renderSettings() {
       '<span class="stars-arrow">›</span>' +
     '</div>';
 
+  /* ─── Панель модератора ─── */
+  let modSection = '';
+  if (me.isModerator) {
+    const pending = state.modStats.new_reports || 0;
+    modSection =
+      '<div class="settings-tg-section">' +
+        '<div class="settings-tg-section-title">🛡️ Модерация</div>' +
+        '<div class="settings-tg-group">' +
+          renderTgRow({
+            icon: '🚨', text: 'Панель модератора',
+            value: pending > 0 ? pending + ' новых' : '',
+            onClick: 'openModPanel()'
+          }) +
+        '</div>' +
+      '</div>';
+  }
+
   const botsSection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">🤖 Боты</div>' +
@@ -1008,30 +1209,10 @@ function renderSettings() {
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">🔔 Уведомления и звуки</div>' +
       '<div class="settings-tg-group">' +
-        renderTgRow({
-          icon: '🔔', text: 'Звук', type: 'switch',
-          checked: s.sound == 1,
-          onToggle: 'toggleSetting(\'sound\')',
-          onClick: 'toggleSetting(\'sound\')'
-        }) +
-        renderTgRow({
-          icon: '📳', text: 'Вибрация', type: 'switch',
-          checked: s.vibration == 1,
-          onToggle: 'toggleSetting(\'vibration\')',
-          onClick: 'toggleSetting(\'vibration\')'
-        }) +
-        renderTgRow({
-          icon: '💬', text: 'Личные чаты', type: 'switch',
-          checked: s.notif_private == 1,
-          onToggle: 'toggleSetting(\'notif_private\')',
-          onClick: 'toggleSetting(\'notif_private\')'
-        }) +
-        renderTgRow({
-          icon: '👥', text: 'Группы', type: 'switch',
-          checked: s.notif_groups == 1,
-          onToggle: 'toggleSetting(\'notif_groups\')',
-          onClick: 'toggleSetting(\'notif_groups\')'
-        }) +
+        renderTgRow({ icon: '🔔', text: 'Звук', type: 'switch', checked: s.sound == 1, onToggle: 'toggleSetting(\'sound\')', onClick: 'toggleSetting(\'sound\')' }) +
+        renderTgRow({ icon: '📳', text: 'Вибрация', type: 'switch', checked: s.vibration == 1, onToggle: 'toggleSetting(\'vibration\')', onClick: 'toggleSetting(\'vibration\')' }) +
+        renderTgRow({ icon: '💬', text: 'Личные чаты', type: 'switch', checked: s.notif_private == 1, onToggle: 'toggleSetting(\'notif_private\')', onClick: 'toggleSetting(\'notif_private\')' }) +
+        renderTgRow({ icon: '👥', text: 'Группы', type: 'switch', checked: s.notif_groups == 1, onToggle: 'toggleSetting(\'notif_groups\')', onClick: 'toggleSetting(\'notif_groups\')' }) +
       '</div>' +
     '</div>';
 
@@ -1039,21 +1220,10 @@ function renderSettings() {
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">🔒 Конфиденциальность</div>' +
       '<div class="settings-tg-group">' +
-        renderTgRow({
-          icon: '🔐', text: 'Код-пароль',
-          value: s.passcode ? 'Включён' : 'Выключен',
-          onClick: 'openPasscodeModal()'
-        }) +
-        renderTgRow({
-          icon: '👁', text: 'Последнее посещение',
-          value: lastSeenLabel(),
-          onClick: 'changeLastSeen()'
-        }) +
-        renderTgRow({
-          icon: '🚫', text: 'Заблокированные',
-          value: state.blockedList.length,
-          onClick: 'openBlockedList()'
-        }) +
+        renderTgRow({ icon: '🔐', text: 'Код-пароль', value: s.passcode ? 'Включён' : 'Выключен', onClick: 'openPasscodeModal()' }) +
+        renderTgRow({ icon: '👁', text: 'Последнее посещение', value: lastSeenLabel(), onClick: 'changeLastSeen()' }) +
+        renderTgRow({ icon: '📍', text: 'Кто видит геолокацию', value: geoVisibilityLabel(), onClick: 'changeGeoVisibility()' }) +
+        renderTgRow({ icon: '🚫', text: 'Заблокированные', value: state.blockedList.length, onClick: 'openBlockedList()' }) +
       '</div>' +
     '</div>';
 
@@ -1082,28 +1252,10 @@ function renderSettings() {
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">🎨 Оформление</div>' +
       '<div class="settings-tg-group">' +
-        renderTgRow({
-          icon: '🎨', text: 'Тема',
-          value: s.theme === 'light' ? 'Светлая' : 'Тёмная',
-          onClick: 'changeTheme()'
-        }) +
-        renderTgRow({
-          icon: '📏', text: 'Размер текста',
-          value: fontLabel(),
-          onClick: 'changeFontSize()'
-        }) +
-        renderTgRow({
-          icon: '🎯', text: 'Акцентный цвет',
-          type: 'color',
-          color: s.accent_color || '#8b7fff',
-          onClick: 'openColorPicker(\'accent_color\')'
-        }) +
-        renderTgRow({
-          icon: '⚡', text: 'Отключить анимации', type: 'switch',
-          checked: s.animations == 0,
-          onToggle: 'toggleSetting(\'animations\')',
-          onClick: 'toggleSetting(\'animations\')'
-        }) +
+        renderTgRow({ icon: '🎨', text: 'Тема', value: s.theme === 'light' ? 'Светлая' : 'Тёмная', onClick: 'changeTheme()' }) +
+        renderTgRow({ icon: '📏', text: 'Размер текста', value: fontLabel(), onClick: 'changeFontSize()' }) +
+        renderTgRow({ icon: '🎯', text: 'Акцентный цвет', type: 'color', color: s.accent_color || '#8b7fff', onClick: 'openColorPicker(\'accent_color\')' }) +
+        renderTgRow({ icon: '⚡', text: 'Отключить анимации', type: 'switch', checked: s.animations == 0, onToggle: 'toggleSetting(\'animations\')', onClick: 'toggleSetting(\'animations\')' }) +
       '</div>' +
     '</div>';
 
@@ -1118,16 +1270,14 @@ function renderSettings() {
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-group">' +
         renderTgRow({ icon: '🚪', text: 'Выйти', type: 'danger', onClick: 'logout()' }) +
-        renderTgRow({
-          icon: '🗑', text: 'Удалить аккаунт', type: 'danger',
-          onClick: 'openModal(\'delete-account-modal\')'
-        }) +
+        renderTgRow({ icon: '🗑', text: 'Удалить аккаунт', type: 'danger', onClick: 'openModal(\'delete-account-modal\')' }) +
       '</div>' +
     '</div>';
 
   let html = '';
   html += profileCardHtml;
   html += starsHtml;
+  html += modSection;
   html += botsSection;
   html += progressSection;
   html += giftsSection;
@@ -1138,7 +1288,7 @@ function renderSettings() {
   html += appearanceSection;
   html += qrSection;
   html += accountSection;
-  html += '<div style="padding:30px 20px 10px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.4<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px 20px 10px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.6<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
 
@@ -1158,9 +1308,22 @@ function renderSettings() {
       });
     }
   });
+
+  if (state.me.isModerator) {
+    socket.emit('mod panel stats', function (res) {
+      if (res && res.ok) {
+        state.modStats = res.stats || {};
+        renderSettings();
+      }
+    });
+  }
 }
 
 function lastSeenLabel() { return { everyone: 'Все', contacts: 'Контакты', nobody: 'Никто' }[state.settings.last_seen_visibility] || 'Все'; }
+function geoVisibilityLabel() {
+  const v = state.settings.geo_visibility || 'contacts';
+  return { everyone: 'Все', contacts: 'Контакты', nobody: 'Никто' }[v] || 'Контакты';
+}
 function fontLabel() { return { small: 'Маленький', medium: 'Средний', large: 'Большой' }[state.settings.font_size] || 'Средний'; }
 
 function toggleSetting(key) {
@@ -1198,6 +1361,16 @@ function changeLastSeen() {
   const next = options[(options.indexOf(cur) + 1) % options.length];
   socket.emit('set last seen visibility', { value: next }, function () {
     state.settings.last_seen_visibility = next;
+    renderSettings();
+    if (state.activeTab === 'settings') renderSettingsTab();
+  });
+}
+function changeGeoVisibility() {
+  const options = ['everyone', 'contacts', 'nobody'];
+  const cur = state.settings.geo_visibility || 'contacts';
+  const next = options[(options.indexOf(cur) + 1) % options.length];
+  socket.emit('update settings', { key: 'geo_visibility', value: next }, function () {
+    state.settings.geo_visibility = next;
     renderSettings();
     if (state.activeTab === 'settings') renderSettingsTab();
   });
@@ -1273,7 +1446,7 @@ function confirmDeleteAccount() {
   });
 }
 
-/* ─── 🎨 БАННЕР ПРОФИЛЯ ─── */
+/* ─── ПРОФИЛЬ ─── */
 function openProfile() {
   $('profile-username').textContent = '@' + (state.me.username || '');
   $('my-first-name').value = state.me.firstName || '';
@@ -1306,7 +1479,6 @@ function uploadBanner(event) {
     event.target.value = '';
     return;
   }
-
   const reader = new FileReader();
   reader.onload = function (e) {
     const img = new Image();
@@ -1317,28 +1489,22 @@ function uploadBanner(event) {
       canvas.width = targetW;
       canvas.height = targetH;
       const ctx = canvas.getContext('2d');
-
       const scale = Math.max(targetW / img.width, targetH / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
       const x = (targetW - w) / 2;
       const y = (targetH - h) / 2;
-
       ctx.drawImage(img, x, y, w, h);
-
       const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-
       if (dataUrl.length > 2_000_000) {
         showToast('⚠️ Баннер слишком большой. Выбери картинку поменьше.');
         return;
       }
-
       const bannerPreview = $('profile-banner-preview');
       const bannerImg = $('profile-banner-img');
       bannerImg.src = dataUrl;
       bannerPreview.style.display = 'block';
       bannerPreview.classList.remove('removing');
-
       socket.emit('set banner', { banner: dataUrl }, function (res) {
         if (res && res.ok) {
           state.me.banner = dataUrl;
@@ -1346,9 +1512,7 @@ function uploadBanner(event) {
           vibrate([50, 30, 50]);
         } else {
           showToast('❌ ' + ((res && res.error) || 'Ошибка'));
-          if (!state.me.banner) {
-            bannerPreview.style.display = 'none';
-          }
+          if (!state.me.banner) bannerPreview.style.display = 'none';
         }
       });
     };
@@ -1362,10 +1526,8 @@ function removeMyBanner(event) {
   if (event) event.stopPropagation();
   if (!state.me.banner) return;
   if (!confirm('Убрать баннер?')) return;
-
   const bannerPreview = $('profile-banner-preview');
   if (bannerPreview) bannerPreview.classList.add('removing');
-
   socket.emit('remove banner', function (res) {
     if (res && res.ok) {
       state.me.banner = null;
@@ -1621,7 +1783,6 @@ function doAddContactReal() {
       vibrate([30, 20, 30]);
       return;
     }
-
     nameInput.value = '';
     userInput.value = '';
     errEl.textContent = '';
@@ -1641,7 +1802,7 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-/* ─── ПРОФИЛЬ КОНТАКТА / БОТА ─── */
+/* ─── ПРОФИЛЬ КОНТАКТА ─── */
 function openContactProfile(username) {
   socket.emit('get profile', { username: username }, function (data) {
     if (!data) return;
@@ -1663,6 +1824,19 @@ function openContactProfile(username) {
     let extra = '';
     if (data.blockedByMe) extra = '<div style="color:#f87171;font-size:13px;margin-bottom:8px;text-align:center;">🚫 Вы заблокировали</div>';
     else if (data.blockedMe) extra = '<div style="color:#f87171;font-size:13px;margin-bottom:8px;text-align:center;">🚫 Вас заблокировали</div>';
+
+    let modPunishments = '';
+    if (state.me.isModerator && data.punishments && data.punishments.length > 0) {
+      modPunishments = '<div class="profile-punishments"><div class="pp-title">🛡️ Активные наказания</div>';
+      data.punishments.forEach(function (p) {
+        modPunishments += '<div class="pp-row">' +
+          '<span class="pp-type">' + (PUNISH_LABELS[p.type] || p.type) + '</span>' +
+          '<span class="pp-reason">' + escapeHtml(p.reason || '') + '</span>' +
+          '<span class="pp-dur">' + escapeHtml(p.duration_text) + '</span>' +
+          '</div>';
+      });
+      modPunishments += '</div>';
+    }
 
     let giftsHtml = '';
     if (data.gifts && data.gifts.length > 0) {
@@ -1701,6 +1875,7 @@ function openContactProfile(username) {
       '<div class="profile-status ' + (data.online ? 'online' : '') + '">' + (isBotUser ? 'всегда на связи' : (data.online ? 'в сети' : 'не в сети')) + '</div>' +
       '</div>' +
       (data.bio ? '<div class="profile-bio">' + escapeHtml(data.bio) + '</div>' : '') +
+      modPunishments +
       botCmdsHtml +
       giftsHtml + extra;
 
@@ -1723,6 +1898,29 @@ function openContactProfile(username) {
         badgeBtn.style.display = 'none';
       }
     }
+
+    /* 🚨 Кнопка «Пожаловаться» */
+    const reportBtn = $('report-contact-btn');
+    if (reportBtn) {
+      if (username !== state.me.username && !isBotUser) {
+        reportBtn.style.display = 'block';
+        reportBtn.onclick = function () { openReportModal(username, null, false); };
+      } else {
+        reportBtn.style.display = 'none';
+      }
+    }
+
+    /* 🛡️ Кнопки модератора в профиле */
+    const modActions = $('mod-contact-actions');
+    if (modActions) {
+      if (state.me.isModerator && username !== state.me.username && !isBotUser) {
+        modActions.style.display = 'block';
+        modActions.dataset.target = username;
+      } else {
+        modActions.style.display = 'none';
+      }
+    }
+
     openModal('contact-profile-modal');
   });
 }
@@ -1855,6 +2053,460 @@ function removePasscode() {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════
+   📍 ГЕОЛОКАЦИЯ
+   ═══════════════════════════════════════════════════════════ */
+function sendGeo() {
+  if (!state.currentChat && !state.currentGroup && !state.isSavedChat) {
+    showToast('⚠️ Открой чат');
+    return;
+  }
+  if (!navigator.geolocation) {
+    showToast('⚠️ Геолокация недоступна');
+    return;
+  }
+  showToast('📍 Определяю позицию…');
+  navigator.geolocation.getCurrentPosition(
+    function (pos) {
+      const lat = Number(pos.coords.latitude.toFixed(6));
+      const lng = Number(pos.coords.longitude.toFixed(6));
+      const replyId = state.replyToMessage ? state.replyToMessage.id : null;
+      const payload = { lat, lng, replyTo: replyId };
+      if (state.isSavedChat) payload.to = state.me.username;
+      else if (state.currentChat) payload.to = state.currentChat;
+      else if (state.currentGroup) payload.groupId = state.currentGroup.id;
+      socket.emit('send geo', payload, function (res) {
+        if (!res || !res.ok) {
+          showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+          return;
+        }
+        cancelReply();
+        showToast('📍 Геолокация отправлена');
+        vibrate(15);
+      });
+    },
+    function (err) {
+      let msg = 'Не удалось получить позицию';
+      if (err.code === 1) msg = '🚫 Доступ к геолокации запрещён';
+      else if (err.code === 2) msg = '📡 Позиция недоступна';
+      else if (err.code === 3) msg = '⏱ Таймаут';
+      showToast(msg);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  );
+}
+
+function renderGeoBlock(geo) {
+  if (!geo || geo.lat == null || geo.lng == null) return null;
+  const lat = Number(geo.lat);
+  const lng = Number(geo.lng);
+  const label = geo.label || null;
+  const staticMapUrl = 'https://staticmap.openstreetmap.de/staticmap.php?center=' +
+    lat + ',' + lng + '&zoom=15&size=400x260&maptype=mapnik&markers=' +
+    lat + ',' + lng + ',red-pushpin';
+  const mapsLink = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '#map=16/' + lat + '/' + lng;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'geo-block';
+  wrap.onclick = function (e) {
+    e.stopPropagation();
+    window.open(mapsLink, '_blank');
+  };
+  wrap.innerHTML =
+    '<div class="geo-img" style="background-image:url(' + staticMapUrl + ')"></div>' +
+    '<div class="geo-info">' +
+      '<div class="geo-label">📍 ' + (label ? escapeHtml(label) : 'Моя геолокация') + '</div>' +
+      '<div class="geo-coords">' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</div>' +
+      '<div class="geo-open">Открыть в картах →</div>' +
+    '</div>';
+  return wrap;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🚨 ЖАЛОБЫ
+   ═══════════════════════════════════════════════════════════ */
+function openReportModal(targetUser, messageId, isGroup) {
+  state.reportTarget = targetUser || null;
+  state.reportTargetMessageId = messageId || null;
+  state.reportIsGroup = !!isGroup;
+
+  const box = $('report-reasons');
+  if (box) {
+    box.innerHTML = '';
+    Object.entries(REPORT_REASONS).forEach(function (entry) {
+      const key = entry[0], label = entry[1];
+      const btn = document.createElement('button');
+      btn.className = 'report-reason-btn';
+      btn.dataset.reason = key;
+      btn.textContent = label;
+      btn.onclick = function () {
+        document.querySelectorAll('.report-reason-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        $('report-comment-wrap').style.display = key === 'other' ? 'block' : 'none';
+      };
+      box.appendChild(btn);
+    });
+  }
+
+  const target = $('report-target-info');
+  if (target) {
+    if (state.reportTarget) {
+      target.textContent = 'На: @' + state.reportTarget;
+    } else if (state.reportTargetMessageId) {
+      target.textContent = 'На сообщение #' + state.reportTargetMessageId;
+    }
+  }
+
+  const comment = $('report-comment');
+  if (comment) comment.value = '';
+  const err = $('report-error');
+  if (err) err.textContent = '';
+  const cw = $('report-comment-wrap');
+  if (cw) cw.style.display = 'none';
+
+  hideActionMenu();
+  openModal('report-modal');
+}
+
+function submitReport() {
+  const active = document.querySelector('.report-reason-btn.active');
+  const err = $('report-error');
+  err.textContent = '';
+  if (!active) { err.textContent = 'Выбери причину'; return; }
+  const reason = active.dataset.reason;
+  const comment = $('report-comment') ? $('report-comment').value.trim() : '';
+  if (reason === 'other' && !comment) { err.textContent = 'Опиши причину'; return; }
+
+  socket.emit('report', {
+    targetUser: state.reportTarget,
+    targetMessageId: state.reportTargetMessageId,
+    targetIsGroup: state.reportIsGroup,
+    reason: reason,
+    comment: comment || null
+  }, function (res) {
+    if (!res || !res.ok) { err.textContent = (res && res.error) || 'Ошибка'; return; }
+    closeModal('report-modal');
+    showToast('🚨 Жалоба отправлена модераторам');
+    vibrate([50, 30, 50]);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🛡️ ПАНЕЛЬ МОДЕРАТОРА
+   ═══════════════════════════════════════════════════════════ */
+function openModPanel() {
+  if (!state.me.isModerator) {
+    showToast('⚠️ Только для модераторов');
+    return;
+  }
+  state.modPanelOpen = true;
+  state.modTab = 'reports';
+  switchModTab('reports');
+  openModal('mod-panel-modal');
+  refreshModStats();
+}
+
+function closeModPanel() {
+  state.modPanelOpen = false;
+  closeModal('mod-panel-modal');
+}
+
+function switchModTab(tab) {
+  state.modTab = tab;
+  document.querySelectorAll('.mod-tab').forEach(function (t) {
+    t.classList.toggle('active', t.dataset.tab === tab);
+  });
+  document.querySelectorAll('.mod-section').forEach(function (s) {
+    s.classList.toggle('active', s.dataset.tab === tab);
+  });
+  if (tab === 'reports') loadModReports();
+  else if (tab === 'punishments') loadModPunishments();
+  else if (tab === 'logs') loadModLogs();
+}
+
+function refreshModStats() {
+  socket.emit('mod panel stats', function (res) {
+    if (res && res.ok) {
+      state.modStats = res.stats || {};
+      updateModStatsUI();
+    }
+  });
+}
+
+function updateModStatsUI() {
+  const s = state.modStats;
+  const el1 = $('mod-stat-new'); if (el1) el1.textContent = s.new_reports || 0;
+  const el2 = $('mod-stat-resolved'); if (el2) el2.textContent = s.resolved_reports || 0;
+  const el3 = $('mod-stat-bans'); if (el3) el3.textContent = s.active_bans || 0;
+  const el4 = $('mod-stat-mutes'); if (el4) el4.textContent = s.active_mutes || 0;
+}
+
+function loadModReports() {
+  socket.emit('get reports', { status: state.modReportsFilter }, function (res) {
+    if (!res || !res.ok) return;
+    state.modReports = res.reports || [];
+    renderModReports();
+  });
+}
+
+function renderModReports() {
+  const box = $('mod-reports-list');
+  if (!box) return;
+  box.innerHTML = '';
+  if (state.modReports.length === 0) {
+    box.innerHTML = '<div class="mod-empty">Жалоб нет 🎉</div>';
+    return;
+  }
+  state.modReports.forEach(function (rep) {
+    const card = document.createElement('div');
+    card.className = 'mod-report-card';
+    const reasonLabel = REPORT_REASONS[rep.reason] || rep.reason;
+    const statusClass = rep.status === 'new' ? 'new' : 'resolved';
+    let msgPreview = '';
+    if (rep.target_message_text) {
+      msgPreview = '<div class="mrc-msg">💬 ' + escapeHtml(rep.target_message_text.slice(0, 120)) + '</div>';
+    } else if (rep.target_message_image) {
+      msgPreview = '<div class="mrc-msg">📷 Фото</div>';
+    } else if (rep.target_message_voice) {
+      msgPreview = '<div class="mrc-msg">🎤 Голосовое</div>';
+    } else if (rep.target_message_geo) {
+      msgPreview = '<div class="mrc-msg">📍 Геолокация</div>';
+    }
+    card.innerHTML =
+      '<div class="mrc-head">' +
+        '<span class="mrc-status ' + statusClass + '">' + (rep.status === 'new' ? '🆕' : '✓') + '</span>' +
+        '<span class="mrc-reason">' + escapeHtml(reasonLabel) + '</span>' +
+        '<span class="mrc-time">' + timeAgo(rep.time) + '</span>' +
+      '</div>' +
+      '<div class="mrc-row"><b>От:</b> @' + escapeHtml(rep.reporter) + '</div>' +
+      '<div class="mrc-row"><b>На:</b> @' + escapeHtml(rep.target_user || '—') + '</div>' +
+      msgPreview +
+      (rep.comment ? '<div class="mrc-comment">💬 ' + escapeHtml(rep.comment) + '</div>' : '') +
+      (rep.action_taken && rep.action_taken !== 'ignore'
+        ? '<div class="mrc-action">Мера: ' + (PUNISH_LABELS[rep.action_taken] || rep.action_taken) + '</div>'
+        : '');
+    if (rep.status === 'new') {
+      const actions = document.createElement('div');
+      actions.className = 'mrc-actions';
+      actions.innerHTML =
+        '<button class="mrc-btn danger" data-action="ban">🚫 Бан</button>' +
+        '<button class="mrc-btn warn" data-action="mute">🔇 Мут</button>' +
+        '<button class="mrc-btn" data-action="warn">⚠️ Warn</button>' +
+        '<button class="mrc-btn ghost" data-action="ignore">❌ Игнор</button>';
+      actions.querySelectorAll('.mrc-btn').forEach(function (btn) {
+        btn.onclick = function () {
+          handleReportAction(rep.id, btn.dataset.action);
+        };
+      });
+      card.appendChild(actions);
+    }
+    box.appendChild(card);
+  });
+}
+
+function handleReportAction(reportId, action) {
+  if (action === 'ignore') {
+    socket.emit('resolve report', { reportId, action: 'ignore' }, function (res) {
+      if (res && res.ok) { showToast('✓ Жалоба проигнорирована'); loadModReports(); refreshModStats(); }
+      else showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+    });
+    return;
+  }
+  if (action === 'warn') {
+    const reason = prompt('Причина предупреждения:');
+    if (reason === null) return;
+    socket.emit('resolve report', { reportId, action: 'warn', reason }, function (res) {
+      if (res && res.ok) { showToast('⚠️ Предупреждение выдано'); loadModReports(); refreshModStats(); }
+      else showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+    });
+    return;
+  }
+  if (action === 'ban' || action === 'mute') {
+    openPunishDurationModal(reportId, action);
+  }
+}
+
+function openPunishDurationModal(reportId, action) {
+  const modal = $('punish-duration-modal');
+  const title = $('punish-duration-title');
+  const options = $('punish-duration-options');
+  if (!modal || !options) return;
+
+  if (title) title.textContent = action === 'ban' ? '🚫 Забанить на:' : '🔇 Замутить на:';
+  const durations = action === 'ban'
+    ? [['1h', '1 час'], ['24h', '24 часа'], ['7d', '7 дней'], ['30d', '30 дней'], ['forever', 'Навсегда']]
+    : [['5m', '5 минут'], ['1h', '1 час'], ['24h', '24 часа'], ['7d', '7 дней']];
+
+  options.innerHTML = '';
+  durations.forEach(function (d) {
+    const key = d[0], label = d[1];
+    const btn = document.createElement('button');
+    btn.className = 'punish-duration-btn' + (key === 'forever' ? ' danger' : '');
+    btn.textContent = label;
+    btn.onclick = function () {
+      const reason = prompt('Причина (необязательно):') || null;
+      closeModal('punish-duration-modal');
+      socket.emit('resolve report', { reportId, action, duration: key, reason }, function (res) {
+        if (res && res.ok) {
+          showToast('✓ ' + (action === 'ban' ? 'Забанен' : 'Замучен') + ' на ' + label);
+          loadModReports(); refreshModStats();
+        } else {
+          showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+        }
+      });
+    };
+    options.appendChild(btn);
+  });
+  openModal('punish-duration-modal');
+}
+
+function loadModPunishments() {
+  socket.emit('get punishments', { active: true }, function (res) {
+    if (!res || !res.ok) return;
+    state.modPunishments = res.punishments || [];
+    renderModPunishments();
+  });
+}
+
+function renderModPunishments() {
+  const box = $('mod-punishments-list');
+  if (!box) return;
+  box.innerHTML = '';
+  if (state.modPunishments.length === 0) {
+    box.innerHTML = '<div class="mod-empty">Активных наказаний нет ✅</div>';
+    return;
+  }
+  state.modPunishments.forEach(function (p) {
+    const card = document.createElement('div');
+    card.className = 'mod-punish-card';
+    card.innerHTML =
+      '<div class="mpc-head">' +
+        '<span class="mpc-type">' + (PUNISH_LABELS[p.type] || p.type) + '</span>' +
+        '<span class="mpc-dur">' + escapeHtml(p.duration_text) + '</span>' +
+      '</div>' +
+      '<div class="mpc-row"><b>@</b>' + escapeHtml(p.username) + '</div>' +
+      (p.reason ? '<div class="mpc-reason">💬 ' + escapeHtml(p.reason) + '</div>' : '') +
+      '<div class="mpc-meta">Выдал: @' + escapeHtml(p.issued_by) + ' · ' + timeAgo(p.issued_at) + '</div>' +
+      '<button class="mrc-btn ghost" data-lift="' + p.id + '">✅ Снять</button>';
+    card.querySelector('[data-lift]').onclick = function () {
+      if (!confirm('Снять наказание с @' + p.username + '?')) return;
+      socket.emit('lift punishment', { punishmentId: p.id }, function (res) {
+        if (res && res.ok) { showToast('✅ Снято'); loadModPunishments(); refreshModStats(); }
+        else showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+      });
+    };
+    box.appendChild(card);
+  });
+}
+
+function loadModLogs() {
+  socket.emit('get mod logs', { limit: 200 }, function (res) {
+    if (!res || !res.ok) return;
+    state.modLogs = res.logs || [];
+    renderModLogs();
+  });
+}
+
+function renderModLogs() {
+  const box = $('mod-logs-list');
+  if (!box) return;
+  box.innerHTML = '';
+  if (state.modLogs.length === 0) {
+    box.innerHTML = '<div class="mod-empty">Логов нет</div>';
+    return;
+  }
+  state.modLogs.forEach(function (log) {
+    const row = document.createElement('div');
+    row.className = 'mod-log-row';
+    const actionLabel = {
+      ban: '🚫 Бан', unban: '✅ Разбан',
+      mute: '🔇 Мут', unmute: '✅ Размут',
+      warn: '⚠️ Warn',
+      ignore: '❌ Игнор',
+      resolve: '✓ Решено'
+    }[log.action] || log.action;
+    row.innerHTML =
+      '<div class="mlr-head">' +
+        '<span class="mlr-action">' + actionLabel + '</span>' +
+        '<span class="mlr-time">' + new Date(log.time).toLocaleString('ru-RU') + '</span>' +
+      '</div>' +
+      '<div class="mlr-row">Модератор: <b>@' + escapeHtml(log.moderator) + '</b></div>' +
+      (log.target_user ? '<div class="mlr-row">Цель: @' + escapeHtml(log.target_user) + '</div>' : '') +
+      (log.details ? '<div class="mlr-details">' + escapeHtml(log.details) + '</div>' : '');
+    box.appendChild(row);
+  });
+}
+
+function modBanFromProfile() {
+  const username = ($('mod-contact-actions') && $('mod-contact-actions').dataset.target) || null;
+  if (!username) return;
+  openModBanUserModal(username, 'ban');
+}
+function modMuteFromProfile() {
+  const username = ($('mod-contact-actions') && $('mod-contact-actions').dataset.target) || null;
+  if (!username) return;
+  openModBanUserModal(username, 'mute');
+}
+function modWarnFromProfile() {
+  const username = ($('mod-contact-actions') && $('mod-contact-actions').dataset.target) || null;
+  if (!username) return;
+  const reason = prompt('Причина предупреждения для @' + username + ':');
+  if (reason === null) return;
+  socket.emit('warn user', { username, reason }, function (res) {
+    if (res && res.ok) showToast('⚠️ Предупреждение выдано');
+    else showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+  });
+}
+
+function openModBanUserModal(username, type) {
+  const modal = $('mod-ban-user-modal');
+  if (!modal) return;
+  $('mod-ban-target').textContent = '@' + username;
+  $('mod-ban-title').textContent = type === 'ban' ? '🚫 Забанить' : '🔇 Замутить';
+  $('mod-ban-username').value = username;
+  $('mod-ban-type').value = type;
+  $('mod-ban-error').textContent = '';
+
+  const options = $('mod-ban-durations');
+  options.innerHTML = '';
+  const durations = type === 'ban'
+    ? [['1h', '1 час'], ['24h', '24 часа'], ['7d', '7 дней'], ['30d', '30 дней'], ['forever', 'Навсегда']]
+    : [['5m', '5 минут'], ['1h', '1 час'], ['24h', '24 часа'], ['7d', '7 дней']];
+  durations.forEach(function (d, i) {
+    const btn = document.createElement('button');
+    btn.className = 'punish-duration-btn' + (i === 0 ? ' active' : '') + (d[0] === 'forever' ? ' danger' : '');
+    btn.dataset.dur = d[0];
+    btn.textContent = d[1];
+    btn.onclick = function () {
+      options.querySelectorAll('.punish-duration-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    };
+    options.appendChild(btn);
+  });
+
+  openModal('mod-ban-user-modal');
+}
+
+function submitModBan() {
+  const username = $('mod-ban-username').value.trim().toLowerCase();
+  const type = $('mod-ban-type').value;
+  const durEl = document.querySelector('#mod-ban-durations .punish-duration-btn.active');
+  const reason = $('mod-ban-reason').value.trim() || null;
+  const err = $('mod-ban-error');
+  err.textContent = '';
+  if (!username) { err.textContent = 'Введи ник'; return; }
+  if (!durEl) { err.textContent = 'Выбери срок'; return; }
+  const duration = durEl.dataset.dur;
+  const event = type === 'ban' ? 'ban user' : 'mute user';
+  socket.emit(event, { username, duration, reason }, function (res) {
+    if (!res || !res.ok) { err.textContent = (res && res.error) || 'Ошибка'; return; }
+    closeModal('mod-ban-user-modal');
+    showToast('✓ Готово');
+    refreshModStats();
+    if (state.modPanelOpen && state.modTab === 'punishments') loadModPunishments();
+  });
+}
+
 /* ─── ЗВЁЗДЫ / ПОДАРКИ ─── */
 function openStarsHistory() {
   socket.emit('get stars', function (res) {
@@ -1944,17 +2596,14 @@ function openGiftMessageModal(giftKey) {
   if (!gift) return;
   const to = state.currentGiftTarget;
   if (!to) { showToast('⚠️ Не выбран получатель'); return; }
-
   state.currentGiftKey = giftKey;
   const contact = state.contacts.find(function (c) { return c.name === to; });
   const displayName = (contact && contact.displayName) || to;
-
   $('gift-message-target').textContent = 'Кому: ' + displayName;
   $('gift-message-preview').textContent = gift.emoji;
   $('gift-message-price').textContent = gift.price;
   $('gift-message-input').value = '';
   $('gift-message-error').textContent = '';
-
   closeModal('gifts-catalog-modal');
   openModal('gift-message-modal');
 }
@@ -1968,12 +2617,8 @@ function confirmSendGift() {
   const message = $('gift-message-input').value.trim();
   const errEl = $('gift-message-error');
   errEl.textContent = '';
-
   socket.emit('send gift', { to: to, giftKey: giftKey, message: message || null }, function (res) {
-    if (!res || !res.ok) {
-      errEl.textContent = (res && res.error) || 'Ошибка при отправке';
-      return;
-    }
+    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка при отправке'; return; }
     closeModal('gift-message-modal');
     showToast('🎁 Подарок отправлен! -' + gift.price + ' ⭐');
     state.currentGiftTarget = null;
@@ -2095,12 +2740,10 @@ function openAchievements() {
     box.innerHTML = '';
     const unlockedCount = res.achievements.filter(function (a) { return a.unlocked; }).length;
     const total = res.achievements.length;
-
     const summary = document.createElement('div');
     summary.style.cssText = 'text-align:center;padding:12px 0 18px;color:var(--text-muted);font-size:13px;';
     summary.innerHTML = 'Разблокировано: <b style="color:var(--accent);">' + unlockedCount + '</b> / ' + total;
     box.appendChild(summary);
-
     res.achievements.forEach(function (a) {
       const card = document.createElement('div');
       card.className = 'achievement-card ' + (a.unlocked ? 'unlocked' : 'locked');
@@ -2143,8 +2786,8 @@ function openStats() {
       { emoji: '📷', label: 'Фото', value: Number(s.photos_sent || 0) },
       { emoji: '😍', label: 'Реакций', value: Number(s.reactions_given || 0) },
       { emoji: '🐱', label: 'Стикеров', value: Number(s.stickers_sent || 0) },
+      { emoji: '📍', label: 'Гео', value: Number(s.geo_sent || 0) },
     ];
-
     let html = '<div class="stats-grid">';
     stats.forEach(function (st) {
       html += '<div class="stat-card">' +
@@ -2154,7 +2797,6 @@ function openStats() {
         '</div>';
     });
     html += '</div>';
-
     const dur = Number(s.calls_duration || 0);
     const min = Math.floor(dur / 60);
     const hours = Math.floor(min / 60);
@@ -2163,12 +2805,11 @@ function openStats() {
     else if (min > 0) timeStr = min + ' мин';
     else timeStr = dur + ' сек';
     html += '<div style="text-align:center;padding:14px;color:var(--text-muted);font-size:13px;">📞 Всего в звонках: <b style="color:var(--accent);">' + timeStr + '</b></div>';
-
     box.innerHTML = html;
   });
 }
 
-/* ─── 🤖 БОТЫ ─── */
+/* ─── БОТЫ ─── */
 function openCreateBotModal() {
   $('bot-username').value = '';
   $('bot-name').value = '';
@@ -2253,29 +2894,18 @@ function doCreateBot() {
   const commands = collectBotCommands('bot-commands-list');
   const errEl = $('create-bot-error');
   errEl.textContent = '';
-
   if (!username) { errEl.textContent = 'Введи ник бота'; return; }
   if (!/_bot$/.test(username)) { errEl.textContent = 'Ник должен заканчиваться на _bot'; return; }
   if (!name) { errEl.textContent = 'Введи имя бота'; return; }
-
   socket.emit('create bot', {
-    username: username,
-    name: name,
-    description: description || null,
-    avatar: state.tempBotAvatar,
-    emoji: emoji || null,
-    commands: commands
+    username: username, name: name, description: description || null,
+    avatar: state.tempBotAvatar, emoji: emoji || null, commands: commands
   }, function (res) {
-    if (!res || !res.ok) {
-      errEl.textContent = (res && res.error) || 'Ошибка';
-      return;
-    }
+    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('create-bot-modal');
     showToast('🤖 Бот ' + name + ' создан!');
     vibrate([50, 30, 50]);
-    socket.emit('get my bots', function (r) {
-      if (r && r.ok) state.myBots = r.bots || [];
-    });
+    socket.emit('get my bots', function (r) { if (r && r.ok) state.myBots = r.bots || []; });
   });
 }
 
@@ -2349,7 +2979,6 @@ function doUpdateBot() {
   const errEl = $('edit-bot-error');
   errEl.textContent = '';
   if (!name) { errEl.textContent = 'Введи имя'; return; }
-
   socket.emit('update bot', {
     username: username, name: name, description: description || null,
     emoji: emoji || null, commands: commands
@@ -2357,9 +2986,7 @@ function doUpdateBot() {
     if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('edit-bot-modal');
     showToast('✓ Бот обновлён');
-    socket.emit('get my bots', function (r) {
-      if (r && r.ok) state.myBots = r.bots || [];
-    });
+    socket.emit('get my bots', function (r) { if (r && r.ok) state.myBots = r.bots || []; });
   });
 }
 
@@ -2371,9 +2998,7 @@ function confirmDeleteBot() {
     if (!res || !res.ok) { alert((res && res.error) || 'Ошибка'); return; }
     closeModal('edit-bot-modal');
     showToast('🗑 Бот удалён');
-    socket.emit('get my bots', function (r) {
-      if (r && r.ok) state.myBots = r.bots || [];
-    });
+    socket.emit('get my bots', function (r) { if (r && r.ok) state.myBots = r.bots || []; });
   });
 }
 
@@ -2410,7 +3035,6 @@ function showBotInfoModal(bot) {
   } else {
     cmdsHtml = '<div class="modal-desc" style="margin-bottom:14px;">У бота нет команд</div>';
   }
-
   box.innerHTML = '<div class="profile-header">' +
     '<div class="profile-avatar-big bot" style="' + avStyle + '">' + avContent + '</div>' +
     '<div class="profile-name">' + escapeHtml(bot.name) + ' <span class="bot-mark">бот</span></div>' +
@@ -2698,6 +3322,7 @@ function openChat(name) {
   closeStickersPanel();
   applyChatWallpaper();
   bindRipples($('chat-screen'));
+  applyMuteLock();
 }
 
 function renderBotCommandsHint(commands) {
@@ -2755,6 +3380,7 @@ function openSavedChat() {
   bindScrollDown();
   closeStickersPanel();
   applyChatWallpaper();
+  applyMuteLock();
 }
 
 function openGroupChat(g) {
@@ -2803,6 +3429,7 @@ function openGroupChat(g) {
   bindScrollDown();
   closeStickersPanel();
   applyChatWallpaper();
+  applyMuteLock();
 }
 
 function closeChat() {
@@ -2897,7 +3524,6 @@ function renderMessage(msg) {
   if (msg.isGroup) wrap.dataset.group = '1';
   if (msg.from) wrap.dataset.from = msg.from;
 
-  // ⭐ Premium — золотая полоса для сообщений от премиумов
   if (!msg.self && msg.from) {
     const c = state.contacts.find(function (x) { return x.name === msg.from; });
     if (c && c.premium) wrap.classList.add('from-premium');
@@ -3028,6 +3654,12 @@ function renderMessage(msg) {
       audio.onended = function () { playing = false; pb.textContent = '▶'; vw.classList.remove('playing'); };
     }
 
+    /* 📍 Гео */
+    if (msg.geo) {
+      const geoBlock = renderGeoBlock(msg.geo);
+      if (geoBlock) div.appendChild(geoBlock);
+    }
+
     if (msg.text) {
       if (msg.text.indexOf('🎁 Подарок: ') === 0) {
         let body = msg.text.replace('🎁 Подарок: ', '');
@@ -3156,12 +3788,16 @@ function showActionMenu(e, msg) {
   const touch = (e.touches && e.touches[0]) || e;
   let x = touch.clientX, y = touch.clientY;
   const isMine = msg.from === state.me.username;
-  $('action-edit').style.display = (isMine && !msg.voice && !msg.image && !msg.videoCircle && !msg.sticker && msg.text) ? 'flex' : 'none';
+  $('action-edit').style.display = (isMine && !msg.voice && !msg.image && !msg.videoCircle && !msg.sticker && msg.text && !msg.geo) ? 'flex' : 'none';
   $('action-delete').style.display = isMine ? 'flex' : 'none';
   $('action-pin').style.display = msg.isGroup ? 'flex' : 'none';
+  const reportBtn = $('action-report');
+  if (reportBtn) {
+    reportBtn.style.display = isMine ? 'none' : 'flex';
+  }
   menu.classList.add('active');
   const rect = menu.getBoundingClientRect();
-  const w = rect.width || 200, h = rect.height || 250;
+  const w = rect.width || 200, h = rect.height || 280;
   x = Math.min(Math.max(x - w / 2, 10), window.innerWidth - w - 10);
   y = Math.min(Math.max(y, 10), window.innerHeight - h - 10);
   menu.style.left = x + 'px';
@@ -3180,7 +3816,8 @@ function actionReply() {
     || (state.activeMessage.sticker ? 'Стикер'
       : (state.activeMessage.image ? '📷 Фото'
         : (state.activeMessage.voice ? '🎤 Голосовое'
-          : (state.activeMessage.videoCircle ? '🎥 Кружок' : ''))));
+          : (state.activeMessage.videoCircle ? '🎥 Кружок'
+            : (state.activeMessage.geo ? '📍 Геолокация' : '')))));
   $('rp-name').textContent = name;
   $('rp-msg').textContent = preview;
   $('reply-preview').classList.add('active');
@@ -3239,6 +3876,13 @@ function actionPin() {
     $('pinned-text').textContent = 'Закреплённое сообщение';
     hideActionMenu();
   });
+}
+function actionReport() {
+  if (!state.activeMessage) return;
+  const msg = state.activeMessage;
+  const isGroup = !!msg.isGroup;
+  const target = msg.from;
+  openReportModal(target, msg.id, isGroup);
 }
 
 document.addEventListener('click', function (e) {
@@ -3320,10 +3964,10 @@ function triggerReplyFromSwipe(msg) {
   state.replyToMessage = {
     id: msg.id, from: msg.from, text: msg.text, image: msg.image,
     voice: msg.voice, videoCircle: msg.videoCircle, sticker: msg.sticker,
-    self: msg.self, isGroup: msg.isGroup
+    self: msg.self, isGroup: msg.isGroup, geo: msg.geo
   };
   const name = msg.self ? 'Я' : displayNameForUser(msg.from);
-  const preview = msg.text || (msg.sticker ? 'Стикер' : (msg.image ? '📷 Фото' : (msg.voice ? '🎤 Голосовое' : (msg.videoCircle ? '🎥 Кружок' : ''))));
+  const preview = msg.text || (msg.sticker ? 'Стикер' : (msg.image ? '📷 Фото' : (msg.voice ? '🎤 Голосовое' : (msg.videoCircle ? '🎥 Кружок' : (msg.geo ? '📍 Геолокация' : '')))));
   $('rp-name').textContent = name;
   $('rp-msg').textContent = preview;
   $('reply-preview').classList.add('active');
@@ -3384,6 +4028,10 @@ function sendMsg() {
   const input = $('msgInput');
   const text = input.value.trim();
   if (!text) return;
+  if (state.me.mute) {
+    showToast('🔇 Ты в муте');
+    return;
+  }
   const replyId = state.replyToMessage ? state.replyToMessage.id : null;
   if (state.isSavedChat) socket.emit('private message', { to: state.me.username, text: text });
   else if (state.currentChat) {
@@ -3428,6 +4076,7 @@ function updateTopStatusTyping() {
 function sendPhoto(event) {
   const file = event.target.files[0];
   if (!file) return;
+  if (state.me.mute) { showToast('🔇 Ты в муте'); event.target.value = ''; return; }
   const replyId = state.replyToMessage ? state.replyToMessage.id : null;
   const reader = new FileReader();
   reader.onload = function (e) {
@@ -3464,6 +4113,7 @@ function getBestAudioMime() {
 
 async function toggleVoiceRecording() {
   if (!state.currentChat && !state.currentGroup && !state.isSavedChat) return;
+  if (state.me.mute) { showToast('🔇 Ты в муте'); return; }
   if (state.isRecording) { stopVoiceRecording(true); return; }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -3546,6 +4196,7 @@ function getBestVideoMime() {
 
 async function startCircleRecording() {
   if (!state.currentChat && !state.currentGroup && !state.isSavedChat) return;
+  if (state.me.mute) { showToast('🔇 Ты в муте'); return; }
   try {
     state.circleStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } },
@@ -3756,6 +4407,7 @@ function renderStickerGrid(box, urls) {
 }
 function sendSticker(url, type) {
   if (!url) return;
+  if (state.me.mute) { showToast('🔇 Ты в муте'); return; }
   let done = false;
   const cb = function (res) {
     if (done) return;
@@ -4194,7 +4846,7 @@ function loadChannelComments(postId) {
       div.innerHTML = '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:4px;">' + escapeHtml(displayNameForUser(c.from_user)) + ' ' + cBadges + '</div>' +
         '<div style="font-size:14px;word-wrap:break-word;">' + highlightMentions(c.text || '') + '</div>' +
         '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">' + new Date(c.time).toLocaleString('ru-RU') + '</div>';
-      box.appendChild(div);
+      box.appendChild(c div);
     });
     box.scrollTop = box.scrollHeight;
   });
@@ -4712,7 +5364,7 @@ function openStoryViewers() {
   });
 }
 
-/* ─── ЗВОНКИ (WebRTC) ─── */
+/* ─── ЗВОНКИ ─── */
 var RTC_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -4777,6 +5429,7 @@ async function stopScreenShare() {
 async function startCall(video) {
   if (!state.currentChat || state.callActive) return;
   if (state.isBotChat) { showToast('🤖 Ботам нельзя звонить'); return; }
+  if (state.me.mute) { showToast('🔇 Ты в муте — звонки недоступны'); return; }
   const contact = state.contacts.find(function (c) { return c.name === state.currentChat; });
   if (contact && !contact.online) { alert((contact.displayName || state.currentChat) + ' не в сети.'); return; }
   try {
@@ -4990,6 +5643,7 @@ socket.on('history', function (data) {
       text: m.text, image: m.image, sticker: m.sticker,
       voice: m.voice, voiceDuration: m.voice_duration,
       videoCircle: m.video_circle, videoDuration: m.video_duration,
+      geo: (m.geo_lat != null && m.geo_lng != null) ? { lat: m.geo_lat, lng: m.geo_lng, label: m.geo_label } : null,
       reactions: m.reactions || {}, time: m.time,
       self: m.from_user === state.me.username,
       replyData: m.replyData,
@@ -5012,6 +5666,7 @@ socket.on('saved history', function (data) {
       text: m.text, image: m.image, sticker: m.sticker,
       voice: m.voice, voiceDuration: m.voice_duration,
       videoCircle: m.video_circle, videoDuration: m.video_duration,
+      geo: (m.geo_lat != null && m.geo_lng != null) ? { lat: m.geo_lat, lng: m.geo_lng, label: m.geo_label } : null,
       reactions: m.reactions || {}, time: m.time, self: true,
       replyData: m.replyData,
       edited: !!m.edited, deleted: !!m.deleted,
@@ -5033,6 +5688,7 @@ socket.on('group history', function (data) {
       text: m.text, image: m.image, sticker: m.sticker,
       voice: m.voice, voiceDuration: m.voice_duration,
       videoCircle: m.video_circle, videoDuration: m.video_duration,
+      geo: (m.geo_lat != null && m.geo_lng != null) ? { lat: m.geo_lat, lng: m.geo_lng, label: m.geo_label } : null,
       reactions: m.reactions || {}, time: m.time,
       self: m.from_user === state.me.username,
       senderName: displayNameForUser(m.from_user),
@@ -5063,6 +5719,7 @@ socket.on('private message', function (data) {
       text: data.text, image: data.image, sticker: data.sticker,
       voice: data.voice, voiceDuration: data.voiceDuration,
       videoCircle: data.videoCircle, videoDuration: data.videoDuration,
+      geo: data.geo || null,
       reactions: data.reactions || {}, time: data.time,
       self: true, replyData: data.replyData, read: false
     });
@@ -5072,6 +5729,7 @@ socket.on('private message', function (data) {
       text: data.text, image: data.image, sticker: data.sticker,
       voice: data.voice, voiceDuration: data.voiceDuration,
       videoCircle: data.videoCircle, videoDuration: data.videoDuration,
+      geo: data.geo || null,
       reactions: data.reactions || {}, time: data.time,
       self: true, replyData: data.replyData, read: false
     });
@@ -5082,6 +5740,7 @@ socket.on('private message', function (data) {
         text: data.text, image: data.image, sticker: data.sticker,
         voice: data.voice, voiceDuration: data.voiceDuration,
         videoCircle: data.videoCircle, videoDuration: data.videoDuration,
+        geo: data.geo || null,
         reactions: data.reactions || {}, time: data.time,
         self: false, replyData: data.replyData,
         system: !!data.system, systemType: data.systemType
@@ -5105,6 +5764,7 @@ socket.on('private message', function (data) {
       if (data.image) preview = '📷 Фото';
       if (data.voice) preview = '🎤 Голосовое';
       if (data.videoCircle) preview = '🎥 Кружок';
+      if (data.geo) preview = '📍 Геолокация';
       if (data.system) preview = data.text || 'Звонок';
       const isBotMsg = c && c.isBot;
       showBrowserNotification((isBotMsg ? '🤖 ' : '') + displayNameForUser(data.from), preview);
@@ -5140,6 +5800,7 @@ socket.on('group message', function (data) {
       text: data.text, image: data.image, sticker: data.sticker,
       voice: data.voice, voiceDuration: data.voiceDuration,
       videoCircle: data.videoCircle, videoDuration: data.videoDuration,
+      geo: data.geo || null,
       reactions: data.reactions || {}, time: data.time,
       self: true, senderName: 'Я', isGroup: true, replyData: data.replyData
     });
@@ -5150,6 +5811,7 @@ socket.on('group message', function (data) {
         text: data.text, image: data.image, sticker: data.sticker,
         voice: data.voice, voiceDuration: data.voiceDuration,
         videoCircle: data.videoCircle, videoDuration: data.videoDuration,
+        geo: data.geo || null,
         reactions: data.reactions || {}, time: data.time,
         self: false, senderName: displayNameForUser(data.from), isGroup: true, replyData: data.replyData
       });
@@ -5171,6 +5833,7 @@ socket.on('group message', function (data) {
       if (data.image) preview = '📷 Фото';
       if (data.voice) preview = '🎤 Голосовое';
       if (data.videoCircle) preview = '🎥 Кружок';
+      if (data.geo) preview = '📍 Геолокация';
       showBrowserNotification((g && g.name || 'Группа') + ' — ' + displayNameForUser(data.from), preview);
     }
   }
@@ -5460,10 +6123,8 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Azerta v13.4 — Client загружен');
-console.log('⭐ Premium: золотая звёздочка, рамка, градиент');
-console.log('🎨 Новые бейджи: синяя галочка, SCAM-плашка');
-console.log('🎨 ТГ-стиль настроек + баннеры профиля');
-console.log('🤖 Боты, достижения, статистика, подарки');
-console.log('✨ Плавность: ripple, skeleton, spring, stagger');
+console.log('✅ Azerta v13.6 — Client загружен');
+console.log('📍 Геолокация: send geo');
+console.log('🚨 Жалобы: report, resolve report');
+console.log('🛡️  Модерация: openModPanel, ban/mute/warn user');
 console.log('✓ ГОТОВО');
