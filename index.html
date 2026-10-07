@@ -276,6 +276,20 @@
   <div id="contact-profile-content"></div>
   <button class="modal-primary" id="gift-to-contact-btn" onclick="openGiftsCatalog(contactProfileCurrent?.username)" style="display:none;">🎁 Подарить подарок</button>
   <button class="modal-primary" id="give-badge-to-contact-btn" onclick="openBadgeModalForCurrent()" style="display:none;">🏅 Управление значками</button>
+
+  <!-- 🚨 Пожаловаться -->
+  <button class="modal-warning" id="report-contact-btn" onclick="openReportModal(contactProfileCurrent?.username, null, false)" style="display:none;">🚨 Пожаловаться</button>
+
+  <!-- 🛡️ Модераторские действия -->
+  <div id="mod-contact-actions" style="display:none;">
+    <div style="margin:12px 0 6px;font-size:12px;color:var(--text-muted);text-align:center;text-transform:uppercase;letter-spacing:1px;">🛡️ Модератор</div>
+    <div style="display:flex;gap:8px;">
+      <button class="modal-danger" style="flex:1;" onclick="modBanFromProfile()">🚫 Бан</button>
+      <button class="modal-secondary" style="flex:1;" onclick="modMuteFromProfile()">🔇 Мут</button>
+    </div>
+    <button class="modal-secondary" style="margin-top:8px;" onclick="modWarnFromProfile()">⚠️ Предупреждение</button>
+  </div>
+
   <div style="display:flex;gap:10px;">
     <button class="modal-secondary" style="flex:1;" onclick="closeModal('contact-profile-modal')">Закрыть</button>
     <button class="modal-danger" style="flex:1;" id="block-action-btn" onclick="toggleBlockCurrent()">🚫 Блок</button>
@@ -392,6 +406,94 @@
   <input id="search-input" placeholder="Что искать..." />
   <div id="search-results" style="max-height:50vh;overflow-y:auto;margin-top:10px;"></div>
   <button class="modal-secondary" onclick="closeModal('search-modal')">Закрыть</button>
+</div></div>
+
+<!-- 🚨 REPORT MODAL -->
+<div class="modal" id="report-modal"><div class="modal-box">
+  <h3>🚨 Пожаловаться</h3>
+  <div class="modal-desc" id="report-target-info">Выбери причину</div>
+  <div class="report-reasons" id="report-reasons"></div>
+  <div id="report-comment-wrap" style="display:none;">
+    <label>Опиши подробнее</label>
+    <textarea id="report-comment" placeholder="Что случилось?" rows="3" maxlength="500"></textarea>
+  </div>
+  <div class="modal-error" id="report-error"></div>
+  <button class="modal-primary" onclick="submitReport()">📤 Отправить жалобу</button>
+  <button class="modal-secondary" onclick="closeModal('report-modal')">Отмена</button>
+</div></div>
+
+<!-- 🛡️ MOD PANEL -->
+<div class="modal" id="mod-panel-modal"><div class="modal-box" style="max-width:560px;">
+  <h3>🛡️ Панель модератора</h3>
+
+  <div class="mod-stats">
+    <div class="mod-stat">
+      <div class="mod-stat-value" id="mod-stat-new">0</div>
+      <div class="mod-stat-label">Новых</div>
+    </div>
+    <div class="mod-stat">
+      <div class="mod-stat-value" id="mod-stat-resolved">0</div>
+      <div class="mod-stat-label">Решено</div>
+    </div>
+    <div class="mod-stat">
+      <div class="mod-stat-value" id="mod-stat-bans">0</div>
+      <div class="mod-stat-label">Банов</div>
+    </div>
+    <div class="mod-stat">
+      <div class="mod-stat-value" id="mod-stat-mutes">0</div>
+      <div class="mod-stat-label">Мутов</div>
+    </div>
+  </div>
+
+  <div class="mod-tabs">
+    <button class="mod-tab active" data-tab="reports" onclick="switchModTab('reports')">🚨 Жалобы</button>
+    <button class="mod-tab" data-tab="punishments" onclick="switchModTab('punishments')">⚖️ Наказания</button>
+    <button class="mod-tab" data-tab="logs" onclick="switchModTab('logs')">📜 Логи</button>
+  </div>
+
+  <div class="mod-section active" data-tab="reports">
+    <div class="mod-filter">
+      <button class="mod-filter-btn active" data-status="new" onclick="state.modReportsFilter='new'; loadModReports(); document.querySelectorAll('.mod-filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.status==='new'));">🆕 Новые</button>
+      <button class="mod-filter-btn" data-status="resolved" onclick="state.modReportsFilter='resolved'; loadModReports(); document.querySelectorAll('.mod-filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.status==='resolved'));">✓ Решённые</button>
+      <button class="mod-filter-btn" data-status="all" onclick="state.modReportsFilter='all'; loadModReports(); document.querySelectorAll('.mod-filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.status==='all'));">Все</button>
+    </div>
+    <div id="mod-reports-list" class="mod-list"></div>
+  </div>
+
+  <div class="mod-section" data-tab="punishments">
+    <div id="mod-punishments-list" class="mod-list"></div>
+  </div>
+
+  <div class="mod-section" data-tab="logs">
+    <div id="mod-logs-list" class="mod-list"></div>
+  </div>
+
+  <button class="modal-secondary" onclick="closeModPanel()">Закрыть</button>
+</div></div>
+
+<!-- 🛡️ PUNISH DURATION -->
+<div class="modal" id="punish-duration-modal"><div class="modal-box">
+  <h3 id="punish-duration-title">Выбери срок</h3>
+  <div class="punish-duration-options" id="punish-duration-options"></div>
+  <button class="modal-secondary" onclick="closeModal('punish-duration-modal')">Отмена</button>
+</div></div>
+
+<!-- 🛡️ MOD BAN USER -->
+<div class="modal" id="mod-ban-user-modal"><div class="modal-box">
+  <h3 id="mod-ban-title">🚫 Забанить</h3>
+  <div class="modal-desc">Цель: <span id="mod-ban-target">—</span></div>
+  <input type="hidden" id="mod-ban-username" />
+  <input type="hidden" id="mod-ban-type" />
+
+  <div class="modal-desc" style="margin-top:10px;">Выбери срок:</div>
+  <div class="punish-duration-options" id="mod-ban-durations"></div>
+
+  <label>Причина (необязательно)</label>
+  <textarea id="mod-ban-reason" placeholder="Причина наказания" rows="2" maxlength="500"></textarea>
+
+  <div class="modal-error" id="mod-ban-error"></div>
+  <button class="modal-danger" onclick="submitModBan()">Применить</button>
+  <button class="modal-secondary" onclick="closeModal('mod-ban-user-modal')">Отмена</button>
 </div></div>
 
 <!-- ═══ SETTINGS MODALS ═══ -->
@@ -759,6 +861,7 @@
   <div id="input-area">
     <button class="attach" onclick="document.getElementById('photoFile').click()">📎</button>
     <button class="attach" id="stickersBtn" onclick="toggleStickersPanel()" title="Стикеры и GIF">😀</button>
+    <button class="attach" id="geoBtn" onclick="sendGeo()" title="Отправить геолокацию">📍</button>
     <input type="file" id="photoFile" accept="image/*" style="display:none" onchange="sendPhoto(event)" />
     <input id="msgInput" placeholder="Сообщение" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMsg();}" oninput="onInputTyping()" />
     <button class="camera" id="circleBtn" onclick="startCircleRecording()">🎥</button>
@@ -823,6 +926,7 @@
   <div class="action-item" onclick="actionPin()" id="action-pin" style="display:none;">📌 Закрепить</div>
   <div class="action-item" onclick="actionEdit()" id="action-edit" style="display:none;">✏️ Изменить</div>
   <div class="action-item danger" onclick="actionDelete()" id="action-delete" style="display:none;">🗑 Удалить</div>
+  <div class="action-item" onclick="actionReport()" id="action-report" style="display:none;">🚨 Пожаловаться</div>
 </div>
 
 <!-- ═══ RECORDING BAR ═══ -->
