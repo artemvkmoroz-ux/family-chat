@@ -1,9 +1,11 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.3 — Client
-   ✓ 🎨 ТГ-стиль настроек
-   ✓ 🎨 Баннер профиля в карточке настроек
+   🌌 AZERTA v13.4 — Client
+   ✓ ⭐ Premium (звёздочка, золотая рамка, градиент)
+   ✓ 🎨 Новые бейджи (синяя галочка, SCAM-плашка)
+   ✓ ТГ-стиль настроек
+   ✓ Баннеры профиля
    ✓ Боты (создание, чат, команды)
    ✓ Ripple + Skeleton + Spring
    ✓ Достижения, статистика, упоминания
@@ -17,7 +19,8 @@ var isLoggedInOnServer = false;
 
 const state = {
   me: {
-    username: null, avatar: null, banner: null, verified: false, bio: '',
+    username: null, avatar: null, banner: null,
+    premium: false, verified: false, bio: '',
     firstName: '', lastName: '', birthday: '', emoji: '',
     stars: 0, sessionId: null, hammer: false, scam: false
   },
@@ -135,21 +138,27 @@ function displayNameForUser(username) {
   return c && c.displayName ? c.displayName : username;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   🎨 БЕЙДЖИ
+   ═══════════════════════════════════════════════════════════ */
+
 function renderBadges(user) {
   if (!user) return '';
   let html = '';
+  if (user.premium) html += '<span class="premium-badge" title="Azerta Premium">⭐</span>';
   if (user.verified) html += '<span class="verified-badge" title="Верифицирован">✓</span>';
   if (user.hammer) html += '<span class="hammer-badge" title="Модератор">🔨</span>';
-  if (user.scam) html += '<span class="scam-badge" title="Мошенник">💀</span>';
+  if (user.scam) html += '<span class="scam-badge" title="Мошенник">SCAM</span>';
   return html;
 }
 
 function renderBadgesBig(user) {
   if (!user) return '';
   let html = '';
+  if (user.premium) html += '<span class="premium-badge big" title="Azerta Premium">⭐</span>';
   if (user.verified) html += '<span class="verified-badge big" title="Верифицирован">✓</span>';
   if (user.hammer) html += '<span class="hammer-badge big" title="Модератор">🔨</span>';
-  if (user.scam) html += '<span class="scam-badge big" title="Мошенник">💀</span>';
+  if (user.scam) html += '<span class="scam-badge big" title="Мошенник">SCAM</span>';
   return html;
 }
 
@@ -611,6 +620,7 @@ function onLoggedIn(res, isAutoLogin) {
   state.me.username = res.username;
   state.me.avatar = res.avatar || null;
   state.me.banner = res.banner || null;
+  state.me.premium = !!res.premium;
   state.me.verified = !!res.verified;
   state.me.hammer = !!res.hammer;
   state.me.scam = !!res.scam;
@@ -671,6 +681,7 @@ async function tryAutoLogin() {
       state.me.username = res.username;
       state.me.avatar = res.avatar || null;
       state.me.banner = res.banner || null;
+      state.me.premium = !!res.premium;
       state.me.verified = !!res.verified;
       state.me.hammer = !!res.hammer;
       state.me.scam = !!res.scam;
@@ -886,13 +897,8 @@ function renderSettingsTab() {
   }
 }
 
-/* ═══════════════════════════════════════════════════════════
-   🎨 ТГ-СТИЛЬ НАСТРОЕК
-   ═══════════════════════════════════════════════════════════ */
-
-/* ─── Вспомогательная: одна ТГ-строка ─── */
+/* ─── ТГ-строка ─── */
 function renderTgRow(opts) {
-  // opts = { icon, text, value, onClick, type: 'switch'|'arrow'|'color'|'danger'|'disabled', checked, color }
   const type = opts.type || 'arrow';
   const danger = opts.type === 'danger' ? ' danger' : '';
   const disabled = opts.type === 'disabled' ? ' disabled' : '';
@@ -923,15 +929,15 @@ function renderTgRow(opts) {
     '</div>';
 }
 
-/* ─── Главная функция рендера настроек ─── */
+/* ─── ГЛАВНАЯ ФУНКЦИЯ РЕНДЕРА НАСТРОЕК ─── */
 function renderSettings() {
   const box = $('settings-content');
   if (!box) return;
   const me = state.me;
   const s = state.settings;
   const isAdmin = me.username === 'moroz';
+  const isPremium = !!me.premium;
 
-  /* ─── Карточка профиля с баннером ─── */
   const displayName = (me.firstName || me.lastName)
     ? (me.firstName + ' ' + (me.lastName || '')).trim()
     : '@' + me.username;
@@ -943,21 +949,20 @@ function renderSettings() {
   const avatarContent = me.avatar ? '' : initials(me.username);
 
   const profileCardHtml =
-    '<div class="settings-profile-card-tg' + (hasBanner ? '' : ' no-banner') + '" onclick="openProfile()">' +
+    '<div class="settings-profile-card-tg' + (hasBanner ? '' : ' no-banner') + (isPremium ? ' premium' : '') + '" onclick="openProfile()">' +
       '<div class="tg-banner" style="' + bannerStyle + '"></div>' +
       '<div class="tg-banner-overlay"></div>' +
       (hasBanner ? '' : '<span class="tg-no-banner-hint">+ Сменить баннер</span>') +
       '<div class="tg-profile-row">' +
         '<div class="tg-profile-avatar" style="' + avatarStyle + '">' + avatarContent + '</div>' +
         '<div class="tg-profile-info">' +
-          '<div class="tg-profile-name">' + escapeHtml(displayName) + emojiStr + ' ' + tick + '</div>' +
+          '<div class="tg-profile-name' + (isPremium ? ' premium' : '') + '">' + escapeHtml(displayName) + emojiStr + ' ' + tick + '</div>' +
           '<div class="tg-profile-username">@' + escapeHtml(me.username) + '</div>' +
-          '<div class="tg-profile-status"><span class="dot"></span>в сети</div>' +
+          '<div class="tg-profile-status"><span class="dot"></span>' + (isPremium ? 'Premium активен' : 'в сети') + '</div>' +
         '</div>' +
       '</div>' +
     '</div>';
 
-  /* ─── Звёзды ─── */
   const starsHtml =
     '<div class="settings-stars-row" onclick="openStarsHistory()">' +
       '<span class="stars-icon">⭐</span>' +
@@ -968,7 +973,6 @@ function renderSettings() {
       '<span class="stars-arrow">›</span>' +
     '</div>';
 
-  /* ─── Секция: Мои боты ─── */
   const botsSection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">🤖 Боты</div>' +
@@ -979,7 +983,6 @@ function renderSettings() {
       '</div>' +
     '</div>';
 
-  /* ─── Секция: Прогресс ─── */
   const progressSection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">📈 Прогресс</div>' +
@@ -989,7 +992,6 @@ function renderSettings() {
       '</div>' +
     '</div>';
 
-  /* ─── Секция: Подарки ─── */
   let giftsGroup = '';
   giftsGroup += renderTgRow({ icon: '🎁', text: 'Мои подарки', onClick: 'openMyGifts()' });
   giftsGroup += renderTgRow({ icon: '💳', text: 'Активировать премиум по коду', onClick: 'openGiftModal()' });
@@ -1002,7 +1004,6 @@ function renderSettings() {
       '<div class="settings-tg-group">' + giftsGroup + '</div>' +
     '</div>';
 
-  /* ─── Секция: Уведомления ─── */
   const notifSection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">🔔 Уведомления и звуки</div>' +
@@ -1034,7 +1035,6 @@ function renderSettings() {
       '</div>' +
     '</div>';
 
-  /* ─── Секция: Конфиденциальность ─── */
   const privacySection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">🔒 Конфиденциальность</div>' +
@@ -1057,7 +1057,6 @@ function renderSettings() {
       '</div>' +
     '</div>';
 
-  /* ─── Секция: Устройства ─── */
   const devicesSection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">📱 Устройства</div>' +
@@ -1066,7 +1065,6 @@ function renderSettings() {
       '</div>' +
     '</div>';
 
-  /* ─── Секция: Данные и память ─── */
   const dataSection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">💾 Данные и память</div>' +
@@ -1080,7 +1078,6 @@ function renderSettings() {
       '</div>' +
     '</div>';
 
-  /* ─── Секция: Оформление ─── */
   const appearanceSection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-section-title">🎨 Оформление</div>' +
@@ -1110,7 +1107,6 @@ function renderSettings() {
       '</div>' +
     '</div>';
 
-  /* ─── Секция: QR ─── */
   const qrSection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-group">' +
@@ -1118,7 +1114,6 @@ function renderSettings() {
       '</div>' +
     '</div>';
 
-  /* ─── Секция: Аккаунт ─── */
   const accountSection =
     '<div class="settings-tg-section">' +
       '<div class="settings-tg-group">' +
@@ -1130,7 +1125,6 @@ function renderSettings() {
       '</div>' +
     '</div>';
 
-  /* ─── Финальная сборка ─── */
   let html = '';
   html += profileCardHtml;
   html += starsHtml;
@@ -1144,14 +1138,13 @@ function renderSettings() {
   html += appearanceSection;
   html += qrSection;
   html += accountSection;
-  html += '<div style="padding:30px 20px 10px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.3<br><br>Сделано с ❤️</div>';
+  html += '<div style="padding:30px 20px 10px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.4<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
 
   setTimeout(showCacheSize, 100);
   bindRipples(box);
 
-  /* Обновляем счётчик ботов, если пришёл свежий список */
   socket.emit('get my bots', function (res) {
     if (res && res.ok) {
       state.myBots = res.bots || [];
@@ -1440,8 +1433,16 @@ function uploadAvatar(event) {
 function updateMyAvatarBtn() {
   const btn = $('my-avatar-btn');
   if (!btn) return;
-  if (state.me.avatar) btn.innerHTML = '<img src="' + state.me.avatar + '" alt="">';
-  else btn.textContent = '👤';
+  if (state.me.avatar) {
+    btn.innerHTML = '<img src="' + state.me.avatar + '" alt="">';
+  } else {
+    btn.textContent = '👤';
+  }
+  if (state.me.premium) {
+    btn.style.boxShadow = '0 0 0 2px var(--gold), 0 0 12px rgba(251, 191, 36, 0.5)';
+  } else {
+    btn.style.boxShadow = '';
+  }
 }
 
 function updateVerifyButton() {
@@ -1492,7 +1493,12 @@ function selectBadgeType(type) {
   document.querySelectorAll('.badge-option').forEach(function (el) {
     el.classList.toggle('active', el.dataset.badge === type);
   });
-  const titles = { verified: '✓ Выдать галочку', hammer: '🔨 Выдать молоток', scam: '💀 Выдать скам' };
+  const titles = {
+    verified: '✓ Выдать галочку',
+    hammer: '🔨 Выдать молоток',
+    scam: 'SCAM — Выдать скам',
+    premium: '⭐ Выдать Azerta Premium'
+  };
   const titleEl = $('badge-modal-title');
   if (titleEl) titleEl.textContent = titles[type] || '🏅 Выдать значок';
   vibrate(10);
@@ -1503,14 +1509,15 @@ function giveBadgeAction() {
   const errEl = $('badge-error');
   errEl.textContent = '';
   if (!username) { errEl.textContent = 'Введи ник'; return; }
-  const events = { verified: 'verify', hammer: 'give hammer', scam: 'give scam' };
+  const events = { verified: 'verify', hammer: 'give hammer', scam: 'give scam', premium: 'give premium' };
   const event = events[currentBadgeType];
   if (!event) { errEl.textContent = 'Неизвестный значок'; return; }
   socket.emit(event, { username: username }, function (res) {
     if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('badge-modal');
-    const names = { verified: 'Галочка', hammer: 'Молоток', scam: 'Скам' };
+    const names = { verified: 'Галочка', hammer: 'Молоток', scam: 'Скам', premium: '⭐ Премиум' };
     showToast('✓ ' + names[currentBadgeType] + ' выдан @' + res.username);
+    vibrate([50, 30, 50]);
   });
 }
 
@@ -1519,13 +1526,13 @@ function removeBadgeAction() {
   const errEl = $('badge-error');
   errEl.textContent = '';
   if (!username) { errEl.textContent = 'Введи ник'; return; }
-  const events = { verified: 'unverify', hammer: 'remove hammer', scam: 'remove scam' };
+  const events = { verified: 'unverify', hammer: 'remove hammer', scam: 'remove scam', premium: 'remove premium' };
   const event = events[currentBadgeType];
   if (!event) { errEl.textContent = 'Неизвестный значок'; return; }
   socket.emit(event, { username: username }, function (res) {
     if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('badge-modal');
-    const names = { verified: 'Галочка', hammer: 'Молоток', scam: 'Скам' };
+    const names = { verified: 'Галочка', hammer: 'Молоток', scam: 'Скам', premium: '⭐ Премиум' };
     showToast('✓ ' + names[currentBadgeType] + ' снят с @' + res.username);
   });
 }
@@ -1642,6 +1649,7 @@ function openContactProfile(username) {
     contactProfileCurrent = data;
     const box = $('contact-profile-content');
     const isBotUser = !!data.isBot;
+    const isPremium = !!data.premium;
     const avStyle = data.avatar ? 'background-image:url(' + data.avatar + ')' : '';
     const avContent = data.avatar ? '' : (isBotUser ? (data.emojiStatus || '🤖') : initials(username));
     const badges = renderBadgesBig(data);
@@ -1678,7 +1686,7 @@ function openContactProfile(username) {
     let bannerHtml = '';
     const hasBanner = !!data.banner && !isBotUser;
     if (hasBanner) {
-      bannerHtml = '<div class="contact-banner"><img src="' + data.banner + '" alt="" /></div>';
+      bannerHtml = '<div class="contact-banner' + (isPremium ? ' premium' : '') + '"><img src="' + data.banner + '" alt="" /></div>';
     }
 
     const profileHeaderOpen = hasBanner
@@ -1687,8 +1695,8 @@ function openContactProfile(username) {
 
     box.innerHTML = bannerHtml +
       profileHeaderOpen +
-      '<div class="profile-avatar-big' + (isBotUser ? ' bot' : '') + '" style="' + avStyle + '">' + avContent + '</div>' +
-      '<div class="profile-name">' + escapeHtml(displayName) + emojiStr + botMark + ' ' + badges + '</div>' +
+      '<div class="profile-avatar-big' + (isBotUser ? ' bot' : '') + (isPremium ? ' premium' : '') + '" style="' + avStyle + '">' + avContent + '</div>' +
+      '<div class="profile-name' + (isPremium ? ' premium' : '') + '">' + escapeHtml(displayName) + emojiStr + botMark + ' ' + badges + '</div>' +
       '<div class="profile-nick">@' + escapeHtml(username) + '</div>' +
       '<div class="profile-status ' + (data.online ? 'online' : '') + '">' + (isBotUser ? 'всегда на связи' : (data.online ? 'в сети' : 'не в сети')) + '</div>' +
       '</div>' +
@@ -1856,7 +1864,7 @@ function openStarsHistory() {
     if (!res.transactions || res.transactions.length === 0) {
       box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Пока нет операций</div>';
     } else {
-      const labels = { welcome: '🎉 Бонус за регистрацию', premium_activated: '✨ Активация премиума' };
+      const labels = { welcome: '🎉 Бонус за регистрацию', premium_activated: '⭐ Активация премиума' };
       box.innerHTML = '';
       res.transactions.forEach(function (t) {
         let label = t.reason;
@@ -2025,7 +2033,7 @@ function redeemGiftCode() {
   socket.emit('redeem gift code', { code: code }, function (res) {
     if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('gift-modal');
-    showToast('🎉 Премиум активирован! +' + (res.bonus || 25) + ' ⭐');
+    showToast('⭐ Премиум активирован! +' + (res.bonus || 25) + ' ⭐');
     renderSettings();
     if (state.activeTab === 'settings') renderSettingsTab();
   });
@@ -2442,13 +2450,14 @@ function renderContactsTab() {
   }
   list.forEach(function (c) {
     const div = document.createElement('div');
-    div.className = 'chat-item';
+    div.className = 'chat-item' + (c.premium ? ' premium-user' : '');
     const avStyle = c.avatar ? 'background-image:url(' + c.avatar + ')' : (c.isBot ? 'background:linear-gradient(135deg,#06b6d4,#0891b2)' : 'background:var(--accent)');
     const avContent = c.avatar ? '' : (c.isBot ? (c.emojiStatus || '🤖') : initials(c.displayName || c.name));
     const badges = renderBadges(c);
     const online = c.online ? '<span class="online-dot"></span>' : '';
     const botMark = c.isBot ? ' <span class="bot-mark">бот</span>' : '';
-    div.innerHTML = '<div class="avatar' + (c.isBot ? ' bot' : '') + '" style="' + avStyle + '">' + avContent + online + '</div>' +
+    const avClass = 'avatar' + (c.isBot ? ' bot' : '') + (c.premium ? ' premium' : '');
+    div.innerHTML = '<div class="' + avClass + '" style="' + avStyle + '">' + avContent + online + '</div>' +
       '<div class="chat-info"><div class="chat-name">' + escapeHtml(c.displayName || c.name) + botMark + badges + '</div>' +
       '<div class="chat-preview">@' + escapeHtml(c.name) + '</div></div>';
     div.onclick = function () { switchTab('chats'); openChat(c.name); };
@@ -2570,7 +2579,11 @@ function renderGroupItem(g) {
 function renderContactItem(u) {
   const div = document.createElement('div');
   const unreadCount = state.unread[u.name] || 0;
-  div.className = 'chat-item' + (state.currentChat === u.name ? ' active' : '') + (u.pinned ? ' pinned' : '');
+  const isPremium = !!u.premium;
+  div.className = 'chat-item' +
+    (state.currentChat === u.name ? ' active' : '') +
+    (u.pinned ? ' pinned' : '') +
+    (isPremium ? ' premium-user' : '');
   const onlineDot = u.online ? '<span class="online-dot"></span>' : '';
   const style = u.avatar
     ? 'background-image:url(' + u.avatar + ')'
@@ -2587,7 +2600,8 @@ function renderContactItem(u) {
   const preview = isTyping
     ? '<span class="typing">печатает…</span>'
     : (unreadCount > 0 ? 'новое сообщение' : (u.online ? (u.isBot ? 'бот онлайн' : 'в сети') : 'был(а) недавно'));
-  div.innerHTML = '<div class="avatar' + (u.isBot ? ' bot' : '') + '" style="' + style + '">' + content + onlineDot + '</div>' +
+  const avClass = 'avatar' + (u.isBot ? ' bot' : '') + (isPremium ? ' premium' : '');
+  div.innerHTML = '<div class="' + avClass + '" style="' + style + '">' + content + onlineDot + '</div>' +
     '<div class="chat-info">' +
       '<div class="chat-name">' + blockIcon + escapeHtml(u.displayName || u.name) + botMark + emojiStr + badges + ' ' + pinMark + muteIcon + '</div>' +
       '<div class="chat-preview">' + preview + '</div>' +
@@ -2627,6 +2641,7 @@ function openChat(name) {
   state.pinnedMessageId = null;
   $('pinned-bar').classList.remove('active');
 
+  const isPremium = contact && contact.premium;
   const badges = renderBadgesBig(contact || {});
   const displayName = (contact && contact.displayName) || name;
   const botMark = state.isBotChat ? ' <span class="bot-mark">бот</span>' : '';
@@ -2637,6 +2652,7 @@ function openChat(name) {
   $('chat-top-status').classList.remove('typing');
 
   const av = $('chat-avatar');
+  av.classList.toggle('premium', !!isPremium);
   if (contact && contact.avatar) {
     av.style.backgroundImage = 'url(' + contact.avatar + ')';
     av.textContent = '';
@@ -2729,7 +2745,7 @@ function openSavedChat() {
   av.textContent = '⭐';
   av.style.background = '';
   av.classList.add('saved');
-  av.classList.remove('group', 'bot');
+  av.classList.remove('group', 'bot', 'premium');
   $('chat-actions').style.display = 'none';
   $('chat-top-info').onclick = null;
   $('messages').innerHTML = '';
@@ -2757,6 +2773,7 @@ function openGroupChat(g) {
   $('chat-top-status').textContent = g.memberCount + ' участник' + memberWord;
   $('chat-top-status').classList.remove('typing');
   const av = $('chat-avatar');
+  av.classList.remove('premium');
   if (g.avatar) {
     av.style.backgroundImage = 'url(' + g.avatar + ')';
     av.textContent = '';
@@ -2879,6 +2896,12 @@ function renderMessage(msg) {
   wrap.dataset.id = msg.id;
   if (msg.isGroup) wrap.dataset.group = '1';
   if (msg.from) wrap.dataset.from = msg.from;
+
+  // ⭐ Premium — золотая полоса для сообщений от премиумов
+  if (!msg.self && msg.from) {
+    const c = state.contacts.find(function (x) { return x.name === msg.from; });
+    if (c && c.premium) wrap.classList.add('from-premium');
+  }
 
   if (msg.isGroup && !msg.self && msg.senderName) {
     const se = document.createElement('div');
@@ -4446,7 +4469,8 @@ function renderStoriesBar() {
   mineBubble.className = 'story-bubble';
   const av = state.me.avatar ? 'background-image:url(' + state.me.avatar + ')' : '';
   const avContent = state.me.avatar ? '' : initials(state.me.username || '?');
-  mineBubble.innerHTML = '<div class="story-ring mine ' + (mineHasStory ? 'has-story' : '') + '">' +
+  const minePremiumClass = state.me.premium ? ' premium' : '';
+  mineBubble.innerHTML = '<div class="story-ring mine ' + (mineHasStory ? 'has-story' : '') + minePremiumClass + '">' +
     '<div class="story-ring-inner" style="' + av + '">' + avContent + '</div>' +
     '<div class="story-add-badge">+</div></div>' +
     '<div class="story-name">Моя</div>';
@@ -4467,7 +4491,8 @@ function renderStoriesBar() {
     const displayName = (u.firstName || u.lastName)
       ? ((u.firstName || '') + ' ' + (u.lastName || '')).trim()
       : u.username;
-    bubble.innerHTML = '<div class="story-ring ' + (allViewed ? 'viewed' : '') + '">' +
+    const premiumClass = u.premium && !allViewed ? ' premium' : '';
+    bubble.innerHTML = '<div class="story-ring ' + (allViewed ? 'viewed' : '') + premiumClass + '">' +
       '<div class="story-ring-inner" style="' + avs + '">' + avc + '</div></div>' +
       '<div class="story-name">' + escapeHtml(displayName) + '</div>';
     bubble.onclick = function () { openStoryViewer(idx, 0); };
@@ -4556,6 +4581,7 @@ function renderCurrentStory() {
     av.textContent = initials(u.firstName || u.username);
     av.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
   }
+  av.classList.toggle('premium', !!u.premium);
   const displayName = (u.firstName || u.lastName)
     ? ((u.firstName || '') + ' ' + (u.lastName || '')).trim()
     : u.username;
@@ -4798,6 +4824,7 @@ function showCallScreen(peerName, contact, video, statusText) {
   } else {
     rw.classList.add('audio-only');
     ba.style.display = 'flex';
+    ba.classList.toggle('premium', !!(contact && contact.premium));
     if (contact && contact.avatar) {
       ba.style.backgroundImage = 'url(' + contact.avatar + ')';
       ba.textContent = '';
@@ -4819,6 +4846,7 @@ socket.on('incoming-call', function (data) {
   $('incoming-name').innerHTML = escapeHtml(displayName) + ' ' + badges;
   $('incoming-type').textContent = data.video ? 'Видеозвонок' : 'Аудиозвонок';
   const av = $('incoming-avatar');
+  av.classList.toggle('premium', !!(contact && contact.premium));
   if (contact && contact.avatar) {
     av.style.backgroundImage = 'url(' + contact.avatar + ')';
     av.textContent = '';
@@ -5273,6 +5301,7 @@ socket.on('stars updated', function (data) {
   if (state.activeTab === 'settings') renderSettingsTab();
 });
 socket.on('me updated', function (data) {
+  if (data.premium !== undefined) state.me.premium = !!data.premium;
   if (data.verified !== undefined) state.me.verified = !!data.verified;
   if (data.hammer !== undefined) state.me.hammer = !!data.hammer;
   if (data.scam !== undefined) state.me.scam = !!data.scam;
@@ -5293,6 +5322,7 @@ socket.on('friend updated', function (data) {
   if (!data || !data.username) return;
   const c = state.contacts.find(function (x) { return x.name === data.username; });
   if (c) {
+    if (data.premium !== undefined) c.premium = !!data.premium;
     if (data.verified !== undefined) c.verified = !!data.verified;
     if (data.hammer !== undefined) c.hammer = !!data.hammer;
     if (data.scam !== undefined) c.scam = !!data.scam;
@@ -5306,6 +5336,8 @@ socket.on('friend updated', function (data) {
       const displayName = c.displayName || c.name;
       const nameEl = $('chat-top-name');
       if (nameEl) nameEl.innerHTML = escapeHtml(displayName) + ' ' + badges;
+      const av = $('chat-avatar');
+      if (av) av.classList.toggle('premium', !!c.premium);
     }
   }
 });
@@ -5428,9 +5460,10 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Azerta v13.3 — Client загружен');
-console.log('🎨 ТГ-стиль настроек: ВКЛЮЧЁН');
-console.log('🎨 Баннер профиля в карточке: ВКЛЮЧЁН');
-console.log('🤖 Боты: создание, чат, команды');
+console.log('✅ Azerta v13.4 — Client загружен');
+console.log('⭐ Premium: золотая звёздочка, рамка, градиент');
+console.log('🎨 Новые бейджи: синяя галочка, SCAM-плашка');
+console.log('🎨 ТГ-стиль настроек + баннеры профиля');
+console.log('🤖 Боты, достижения, статистика, подарки');
 console.log('✨ Плавность: ripple, skeleton, spring, stagger');
 console.log('✓ ГОТОВО');
