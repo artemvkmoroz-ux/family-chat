@@ -1,8 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.2 — style.css
-   Полный файл: base, auth, app, chat, modals, settings,
-                gifts, achievements, stats, stories, stickers,
-                channels, bots, calls, banners, adaptation
+   🌌 AZERTA v13.3 — style.css
+   Полный файл + ТГ-стиль настроек + карточка профиля с баннером
    ═══════════════════════════════════════════════════════════ */
 
 *, *::before, *::after {
@@ -1381,7 +1379,6 @@ body.light .auth-card {
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* Баннер в карточке контакта */
 .contact-banner {
   position: relative;
   width: calc(100% + 48px);
@@ -1409,7 +1406,6 @@ body.light .contact-banner::after {
   background: linear-gradient(180deg, transparent 40%, rgba(255, 255, 255, 0.95) 100%);
 }
 
-/* Сдвиг аватара и имени вниз при наличии баннера */
 .contact-profile-with-banner {
   margin-top: -50px;
   position: relative;
@@ -1734,6 +1730,356 @@ body.light .contact-banner::after {
   overscroll-behavior: contain;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   🎨 НОВЫЙ ТГ-СТИЛЬ НАСТРОЕК
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Карточка профиля с баннером ─── */
+.settings-profile-card-tg {
+  position: relative;
+  margin: 8px 16px 16px;
+  border-radius: 20px;
+  overflow: hidden;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6d5eff, #8b7fff, #a78bfa);
+  min-height: 140px;
+  animation: profileCardIn 0.5s var(--ease-spring);
+  transition: transform var(--dur-base) var(--ease-spring),
+              box-shadow var(--dur-base);
+}
+.settings-profile-card-tg:active {
+  transform: scale(0.98);
+  box-shadow: 0 8px 24px rgba(139, 127, 255, 0.25);
+}
+@keyframes profileCardIn {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.settings-profile-card-tg .tg-banner {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.settings-profile-card-tg:active .tg-banner {
+  transform: scale(1.03);
+}
+.settings-profile-card-tg .tg-banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.1) 0%,
+    rgba(0, 0, 0, 0.35) 60%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+.settings-profile-card-tg .tg-profile-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  min-height: 140px;
+}
+
+.settings-profile-card-tg .tg-profile-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.settings-profile-card-tg .tg-profile-info {
+  flex: 1;
+  min-width: 0;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+.settings-profile-card-tg .tg-profile-name {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  word-break: break-word;
+}
+.settings-profile-card-tg .tg-profile-username {
+  font-size: 14px;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+.settings-profile-card-tg .tg-profile-status {
+  font-size: 12px;
+  opacity: 0.75;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.settings-profile-card-tg .tg-profile-status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--online);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.7);
+}
+
+/* Плейсхолдер, если баннера нет */
+.settings-profile-card-tg.no-banner {
+  background: var(--bg-input);
+  border: 2px dashed rgba(139, 127, 255, 0.3);
+}
+.settings-profile-card-tg.no-banner .tg-banner {
+  background: linear-gradient(135deg, #6d5eff 0%, #8b7fff 50%, #a78bfa 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 6s ease-in-out infinite;
+  opacity: 0.7;
+}
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.settings-profile-card-tg.no-banner .tg-profile-row {
+  justify-content: center;
+  text-align: center;
+}
+.settings-profile-card-tg .tg-no-banner-hint {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  z-index: 3;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ─── Звёзды-строка ─── */
+.settings-stars-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 16px 16px;
+  padding: 14px 18px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: background var(--dur-base), transform var(--dur-fast) var(--ease-spring);
+}
+.settings-stars-row:active {
+  transform: scale(0.98);
+  background: rgba(251, 191, 36, 0.14);
+}
+.settings-stars-row .stars-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.settings-stars-row .stars-info {
+  flex: 1;
+  min-width: 0;
+}
+.settings-stars-row .stars-count {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--gold);
+  margin-bottom: 2px;
+}
+.settings-stars-row .stars-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.settings-stars-row .stars-arrow {
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+/* ─── ТГ-секция ─── */
+.settings-tg-section {
+  margin: 0 0 4px;
+  background: var(--bg-panel);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.settings-tg-section-title {
+  padding: 18px 20px 8px;
+  font-size: 12px;
+  color: var(--accent);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  opacity: 0.9;
+}
+
+.settings-tg-group {
+  background: var(--bg-panel);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  margin-bottom: 8px;
+}
+body.light .settings-tg-group {
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.settings-tg-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: background var(--dur-base);
+  min-height: 56px;
+}
+.settings-tg-row:active {
+  background: var(--bg-active);
+}
+.settings-tg-row.danger .tg-row-text {
+  color: var(--danger);
+}
+.settings-tg-row.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.settings-tg-row.disabled:active {
+  background: transparent;
+}
+
+.settings-tg-row + .settings-tg-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+body.light .settings-tg-row + .settings-tg-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.settings-tg-row .tg-row-icon {
+  font-size: 20px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-tg-row .tg-row-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.settings-tg-row .tg-row-value {
+  font-size: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  max-width: 40%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.settings-tg-row .tg-row-arrow {
+  font-size: 18px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: transform var(--dur-fast);
+  margin-left: -4px;
+}
+.settings-tg-row:active .tg-row-arrow {
+  transform: translateX(2px);
+}
+
+.settings-tg-row .tg-row-switch {
+  flex-shrink: 0;
+  margin-left: auto;
+  position: relative;
+  width: 48px;
+  height: 28px;
+}
+.settings-tg-row .tg-row-switch input {
+  opacity: 0; width: 0; height: 0;
+}
+.settings-tg-row .tg-row-switch .slider {
+  position: absolute; inset: 0;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  transition: background var(--dur-base);
+  cursor: pointer;
+}
+body.light .settings-tg-row .tg-row-switch .slider {
+  background: rgba(0, 0, 0, 0.12);
+}
+.settings-tg-row .tg-row-switch .slider::before {
+  content: ''; position: absolute;
+  width: 22px; height: 22px;
+  border-radius: 50%; background: #fff;
+  top: 3px; left: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+.settings-tg-row .tg-row-switch input:checked + .slider {
+  background: var(--online);
+}
+.settings-tg-row .tg-row-switch input:checked + .slider::before {
+  transform: translateX(20px);
+}
+
+.settings-tg-row .tg-row-color-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  margin-right: 4px;
+}
+
+/* ─── Заголовок страницы настроек ─── */
+.settings-page-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+
+/* ─── Возврат к старому ─── */
 .settings-profile-card {
   display: flex; align-items: center;
   gap: 16px; padding: 20px 18px;
@@ -2431,11 +2777,21 @@ body.light .contact-banner::after {
   .bot-command-row { flex-direction: column; }
   .bot-command-row .bcc-trigger { flex: 1; }
 
-  /* Баннеры — адаптация под мобилки */
   .profile-banner-preview { height: 110px; }
   .contact-banner { height: 130px; }
   .contact-profile-with-banner { margin-top: -40px; }
   .contact-profile-with-banner .profile-avatar-big { width: 80px; height: 80px; font-size: 32px; }
+
+  /* ТГ-настройки — адаптация */
+  .settings-profile-card-tg { min-height: 120px; margin: 8px 12px 14px; }
+  .settings-profile-card-tg .tg-profile-row { padding: 14px; min-height: 120px; gap: 12px; }
+  .settings-profile-card-tg .tg-profile-avatar { width: 72px; height: 72px; font-size: 28px; }
+  .settings-profile-card-tg .tg-profile-name { font-size: 16px; }
+  .settings-profile-card-tg .tg-profile-username { font-size: 13px; }
+  .settings-tg-row { padding: 13px 16px; min-height: 52px; }
+  .settings-tg-row .tg-row-icon { font-size: 18px; width: 24px; }
+  .settings-tg-row .tg-row-text { font-size: 14.5px; }
+  .settings-tg-row .tg-row-value { font-size: 13px; }
 }
 
 @media (max-width: 360px) {
@@ -2446,6 +2802,11 @@ body.light .contact-banner::after {
   .msg { font-size: 14px; }
   .profile-banner-preview { height: 90px; }
   .contact-banner { height: 110px; }
+
+  .settings-profile-card-tg { min-height: 100px; }
+  .settings-profile-card-tg .tg-profile-row { padding: 12px; min-height: 100px; gap: 10px; }
+  .settings-profile-card-tg .tg-profile-avatar { width: 64px; height: 64px; font-size: 24px; }
+  .settings-profile-card-tg .tg-profile-name { font-size: 15px; }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
