@@ -5,9 +5,9 @@
    ✓ ⭐ Premium + бейджи + баннеры
    ✓ 🎨 ТГ-стиль настроек
    ✓ 🤖 Боты, достижения, подарки
-   ✓ 📍 Геолокация (NEW)
-   ✓ 🚨 Жалобы (NEW)
-   ✓ 🛡️ Модерация: панель, баны, муты, логи (NEW)
+   ✓ 📍 Геолокация
+   ✓ 🚨 Жалобы
+   ✓ 🛡️ Модерация: панель, баны, муты, логи
    ═══════════════════════════════════════════════════════════ */
 
 var contactProfileCurrent = null;
@@ -54,7 +54,6 @@ const state = {
   chatWallpapers: {}, contactProfileCurrent: null,
   myBots: [], editingBotUsername: null, tempBotAvatar: null,
   tempBanner: null,
-  /* Модерация */
   modPanelOpen: false,
   modTab: 'reports',
   modReportsFilter: 'new',
@@ -216,7 +215,7 @@ function vibrate(ms) {
 
 /* ─── RIPPLE ─── */
 function attachRipple(el) {
-  if (el.dataset.rippleBound) return;
+  if (!el || el.dataset.rippleBound) return;
   el.dataset.rippleBound = '1';
   el.classList.add('ripple-container');
   el.addEventListener('pointerdown', function (e) {
@@ -457,11 +456,13 @@ function forceShowAuth(message) {
 function switchAuthScreen(screen) {
   document.querySelectorAll('.auth-screen').forEach(function (s) { s.classList.remove('active'); });
   if (screen === 'login') {
-    $('auth-login-screen').classList.add('active');
+    const el = $('auth-login-screen');
+    if (el) el.classList.add('active');
     state.authMode = 'login';
     state.regStep = 1;
   } else {
-    $('auth-register-screen').classList.add('active');
+    const el = $('auth-register-screen');
+    if (el) el.classList.add('active');
     state.authMode = 'register';
     state.regStep = 1;
     regShowStep(1);
@@ -496,9 +497,10 @@ function regNext(step) {
     if (!state.regUsernameAvailable) return;
     regShowStep(2);
   } else if (step === 2) {
-    const dn = $('reg-displayname').value.trim();
-    if (!dn) { $('reg-error-2').textContent = 'Введи имя'; return; }
-    $('reg-error-2').textContent = '';
+    const dnEl = $('reg-displayname');
+    const dn = dnEl ? dnEl.value.trim() : '';
+    if (!dn) { const e = $('reg-error-2'); if (e) e.textContent = 'Введи имя'; return; }
+    const e = $('reg-error-2'); if (e) e.textContent = '';
     regShowStep(3);
   }
 }
@@ -513,6 +515,7 @@ function onRegUsernameInput() {
   const status = $('reg-username-status');
   const hint = $('reg-username-hint');
   const nextBtn = $('reg-next-1');
+  if (!input || !wrap || !status || !hint || !nextBtn) return;
   const v = input.value.trim().toLowerCase();
   input.value = v;
   wrap.classList.remove('error', 'success', 'focus');
@@ -562,9 +565,12 @@ function onRegUsernameInput() {
 }
 
 function onRegPasswordInput() {
-  const p = $('reg-password').value;
+  const pEl = $('reg-password');
+  if (!pEl) return;
+  const p = pEl.value;
   const bar = $('reg-strength-bar');
   const label = $('reg-strength-label');
+  if (!bar || !label) return;
   bar.classList.remove('weak', 'medium', 'strong');
   if (!p) {
     label.textContent = 'Введи пароль';
@@ -586,9 +592,12 @@ function onRegPasswordInput() {
 }
 
 function onRegPassword2Input() {
-  const p = $('reg-password').value;
-  const p2 = $('reg-password2').value;
+  const pEl = $('reg-password');
+  const p2El = $('reg-password2');
   const hint = $('reg-password2-hint');
+  if (!pEl || !p2El || !hint) return;
+  const p = pEl.value;
+  const p2 = p2El.value;
   if (!p2) { hint.textContent = ''; hint.classList.remove('success', 'error'); }
   else if (p === p2) { hint.textContent = '✓ Совпадают'; hint.classList.add('success'); hint.classList.remove('error'); }
   else { hint.textContent = 'Пароли не совпадают'; hint.classList.add('error'); hint.classList.remove('success'); }
@@ -598,24 +607,28 @@ function onRegPassword2Input() {
 function updateRegSubmit() {
   const btn = $('reg-submit');
   if (!btn) return;
-  const p = $('reg-password').value;
-  const p2 = $('reg-password2').value;
-  const dn = $('reg-displayname').value.trim();
+  const pEl = $('reg-password');
+  const p2El = $('reg-password2');
+  const dnEl = $('reg-displayname');
+  if (!pEl || !p2El || !dnEl) return;
+  const p = pEl.value;
+  const p2 = p2El.value;
+  const dn = dnEl.value.trim();
   const valid = p.length >= 8 && /[a-zA-Z]/.test(p) && /[0-9]/.test(p) && p === p2 && dn && state.regUsernameAvailable;
   btn.disabled = !valid;
 }
 
 function doRegister() {
-  const username = $('reg-username').value.trim().toLowerCase();
-  const displayName = $('reg-displayname').value.trim();
-  const password = $('reg-password').value;
+  const username = ($('reg-username') || {}).value || '';
+  const displayName = ($('reg-displayname') || {}).value || '';
+  const password = ($('reg-password') || {}).value || '';
   const errEl = $('reg-error-3');
-  errEl.textContent = '';
+  if (errEl) errEl.textContent = '';
   showBtnSpinner('reg-submit', 'Создаю…');
-  socket.emit('register', { username: username, password: password, displayName: displayName }, function (res) {
+  socket.emit('register', { username: username.trim().toLowerCase(), password: password, displayName: displayName.trim() }, function (res) {
     hideBtnSpinner('reg-submit', 'Создать аккаунт');
     if (!res || !res.ok) {
-      errEl.textContent = res && res.error ? res.error : 'Ошибка регистрации';
+      if (errEl) errEl.textContent = res && res.error ? res.error : 'Ошибка регистрации';
       vibrate([30, 20, 30]);
       return;
     }
@@ -627,15 +640,19 @@ function doRegister() {
 }
 
 function doLogin() {
-  const username = $('login-username').value.trim().toLowerCase();
-  const password = $('login-password').value;
+  const username = ($('login-username') || {}).value || '';
+  const password = ($('login-password') || {}).value || '';
   const errEl = $('login-error');
-  errEl.textContent = '';
-  if (!username || !password) { errEl.textContent = 'Заполни все поля'; vibrate([30, 20, 30]); return; }
+  if (errEl) errEl.textContent = '';
+  if (!username || !password) {
+    if (errEl) errEl.textContent = 'Заполни все поля';
+    vibrate([30, 20, 30]);
+    return;
+  }
   showBtnSpinner('login-btn', 'Вхожу…');
   const existing = loadJson(STORAGE.SESSION);
   socket.emit('login', {
-    username: username,
+    username: username.trim().toLowerCase(),
     password: password,
     device: (navigator.userAgent || '').slice(0, 40),
     sessionId: existing ? existing.sessionId : null
@@ -646,7 +663,7 @@ function doLogin() {
         showBanScreen(res.ban);
         return;
       }
-      errEl.textContent = res && res.error ? res.error : 'Ошибка входа';
+      if (errEl) errEl.textContent = res && res.error ? res.error : 'Ошибка входа';
       vibrate([30, 20, 30]);
       return;
     }
@@ -744,11 +761,9 @@ function applyMuteLock() {
   if (!banner) {
     banner = document.createElement('div');
     banner.id = 'mute-banner';
-    const chatScreen = $('chat-screen');
-    if (chatScreen) {
-      const inputArea = $('input-area');
-      if (inputArea) inputArea.parentNode.insertBefore(banner, inputArea);
-      else chatScreen.appendChild(banner);
+    const inputArea = $('input-area');
+    if (inputArea && inputArea.parentNode) {
+      inputArea.parentNode.insertBefore(banner, inputArea);
     }
   }
   banner.innerHTML =
@@ -758,12 +773,18 @@ function applyMuteLock() {
 }
 
 function tryPasscode() {
-  const passcode = $('passcode-input').value;
+  const passcodeEl = $('passcode-input');
   const errEl = $('passcode-error');
-  errEl.textContent = '';
+  if (!passcodeEl) return;
+  const passcode = passcodeEl.value;
+  if (errEl) errEl.textContent = '';
   socket.emit('check passcode', { passcode: passcode }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = 'Неверный код'; vibrate([30, 20, 30]); return; }
-    $('passcode-screen').classList.remove('active');
+    if (!res || !res.ok) {
+      if (errEl) errEl.textContent = 'Неверный код';
+      vibrate([30, 20, 30]);
+      return;
+    }
+    const p = $('passcode-screen'); if (p) p.classList.remove('active');
     playLoginTransition(state.me.username, state.me.firstName, true);
   });
 }
@@ -783,7 +804,7 @@ async function tryAutoLogin() {
       if (resolved) return;
       resolved = true;
       resolve(false);
-    }, 6000);
+    }, 8000);
     socket.emit('login with session', { sessionId: creds.sessionId }, function (res) {
       if (resolved) return;
       resolved = true;
@@ -822,7 +843,7 @@ async function tryAutoLogin() {
       });
       socket.emit('has passcode', function (has) {
         if (has) {
-          $('passcode-screen').classList.add('active');
+          const el = $('passcode-screen'); if (el) el.classList.add('active');
         } else {
           playLoginTransition(res.username, res.firstName, true);
         }
@@ -839,8 +860,8 @@ socket.on('connect', async function () {
   if (autoLoginDone) return;
   const ok = await tryAutoLogin();
   if (!ok) {
-    $('app').classList.remove('active');
-    $('auth').classList.add('active');
+    const app = $('app'); if (app) app.classList.remove('active');
+    const auth = $('auth'); if (auth) auth.classList.add('active');
     state.isLoggedIn = false;
     isLoggedInOnServer = false;
   }
@@ -874,7 +895,6 @@ socket.on('server toast', function (data) {
   if (data && data.text) showToast(data.text);
 });
 
-/* ─── НАКАЗАНИЯ (уведомления) ─── */
 socket.on('punishment issued', function (data) {
   const title = data.title || (data.type === 'ban' ? 'Ты забанен' : (data.type === 'mute' ? 'Ты в муте' : 'Предупреждение'));
   const emoji = data.emoji || '⚠️';
@@ -946,7 +966,8 @@ function initNotifications() {
 }
 
 async function enableNotifications() {
-  $('notif-banner').classList.remove('active');
+  const b = $('notif-banner');
+  if (b) b.classList.remove('active');
   if (!('Notification' in window)) return;
   try {
     const perm = await Notification.requestPermission();
@@ -1028,6 +1049,7 @@ const TAB_TITLES = { chats: 'Azerta', calls: 'Звонки', contacts: 'Конт
 function switchTab(tab) {
   state.activeTab = tab;
   const app = $('app');
+  if (!app) return;
   app.dataset.tab = tab;
   document.querySelectorAll('.nav-btn').forEach(function (b) {
     b.classList.toggle('active', b.dataset.tab === tab);
@@ -1062,13 +1084,15 @@ function renderCallsTab() {
 
 /* ─── НАСТРОЙКИ ─── */
 function openSettings() {
-  $('settings-screen').classList.add('active');
+  const el = $('settings-screen');
+  if (el) el.classList.add('active');
   renderSettings();
   bindRipples($('settings-screen'));
 }
 
 function closeSettings() {
-  $('settings-screen').classList.remove('active');
+  const el = $('settings-screen');
+  if (el) el.classList.remove('active');
   renderChatList();
 }
 
@@ -1157,7 +1181,6 @@ function renderSettings() {
       '<span class="stars-arrow">›</span>' +
     '</div>';
 
-  /* ─── Панель модератора ─── */
   let modSection = '';
   if (me.isModerator) {
     const pending = state.modStats.new_reports || 0;
@@ -1313,7 +1336,6 @@ function renderSettings() {
     socket.emit('mod panel stats', function (res) {
       if (res && res.ok) {
         state.modStats = res.stats || {};
-        renderSettings();
       }
     });
   }
@@ -1380,6 +1402,7 @@ function openColorPicker(target) {
   state.currentColorTarget = target;
   const colors = ['#8b7fff','#ec4899','#6d5eff','#fbbf24','#22c55e','#06b6d4','#ef4444','#f97316','#a78bfa','#14b8a6','#f43f5e','#3b82f6'];
   const grid = $('color-grid');
+  if (!grid) return;
   grid.innerHTML = '';
   colors.forEach(function (c) {
     const dot = document.createElement('div');
@@ -1397,7 +1420,8 @@ function openColorPicker(target) {
     };
     grid.appendChild(dot);
   });
-  $('color-modal-title').textContent = 'Акцентный цвет';
+  const title = $('color-modal-title');
+  if (title) title.textContent = 'Акцентный цвет';
   openModal('color-modal');
 }
 
@@ -1435,12 +1459,14 @@ function logout() {
   location.reload();
 }
 function confirmDeleteAccount() {
-  const pass = $('delete-account-pass').value;
+  const passEl = $('delete-account-pass');
   const errEl = $('delete-account-error');
-  errEl.textContent = '';
-  if (!pass) { errEl.textContent = 'Введи пароль'; return; }
+  if (!passEl) return;
+  const pass = passEl.value;
+  if (errEl) errEl.textContent = '';
+  if (!pass) { if (errEl) errEl.textContent = 'Введи пароль'; return; }
   socket.emit('delete account', { password: pass }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Не удалось'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Не удалось'; return; }
     localStorage.clear();
     location.reload();
   });
@@ -1448,21 +1474,21 @@ function confirmDeleteAccount() {
 
 /* ─── ПРОФИЛЬ ─── */
 function openProfile() {
-  $('profile-username').textContent = '@' + (state.me.username || '');
-  $('my-first-name').value = state.me.firstName || '';
-  $('my-last-name').value = state.me.lastName || '';
-  $('my-bio').value = state.me.bio || '';
-  $('my-birthday').value = state.me.birthday || '';
-  $('my-emoji').value = state.me.emoji || '';
+  const un = $('profile-username'); if (un) un.textContent = '@' + (state.me.username || '');
+  const fn = $('my-first-name'); if (fn) fn.value = state.me.firstName || '';
+  const ln = $('my-last-name'); if (ln) ln.value = state.me.lastName || '';
+  const bio = $('my-bio'); if (bio) bio.value = state.me.bio || '';
+  const bd = $('my-birthday'); if (bd) bd.value = state.me.birthday || '';
+  const em = $('my-emoji'); if (em) em.value = state.me.emoji || '';
 
   const bannerPreview = $('profile-banner-preview');
   const bannerImg = $('profile-banner-img');
-  if (state.me.banner) {
+  if (state.me.banner && bannerPreview && bannerImg) {
     bannerImg.src = state.me.banner;
     bannerPreview.style.display = 'block';
     bannerPreview.classList.remove('removing');
-  } else {
-    bannerImg.src = '';
+  } else if (bannerPreview) {
+    if (bannerImg) bannerImg.src = '';
     bannerPreview.style.display = 'none';
   }
 
@@ -1496,15 +1522,17 @@ function uploadBanner(event) {
       const y = (targetH - h) / 2;
       ctx.drawImage(img, x, y, w, h);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-      if (dataUrl.length > 2_000_000) {
+      if (dataUrl.length > 2000000) {
         showToast('⚠️ Баннер слишком большой. Выбери картинку поменьше.');
         return;
       }
       const bannerPreview = $('profile-banner-preview');
       const bannerImg = $('profile-banner-img');
-      bannerImg.src = dataUrl;
-      bannerPreview.style.display = 'block';
-      bannerPreview.classList.remove('removing');
+      if (bannerImg) bannerImg.src = dataUrl;
+      if (bannerPreview) {
+        bannerPreview.style.display = 'block';
+        bannerPreview.classList.remove('removing');
+      }
       socket.emit('set banner', { banner: dataUrl }, function (res) {
         if (res && res.ok) {
           state.me.banner = dataUrl;
@@ -1512,7 +1540,7 @@ function uploadBanner(event) {
           vibrate([50, 30, 50]);
         } else {
           showToast('❌ ' + ((res && res.error) || 'Ошибка'));
-          if (!state.me.banner) bannerPreview.style.display = 'none';
+          if (!state.me.banner && bannerPreview) bannerPreview.style.display = 'none';
         }
       });
     };
@@ -1547,16 +1575,21 @@ function removeMyBanner(event) {
 }
 
 function saveProfile() {
-  const firstName = $('my-first-name').value.trim();
-  const lastName = $('my-last-name').value.trim();
-  const bio = $('my-bio').value.trim();
-  const birthday = $('my-birthday').value;
-  const emojiStatus = $('my-emoji').value.trim();
-  socket.emit('update profile', { firstName: firstName, lastName: lastName, bio: bio, birthday: birthday, emojiStatus: emojiStatus }, function (res) {
+  const fn = $('my-first-name');
+  const ln = $('my-last-name');
+  const bio = $('my-bio');
+  const bd = $('my-birthday');
+  const em = $('my-emoji');
+  const firstName = fn ? fn.value.trim() : '';
+  const lastName = ln ? ln.value.trim() : '';
+  const bioVal = bio ? bio.value.trim() : '';
+  const birthday = bd ? bd.value : '';
+  const emojiStatus = em ? em.value.trim() : '';
+  socket.emit('update profile', { firstName: firstName, lastName: lastName, bio: bioVal, birthday: birthday, emojiStatus: emojiStatus }, function (res) {
     if (res && res.ok) {
       state.me.firstName = firstName;
       state.me.lastName = lastName;
-      state.me.bio = bio;
+      state.me.bio = bioVal;
       state.me.birthday = birthday;
       state.me.emoji = emojiStatus;
       closeModal('profile-modal');
@@ -1624,8 +1657,8 @@ function updateVerifyChannelButton() {
   if (state.me.username === 'moroz') {
     btn.style.display = 'block';
     btn.onclick = function () {
-      $('verify-channel-slug').value = '';
-      $('verify-channel-error').textContent = '';
+      const slug = $('verify-channel-slug'); if (slug) slug.value = '';
+      const err = $('verify-channel-error'); if (err) err.textContent = '';
       openModal('verify-channel-modal');
     };
   } else {
@@ -1634,8 +1667,8 @@ function updateVerifyChannelButton() {
 }
 
 function openBadgeModal() {
-  $('badge-username').value = '';
-  $('badge-error').textContent = '';
+  const u = $('badge-username'); if (u) u.value = '';
+  const e = $('badge-error'); if (e) e.textContent = '';
   selectBadgeType('verified');
   openModal('badge-modal');
 }
@@ -1644,8 +1677,8 @@ function openBadgeModalForCurrent() {
   const u = (contactProfileCurrent && contactProfileCurrent.username) || (state.contactProfileCurrent && state.contactProfileCurrent.username);
   if (!u) return;
   closeModal('contact-profile-modal');
-  $('badge-username').value = u;
-  $('badge-error').textContent = '';
+  const inp = $('badge-username'); if (inp) inp.value = u;
+  const e = $('badge-error'); if (e) e.textContent = '';
   selectBadgeType('verified');
   openModal('badge-modal');
 }
@@ -1667,15 +1700,16 @@ function selectBadgeType(type) {
 }
 
 function giveBadgeAction() {
-  const username = $('badge-username').value.trim().toLowerCase();
+  const u = $('badge-username'); if (!u) return;
+  const username = u.value.trim().toLowerCase();
   const errEl = $('badge-error');
-  errEl.textContent = '';
-  if (!username) { errEl.textContent = 'Введи ник'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!username) { if (errEl) errEl.textContent = 'Введи ник'; return; }
   const events = { verified: 'verify', hammer: 'give hammer', scam: 'give scam', premium: 'give premium' };
   const event = events[currentBadgeType];
-  if (!event) { errEl.textContent = 'Неизвестный значок'; return; }
+  if (!event) { if (errEl) errEl.textContent = 'Неизвестный значок'; return; }
   socket.emit(event, { username: username }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('badge-modal');
     const names = { verified: 'Галочка', hammer: 'Молоток', scam: 'Скам', premium: '⭐ Премиум' };
     showToast('✓ ' + names[currentBadgeType] + ' выдан @' + res.username);
@@ -1684,15 +1718,16 @@ function giveBadgeAction() {
 }
 
 function removeBadgeAction() {
-  const username = $('badge-username').value.trim().toLowerCase();
+  const u = $('badge-username'); if (!u) return;
+  const username = u.value.trim().toLowerCase();
   const errEl = $('badge-error');
-  errEl.textContent = '';
-  if (!username) { errEl.textContent = 'Введи ник'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!username) { if (errEl) errEl.textContent = 'Введи ник'; return; }
   const events = { verified: 'unverify', hammer: 'remove hammer', scam: 'remove scam', premium: 'remove premium' };
   const event = events[currentBadgeType];
-  if (!event) { errEl.textContent = 'Неизвестный значок'; return; }
+  if (!event) { if (errEl) errEl.textContent = 'Неизвестный значок'; return; }
   socket.emit(event, { username: username }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('badge-modal');
     const names = { verified: 'Галочка', hammer: 'Молоток', scam: 'Скам', premium: '⭐ Премиум' };
     showToast('✓ ' + names[currentBadgeType] + ' снят с @' + res.username);
@@ -1700,12 +1735,13 @@ function removeBadgeAction() {
 }
 
 function doVerifyChannel() {
-  const slug = $('verify-channel-slug').value.trim().toLowerCase();
+  const s = $('verify-channel-slug'); if (!s) return;
+  const slug = s.value.trim().toLowerCase();
   const errEl = $('verify-channel-error');
-  errEl.textContent = '';
-  if (!slug) { errEl.textContent = 'Введи ID канала'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!slug) { if (errEl) errEl.textContent = 'Введи ID канала'; return; }
   socket.emit('verify channel', { slug: slug }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('verify-channel-modal');
     showToast('✓ Галочка выдана каналу @' + res.slug);
   });
@@ -1737,9 +1773,9 @@ function ensureAuthorized(callback) {
 
 /* ─── ДОБАВЛЕНИЕ КОНТАКТА ─── */
 function openAddContactModal() {
-  $('add-display-name').value = '';
-  $('add-username').value = '';
-  $('add-error').textContent = '';
+  const n = $('add-display-name'); if (n) n.value = '';
+  const u = $('add-username'); if (u) u.value = '';
+  const e = $('add-error'); if (e) e.textContent = '';
   openModal('add-modal');
   setTimeout(function () {
     const el = $('add-display-name');
@@ -1758,22 +1794,23 @@ function doAddContactReal() {
   const nameInput = $('add-display-name');
   const userInput = $('add-username');
   const errEl = $('add-error');
+  if (!nameInput || !userInput) return;
 
   const displayName = nameInput.value.trim();
   const username = userInput.value.trim().toLowerCase();
 
-  errEl.textContent = '';
+  if (errEl) errEl.textContent = '';
 
-  if (!displayName) { errEl.textContent = '⚠️ Введи имя'; nameInput.focus(); vibrate([30, 20, 30]); return; }
-  if (!username) { errEl.textContent = '⚠️ Введи ник'; userInput.focus(); vibrate([30, 20, 30]); return; }
-  if (username.length < 3) { errEl.textContent = '⚠️ Ник минимум 3 символа'; userInput.focus(); vibrate([30, 20, 30]); return; }
-  if (username === state.me.username) { errEl.textContent = '⚠️ Это твой ник'; vibrate([30, 20, 30]); return; }
+  if (!displayName) { if (errEl) errEl.textContent = '⚠️ Введи имя'; nameInput.focus(); vibrate([30, 20, 30]); return; }
+  if (!username) { if (errEl) errEl.textContent = '⚠️ Введи ник'; userInput.focus(); vibrate([30, 20, 30]); return; }
+  if (username.length < 3) { if (errEl) errEl.textContent = '⚠️ Ник минимум 3 символа'; userInput.focus(); vibrate([30, 20, 30]); return; }
+  if (username === state.me.username) { if (errEl) errEl.textContent = '⚠️ Это твой ник'; vibrate([30, 20, 30]); return; }
 
-  errEl.innerHTML = '<span style="color:var(--accent);">⏳ Добавляю…</span>';
+  if (errEl) errEl.innerHTML = '<span style="color:var(--accent);">⏳ Добавляю…</span>';
 
   socket.emit('add contact', { username: username, displayName: displayName }, function (res) {
     if (!res || !res.ok) {
-      errEl.textContent = '❌ ' + ((res && res.error) || 'Ошибка');
+      if (errEl) errEl.textContent = '❌ ' + ((res && res.error) || 'Ошибка');
       if (res && res.error && res.error.indexOf('авторизован') !== -1) {
         setTimeout(function () {
           closeModal('add-modal');
@@ -1785,7 +1822,7 @@ function doAddContactReal() {
     }
     nameInput.value = '';
     userInput.value = '';
-    errEl.textContent = '';
+    if (errEl) errEl.textContent = '';
     closeModal('add-modal');
     showToast('✓ ' + displayName + ' добавлен');
     vibrate([50, 30, 50]);
@@ -1793,7 +1830,8 @@ function doAddContactReal() {
 }
 
 document.addEventListener('keydown', function (e) {
-  if (e.key === 'Enter' && $('add-modal').classList.contains('active')) {
+  const am = $('add-modal');
+  if (e.key === 'Enter' && am && am.classList.contains('active')) {
     const active = document.activeElement;
     if (active && (active.id === 'add-display-name' || active.id === 'add-username')) {
       e.preventDefault();
@@ -1809,6 +1847,7 @@ function openContactProfile(username) {
     state.contactProfileCurrent = data;
     contactProfileCurrent = data;
     const box = $('contact-profile-content');
+    if (!box) return;
     const isBotUser = !!data.isBot;
     const isPremium = !!data.premium;
     const avStyle = data.avatar ? 'background-image:url(' + data.avatar + ')' : '';
@@ -1880,14 +1919,18 @@ function openContactProfile(username) {
       giftsHtml + extra;
 
     const blockBtn = $('block-action-btn');
-    blockBtn.textContent = data.blockedByMe ? '✅ Разблокировать' : '🚫 Блокировать';
-    blockBtn.style.display = isBotUser ? 'none' : '';
+    if (blockBtn) {
+      blockBtn.textContent = data.blockedByMe ? '✅ Разблокировать' : '🚫 Блокировать';
+      blockBtn.style.display = isBotUser ? 'none' : '';
+    }
 
     const giftBtn = $('gift-to-contact-btn');
-    if (username !== state.me.username && !data.blockedByMe && !data.blockedMe && !isBotUser) {
-      giftBtn.style.display = 'block';
-    } else {
-      giftBtn.style.display = 'none';
+    if (giftBtn) {
+      if (username !== state.me.username && !data.blockedByMe && !data.blockedMe && !isBotUser) {
+        giftBtn.style.display = 'block';
+      } else {
+        giftBtn.style.display = 'none';
+      }
     }
 
     const badgeBtn = $('give-badge-to-contact-btn');
@@ -1899,7 +1942,6 @@ function openContactProfile(username) {
       }
     }
 
-    /* 🚨 Кнопка «Пожаловаться» */
     const reportBtn = $('report-contact-btn');
     if (reportBtn) {
       if (username !== state.me.username && !isBotUser) {
@@ -1910,7 +1952,6 @@ function openContactProfile(username) {
       }
     }
 
-    /* 🛡️ Кнопки модератора в профиле */
     const modActions = $('mod-contact-actions');
     if (modActions) {
       if (state.me.isModerator && username !== state.me.username && !isBotUser) {
@@ -1939,6 +1980,7 @@ function toggleBlockCurrent() {
 /* ─── QR ─── */
 function showMyQr() {
   const container = $('qr-display');
+  if (!container) return;
   container.innerHTML = '';
   const link = window.location.origin + '/?add=' + state.me.username;
   const img = document.createElement('img');
@@ -1974,6 +2016,7 @@ function addFromQr() {
 function openSessions() {
   socket.emit('get sessions', function (sessions) {
     const box = $('settings-content');
+    if (!box) return;
     let html = '<div class="settings-tg-section-title">Активные сеансы</div>';
     if (!sessions || sessions.length === 0) {
       html += '<div style="text-align:center;padding:40px;color:var(--text-muted);">Нет активных сессий</div>';
@@ -2006,6 +2049,7 @@ function openBlockedList() {
   socket.emit('get blocked', function (list) {
     state.blockedList = list || [];
     const box = $('settings-content');
+    if (!box) return;
     let html = '<div class="settings-tg-section-title">Заблокированные (' + state.blockedList.length + ')</div>';
     if (state.blockedList.length === 0) {
       html += '<div style="text-align:center;padding:40px;color:var(--text-muted);">Список пуст</div>';
@@ -2024,20 +2068,23 @@ function unblockUser(u) {
 
 /* ─── PASSCODE ─── */
 function openPasscodeModal() {
-  $('passcode-new').value = '';
-  $('passcode-confirm').value = '';
-  $('passcode-error-modal').textContent = '';
+  const p1 = $('passcode-new'); if (p1) p1.value = '';
+  const p2 = $('passcode-confirm'); if (p2) p2.value = '';
+  const e = $('passcode-error-modal'); if (e) e.textContent = '';
   openModal('passcode-setup-modal');
 }
 function savePasscode() {
-  const p1 = $('passcode-new').value;
-  const p2 = $('passcode-confirm').value;
+  const p1El = $('passcode-new');
+  const p2El = $('passcode-confirm');
   const errEl = $('passcode-error-modal');
-  errEl.textContent = '';
-  if (p1.length < 4) { errEl.textContent = 'Минимум 4 символа'; return; }
-  if (p1 !== p2) { errEl.textContent = 'Коды не совпадают'; return; }
+  if (!p1El || !p2El) return;
+  const p1 = p1El.value;
+  const p2 = p2El.value;
+  if (errEl) errEl.textContent = '';
+  if (p1.length < 4) { if (errEl) errEl.textContent = 'Минимум 4 символа'; return; }
+  if (p1 !== p2) { if (errEl) errEl.textContent = 'Коды не совпадают'; return; }
   socket.emit('set passcode', { passcode: p1 }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     state.settings.passcode = 'set';
     closeModal('passcode-setup-modal');
     renderSettings();
@@ -2142,7 +2189,8 @@ function openReportModal(targetUser, messageId, isGroup) {
       btn.onclick = function () {
         document.querySelectorAll('.report-reason-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        $('report-comment-wrap').style.display = key === 'other' ? 'block' : 'none';
+        const cw = $('report-comment-wrap');
+        if (cw) cw.style.display = key === 'other' ? 'block' : 'none';
       };
       box.appendChild(btn);
     });
@@ -2171,11 +2219,12 @@ function openReportModal(targetUser, messageId, isGroup) {
 function submitReport() {
   const active = document.querySelector('.report-reason-btn.active');
   const err = $('report-error');
-  err.textContent = '';
-  if (!active) { err.textContent = 'Выбери причину'; return; }
+  if (err) err.textContent = '';
+  if (!active) { if (err) err.textContent = 'Выбери причину'; return; }
   const reason = active.dataset.reason;
-  const comment = $('report-comment') ? $('report-comment').value.trim() : '';
-  if (reason === 'other' && !comment) { err.textContent = 'Опиши причину'; return; }
+  const commentEl = $('report-comment');
+  const comment = commentEl ? commentEl.value.trim() : '';
+  if (reason === 'other' && !comment) { if (err) err.textContent = 'Опиши причину'; return; }
 
   socket.emit('report', {
     targetUser: state.reportTarget,
@@ -2184,7 +2233,7 @@ function submitReport() {
     reason: reason,
     comment: comment || null
   }, function (res) {
-    if (!res || !res.ok) { err.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (err) err.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('report-modal');
     showToast('🚨 Жалоба отправлена модераторам');
     vibrate([50, 30, 50]);
@@ -2388,13 +2437,16 @@ function renderModPunishments() {
       (p.reason ? '<div class="mpc-reason">💬 ' + escapeHtml(p.reason) + '</div>' : '') +
       '<div class="mpc-meta">Выдал: @' + escapeHtml(p.issued_by) + ' · ' + timeAgo(p.issued_at) + '</div>' +
       '<button class="mrc-btn ghost" data-lift="' + p.id + '">✅ Снять</button>';
-    card.querySelector('[data-lift]').onclick = function () {
-      if (!confirm('Снять наказание с @' + p.username + '?')) return;
-      socket.emit('lift punishment', { punishmentId: p.id }, function (res) {
-        if (res && res.ok) { showToast('✅ Снято'); loadModPunishments(); refreshModStats(); }
-        else showToast('❌ ' + ((res && res.error) || 'Ошибка'));
-      });
-    };
+    const liftBtn = card.querySelector('[data-lift]');
+    if (liftBtn) {
+      liftBtn.onclick = function () {
+        if (!confirm('Снять наказание с @' + p.username + '?')) return;
+        socket.emit('lift punishment', { punishmentId: p.id }, function (res) {
+          if (res && res.ok) { showToast('✅ Снято'); loadModPunishments(); refreshModStats(); }
+          else showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+        });
+      };
+    }
     box.appendChild(card);
   });
 }
@@ -2438,17 +2490,20 @@ function renderModLogs() {
 }
 
 function modBanFromProfile() {
-  const username = ($('mod-contact-actions') && $('mod-contact-actions').dataset.target) || null;
+  const el = $('mod-contact-actions');
+  const username = el && el.dataset.target;
   if (!username) return;
   openModBanUserModal(username, 'ban');
 }
 function modMuteFromProfile() {
-  const username = ($('mod-contact-actions') && $('mod-contact-actions').dataset.target) || null;
+  const el = $('mod-contact-actions');
+  const username = el && el.dataset.target;
   if (!username) return;
   openModBanUserModal(username, 'mute');
 }
 function modWarnFromProfile() {
-  const username = ($('mod-contact-actions') && $('mod-contact-actions').dataset.target) || null;
+  const el = $('mod-contact-actions');
+  const username = el && el.dataset.target;
   if (!username) return;
   const reason = prompt('Причина предупреждения для @' + username + ':');
   if (reason === null) return;
@@ -2461,13 +2516,14 @@ function modWarnFromProfile() {
 function openModBanUserModal(username, type) {
   const modal = $('mod-ban-user-modal');
   if (!modal) return;
-  $('mod-ban-target').textContent = '@' + username;
-  $('mod-ban-title').textContent = type === 'ban' ? '🚫 Забанить' : '🔇 Замутить';
-  $('mod-ban-username').value = username;
-  $('mod-ban-type').value = type;
-  $('mod-ban-error').textContent = '';
+  const target = $('mod-ban-target'); if (target) target.textContent = '@' + username;
+  const title = $('mod-ban-title'); if (title) title.textContent = type === 'ban' ? '🚫 Забанить' : '🔇 Замутить';
+  const un = $('mod-ban-username'); if (un) un.value = username;
+  const tp = $('mod-ban-type'); if (tp) tp.value = type;
+  const err = $('mod-ban-error'); if (err) err.textContent = '';
 
   const options = $('mod-ban-durations');
+  if (!options) return;
   options.innerHTML = '';
   const durations = type === 'ban'
     ? [['1h', '1 час'], ['24h', '24 часа'], ['7d', '7 дней'], ['30d', '30 дней'], ['forever', 'Навсегда']]
@@ -2488,18 +2544,22 @@ function openModBanUserModal(username, type) {
 }
 
 function submitModBan() {
-  const username = $('mod-ban-username').value.trim().toLowerCase();
-  const type = $('mod-ban-type').value;
+  const un = $('mod-ban-username');
+  const tp = $('mod-ban-type');
   const durEl = document.querySelector('#mod-ban-durations .punish-duration-btn.active');
-  const reason = $('mod-ban-reason').value.trim() || null;
+  const reasonEl = $('mod-ban-reason');
   const err = $('mod-ban-error');
-  err.textContent = '';
-  if (!username) { err.textContent = 'Введи ник'; return; }
-  if (!durEl) { err.textContent = 'Выбери срок'; return; }
+  if (!un || !tp) return;
+  const username = un.value.trim().toLowerCase();
+  const type = tp.value;
+  const reason = reasonEl ? reasonEl.value.trim() || null : null;
+  if (err) err.textContent = '';
+  if (!username) { if (err) err.textContent = 'Введи ник'; return; }
+  if (!durEl) { if (err) err.textContent = 'Выбери срок'; return; }
   const duration = durEl.dataset.dur;
   const event = type === 'ban' ? 'ban user' : 'mute user';
   socket.emit(event, { username, duration, reason }, function (res) {
-    if (!res || !res.ok) { err.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (err) err.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('mod-ban-user-modal');
     showToast('✓ Готово');
     refreshModStats();
@@ -2513,6 +2573,7 @@ function openStarsHistory() {
     if (!res || !res.ok) return;
     state.me.stars = res.stars;
     const box = $('stars-history-list');
+    if (!box) return;
     if (!res.transactions || res.transactions.length === 0) {
       box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Пока нет операций</div>';
     } else {
@@ -2555,11 +2616,12 @@ function openGiftsCatalog(username) {
 
   const contact = state.contacts.find(function (c) { return c.name === username; });
   const displayName = (contact && contact.displayName) || username;
-  $('gifts-catalog-target').textContent = 'Кому: ' + displayName;
-  $('gifts-catalog-balance').textContent = state.me.stars;
-  $('gifts-catalog-error').textContent = '';
+  const tgt = $('gifts-catalog-target'); if (tgt) tgt.textContent = 'Кому: ' + displayName;
+  const bal = $('gifts-catalog-balance'); if (bal) bal.textContent = state.me.stars;
+  const err = $('gifts-catalog-error'); if (err) err.textContent = '';
 
   const grid = $('gifts-grid');
+  if (!grid) return;
   grid.innerHTML = '';
   const entries = Object.entries(state.giftsCatalog);
   if (entries.length === 0) {
@@ -2599,11 +2661,11 @@ function openGiftMessageModal(giftKey) {
   state.currentGiftKey = giftKey;
   const contact = state.contacts.find(function (c) { return c.name === to; });
   const displayName = (contact && contact.displayName) || to;
-  $('gift-message-target').textContent = 'Кому: ' + displayName;
-  $('gift-message-preview').textContent = gift.emoji;
-  $('gift-message-price').textContent = gift.price;
-  $('gift-message-input').value = '';
-  $('gift-message-error').textContent = '';
+  const tgt = $('gift-message-target'); if (tgt) tgt.textContent = 'Кому: ' + displayName;
+  const prev = $('gift-message-preview'); if (prev) prev.textContent = gift.emoji;
+  const price = $('gift-message-price'); if (price) price.textContent = gift.price;
+  const inp = $('gift-message-input'); if (inp) inp.value = '';
+  const err = $('gift-message-error'); if (err) err.textContent = '';
   closeModal('gifts-catalog-modal');
   openModal('gift-message-modal');
 }
@@ -2614,11 +2676,12 @@ function confirmSendGift() {
   if (!gift) { showToast('⚠️ Подарок не найден'); return; }
   const to = state.currentGiftTarget;
   if (!to) { showToast('⚠️ Не выбран получатель'); return; }
-  const message = $('gift-message-input').value.trim();
+  const inp = $('gift-message-input');
+  const message = inp ? inp.value.trim() : '';
   const errEl = $('gift-message-error');
-  errEl.textContent = '';
+  if (errEl) errEl.textContent = '';
   socket.emit('send gift', { to: to, giftKey: giftKey, message: message || null }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка при отправке'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка при отправке'; return; }
     closeModal('gift-message-modal');
     showToast('🎁 Подарок отправлен! -' + gift.price + ' ⭐');
     state.currentGiftTarget = null;
@@ -2629,6 +2692,7 @@ function confirmSendGift() {
 function openMyGifts() {
   socket.emit('get my gifts', function (res) {
     const box = $('my-gifts-list');
+    if (!box) return;
     if (!res || !res.ok || !res.gifts || res.gifts.length === 0) {
       box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Пока нет подарков 🎁</div>';
     } else {
@@ -2665,18 +2729,20 @@ function sellGift(giftId) {
 }
 
 function openGiftModal() {
-  $('gift-code-input').value = '';
-  $('gift-error').textContent = '';
+  const i = $('gift-code-input'); if (i) i.value = '';
+  const e = $('gift-error'); if (e) e.textContent = '';
   openModal('gift-modal');
 }
 
 function redeemGiftCode() {
-  const code = $('gift-code-input').value.trim().toUpperCase();
+  const inp = $('gift-code-input');
+  if (!inp) return;
+  const code = inp.value.trim().toUpperCase();
   const errEl = $('gift-error');
-  errEl.textContent = '';
-  if (!code) { errEl.textContent = 'Введи код'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!code) { if (errEl) errEl.textContent = 'Введи код'; return; }
   socket.emit('redeem gift code', { code: code }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('gift-modal');
     showToast('⭐ Премиум активирован! +' + (res.bonus || 25) + ' ⭐');
     renderSettings();
@@ -2686,7 +2752,8 @@ function redeemGiftCode() {
 
 function openGiftAdminModal() {
   if (state.me.username !== 'moroz') return;
-  $('gift-codes-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">Загрузка…</div>';
+  const box = $('gift-codes-list');
+  if (box) box.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">Загрузка…</div>';
   openModal('gift-admin-modal');
   loadGiftCodes();
 }
@@ -2694,6 +2761,7 @@ function openGiftAdminModal() {
 function loadGiftCodes() {
   socket.emit('list gift codes', function (res) {
     const box = $('gift-codes-list');
+    if (!box) return;
     if (!res || !res.ok) {
       box.innerHTML = '<div style="text-align:center;padding:20px;color:#f87171;">Нет доступа</div>';
       return;
@@ -2730,6 +2798,7 @@ function copyText(text) {
 /* ─── ДОСТИЖЕНИЯ / СТАТИСТИКА ─── */
 function openAchievements() {
   const box = $('achievements-content');
+  if (!box) return;
   box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Загрузка…</div>';
   openModal('achievements-modal');
   socket.emit('get achievements', function (res) {
@@ -2763,6 +2832,7 @@ function openAchievements() {
 
 function openStats() {
   const box = $('stats-content');
+  if (!box) return;
   box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Загрузка…</div>';
   openModal('stats-modal');
   socket.emit('get achievements', function (res) {
@@ -2811,13 +2881,13 @@ function openStats() {
 
 /* ─── БОТЫ ─── */
 function openCreateBotModal() {
-  $('bot-username').value = '';
-  $('bot-name').value = '';
-  $('bot-description').value = '';
-  $('bot-emoji').value = '🤖';
-  $('create-bot-error').textContent = '';
-  $('bot-commands-list').innerHTML = '';
-  $('bot-avatar-preview').style.display = 'none';
+  const u = $('bot-username'); if (u) u.value = '';
+  const n = $('bot-name'); if (n) n.value = '';
+  const d = $('bot-description'); if (d) d.value = '';
+  const e = $('bot-emoji'); if (e) e.value = '🤖';
+  const err = $('create-bot-error'); if (err) err.textContent = '';
+  const cl = $('bot-commands-list'); if (cl) cl.innerHTML = '';
+  const pv = $('bot-avatar-preview'); if (pv) pv.style.display = 'none';
   state.tempBotAvatar = null;
   addBotCommandRow();
   openModal('create-bot-modal');
@@ -2832,7 +2902,8 @@ function addBotCommandRow() {
     '<input class="bcc-trigger" placeholder="/start" maxlength="40" />' +
     '<textarea class="bcc-response" placeholder="Ответ бота" rows="2" maxlength="1000"></textarea>' +
     '<button class="bcc-remove" type="button">×</button>';
-  row.querySelector('.bcc-remove').onclick = function () { row.remove(); };
+  const rm = row.querySelector('.bcc-remove');
+  if (rm) rm.onclick = function () { row.remove(); };
   box.appendChild(row);
 }
 
@@ -2845,7 +2916,8 @@ function addEditBotCommandRow() {
     '<input class="bcc-trigger" placeholder="/start" maxlength="40" />' +
     '<textarea class="bcc-response" placeholder="Ответ бота" rows="2" maxlength="1000"></textarea>' +
     '<button class="bcc-remove" type="button">×</button>';
-  row.querySelector('.bcc-remove').onclick = function () { row.remove(); };
+  const rm = row.querySelector('.bcc-remove');
+  if (rm) rm.onclick = function () { row.remove(); };
   box.appendChild(row);
 }
 
@@ -2855,8 +2927,11 @@ function collectBotCommands(boxId) {
   const rows = box.querySelectorAll('.bot-command-row');
   const out = [];
   rows.forEach(function (row) {
-    const trigger = row.querySelector('.bcc-trigger').value.trim();
-    const response = row.querySelector('.bcc-response').value.trim();
+    const tr = row.querySelector('.bcc-trigger');
+    const rs = row.querySelector('.bcc-response');
+    if (!tr || !rs) return;
+    const trigger = tr.value.trim();
+    const response = rs.value.trim();
     if (trigger && response) out.push({ trigger: trigger, response: response });
   });
   return out;
@@ -2877,8 +2952,8 @@ function uploadBotAvatar(event) {
       const min = Math.min(img.width, img.height);
       ctx.drawImage(img, (img.width - min) / 2, (img.height - min) / 2, min, min, 0, 0, size, size);
       state.tempBotAvatar = canvas.toDataURL('image/jpeg', 0.8);
-      $('bot-avatar-img').src = state.tempBotAvatar;
-      $('bot-avatar-preview').style.display = 'block';
+      const imgEl = $('bot-avatar-img'); if (imgEl) imgEl.src = state.tempBotAvatar;
+      const pv = $('bot-avatar-preview'); if (pv) pv.style.display = 'block';
     };
     img.src = e.target.result;
   };
@@ -2887,21 +2962,25 @@ function uploadBotAvatar(event) {
 }
 
 function doCreateBot() {
-  const username = $('bot-username').value.trim().toLowerCase();
-  const name = $('bot-name').value.trim();
-  const description = $('bot-description').value.trim();
-  const emoji = $('bot-emoji').value.trim();
+  const u = $('bot-username'); if (!u) return;
+  const username = u.value.trim().toLowerCase();
+  const n = $('bot-name');
+  const d = $('bot-description');
+  const e = $('bot-emoji');
+  const name = n ? n.value.trim() : '';
+  const description = d ? d.value.trim() : '';
+  const emoji = e ? e.value.trim() : '';
   const commands = collectBotCommands('bot-commands-list');
   const errEl = $('create-bot-error');
-  errEl.textContent = '';
-  if (!username) { errEl.textContent = 'Введи ник бота'; return; }
-  if (!/_bot$/.test(username)) { errEl.textContent = 'Ник должен заканчиваться на _bot'; return; }
-  if (!name) { errEl.textContent = 'Введи имя бота'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!username) { if (errEl) errEl.textContent = 'Введи ник бота'; return; }
+  if (!/_bot$/.test(username)) { if (errEl) errEl.textContent = 'Ник должен заканчиваться на _bot'; return; }
+  if (!name) { if (errEl) errEl.textContent = 'Введи имя бота'; return; }
   socket.emit('create bot', {
     username: username, name: name, description: description || null,
     avatar: state.tempBotAvatar, emoji: emoji || null, commands: commands
   }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('create-bot-modal');
     showToast('🤖 Бот ' + name + ' создан!');
     vibrate([50, 30, 50]);
@@ -2911,6 +2990,7 @@ function doCreateBot() {
 
 function openMyBots() {
   const box = $('my-bots-list');
+  if (!box) return;
   box.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">Загрузка…</div>';
   openModal('my-bots-modal');
   socket.emit('get my bots', function (res) {
@@ -2946,24 +3026,27 @@ function openEditBot(username) {
     if (!res || !res.ok) { showToast('⚠️ Бот не найден'); return; }
     const b = res.bot;
     state.editingBotUsername = b.username;
-    $('edit-bot-username').value = b.username;
-    $('edit-bot-name').value = b.name;
-    $('edit-bot-description').value = b.description || '';
-    $('edit-bot-emoji').value = b.emoji || '';
-    $('edit-bot-error').textContent = '';
+    const un = $('edit-bot-username'); if (un) un.value = b.username;
+    const nm = $('edit-bot-name'); if (nm) nm.value = b.name;
+    const ds = $('edit-bot-description'); if (ds) ds.value = b.description || '';
+    const em = $('edit-bot-emoji'); if (em) em.value = b.emoji || '';
+    const err = $('edit-bot-error'); if (err) err.textContent = '';
     const cmdsBox = $('edit-bot-commands-list');
-    cmdsBox.innerHTML = '';
-    if (b.commands.length === 0) addEditBotCommandRow();
-    else b.commands.forEach(function (c) {
-      const row = document.createElement('div');
-      row.className = 'bot-command-row';
-      row.innerHTML =
-        '<input class="bcc-trigger" placeholder="/start" maxlength="40" value="' + escapeHtml(c.trigger) + '" />' +
-        '<textarea class="bcc-response" placeholder="Ответ бота" rows="2" maxlength="1000">' + escapeHtml(c.response) + '</textarea>' +
-        '<button class="bcc-remove" type="button">×</button>';
-      row.querySelector('.bcc-remove').onclick = function () { row.remove(); };
-      cmdsBox.appendChild(row);
-    });
+    if (cmdsBox) {
+      cmdsBox.innerHTML = '';
+      if (b.commands.length === 0) addEditBotCommandRow();
+      else b.commands.forEach(function (c) {
+        const row = document.createElement('div');
+        row.className = 'bot-command-row';
+        row.innerHTML =
+          '<input class="bcc-trigger" placeholder="/start" maxlength="40" value="' + escapeHtml(c.trigger) + '" />' +
+          '<textarea class="bcc-response" placeholder="Ответ бота" rows="2" maxlength="1000">' + escapeHtml(c.response) + '</textarea>' +
+          '<button class="bcc-remove" type="button">×</button>';
+        const rm = row.querySelector('.bcc-remove');
+        if (rm) rm.onclick = function () { row.remove(); };
+        cmdsBox.appendChild(row);
+      });
+    }
     closeModal('my-bots-modal');
     openModal('edit-bot-modal');
   });
@@ -2972,18 +3055,21 @@ function openEditBot(username) {
 function doUpdateBot() {
   const username = state.editingBotUsername;
   if (!username) return;
-  const name = $('edit-bot-name').value.trim();
-  const description = $('edit-bot-description').value.trim();
-  const emoji = $('edit-bot-emoji').value.trim();
+  const nm = $('edit-bot-name');
+  const ds = $('edit-bot-description');
+  const em = $('edit-bot-emoji');
+  const name = nm ? nm.value.trim() : '';
+  const description = ds ? ds.value.trim() : '';
+  const emoji = em ? em.value.trim() : '';
   const commands = collectBotCommands('edit-bot-commands-list');
   const errEl = $('edit-bot-error');
-  errEl.textContent = '';
-  if (!name) { errEl.textContent = 'Введи имя'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!name) { if (errEl) errEl.textContent = 'Введи имя'; return; }
   socket.emit('update bot', {
     username: username, name: name, description: description || null,
     emoji: emoji || null, commands: commands
   }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('edit-bot-modal');
     showToast('✓ Бот обновлён');
     socket.emit('get my bots', function (r) { if (r && r.ok) state.myBots = r.bots || []; });
@@ -3003,18 +3089,20 @@ function confirmDeleteBot() {
 }
 
 function openFindBotModal() {
-  $('find-bot-input').value = '';
-  $('find-bot-error').textContent = '';
+  const i = $('find-bot-input'); if (i) i.value = '';
+  const e = $('find-bot-error'); if (e) e.textContent = '';
   openModal('find-bot-modal');
 }
 
 function doFindBot() {
-  const username = $('find-bot-input').value.trim().toLowerCase();
+  const inp = $('find-bot-input');
+  if (!inp) return;
+  const username = inp.value.trim().toLowerCase();
   const errEl = $('find-bot-error');
-  errEl.textContent = '';
-  if (!username) { errEl.textContent = 'Введи ник'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!username) { if (errEl) errEl.textContent = 'Введи ник'; return; }
   socket.emit('find bot', { username: username }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Бот не найден'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Бот не найден'; return; }
     closeModal('find-bot-modal');
     showBotInfoModal(res.bot);
   });
@@ -3023,6 +3111,7 @@ function doFindBot() {
 function showBotInfoModal(bot) {
   state.currentBot = bot;
   const box = $('bot-info-content');
+  if (!box) return;
   const avStyle = bot.avatar ? 'background-image:url(' + bot.avatar + ')' : '';
   const avContent = bot.avatar ? '' : (bot.emoji || '🤖');
   let cmdsHtml = '';
@@ -3263,42 +3352,47 @@ function openChat(name) {
   clearUnread(name);
   state.lastDateShown = '';
   state.pinnedMessageId = null;
-  $('pinned-bar').classList.remove('active');
+  const pb = $('pinned-bar'); if (pb) pb.classList.remove('active');
 
   const isPremium = contact && contact.premium;
   const badges = renderBadgesBig(contact || {});
   const displayName = (contact && contact.displayName) || name;
   const botMark = state.isBotChat ? ' <span class="bot-mark">бот</span>' : '';
-  $('chat-top-name').innerHTML = escapeHtml(displayName) + botMark + ' ' + badges;
-  $('chat-top-status').textContent = contact && contact.online
-    ? (state.isBotChat ? 'бот онлайн' : 'в сети')
-    : 'был(а) недавно';
-  $('chat-top-status').classList.remove('typing');
-
-  const av = $('chat-avatar');
-  av.classList.toggle('premium', !!isPremium);
-  if (contact && contact.avatar) {
-    av.style.backgroundImage = 'url(' + contact.avatar + ')';
-    av.textContent = '';
-    av.classList.remove('group', 'saved');
-    av.classList.toggle('bot', state.isBotChat);
-  } else if (state.isBotChat) {
-    av.style.backgroundImage = '';
-    av.textContent = (contact && contact.emojiStatus) || '🤖';
-    av.style.background = '';
-    av.classList.add('bot');
-    av.classList.remove('group', 'saved');
-  } else {
-    av.style.backgroundImage = '';
-    av.textContent = initials(displayName);
-    av.style.background = 'var(--accent)';
-    av.classList.remove('group', 'saved', 'bot');
+  const topName = $('chat-top-name'); if (topName) topName.innerHTML = escapeHtml(displayName) + botMark + ' ' + badges;
+  const topStatus = $('chat-top-status');
+  if (topStatus) {
+    topStatus.textContent = contact && contact.online
+      ? (state.isBotChat ? 'бот онлайн' : 'в сети')
+      : 'был(а) недавно';
+    topStatus.classList.remove('typing');
   }
 
-  $('chat-actions').style.display = 'flex';
-  $('callBtn1').style.display = state.isBotChat ? 'none' : 'block';
-  $('callBtn2').style.display = state.isBotChat ? 'none' : 'block';
-  $('chat-top-info').onclick = function () { openContactProfile(name); };
+  const av = $('chat-avatar');
+  if (av) {
+    av.classList.toggle('premium', !!isPremium);
+    if (contact && contact.avatar) {
+      av.style.backgroundImage = 'url(' + contact.avatar + ')';
+      av.textContent = '';
+      av.classList.remove('group', 'saved');
+      av.classList.toggle('bot', state.isBotChat);
+    } else if (state.isBotChat) {
+      av.style.backgroundImage = '';
+      av.textContent = (contact && contact.emojiStatus) || '🤖';
+      av.style.background = '';
+      av.classList.add('bot');
+      av.classList.remove('group', 'saved');
+    } else {
+      av.style.backgroundImage = '';
+      av.textContent = initials(displayName);
+      av.style.background = 'var(--accent)';
+      av.classList.remove('group', 'saved', 'bot');
+    }
+  }
+
+  const ca = $('chat-actions'); if (ca) ca.style.display = 'flex';
+  const c1 = $('callBtn1'); if (c1) c1.style.display = state.isBotChat ? 'none' : 'block';
+  const c2 = $('callBtn2'); if (c2) c2.style.display = state.isBotChat ? 'none' : 'block';
+  const cti = $('chat-top-info'); if (cti) cti.onclick = function () { openContactProfile(name); };
 
   if (state.isBotChat) {
     socket.emit('find bot', { username: name }, function (res) {
@@ -3312,8 +3406,8 @@ function openChat(name) {
     removeBotCommandsHint();
   }
 
-  $('messages').innerHTML = '';
-  $('chat-screen').classList.add('active');
+  const box = $('messages'); if (box) box.innerHTML = '';
+  const cs = $('chat-screen'); if (cs) cs.classList.add('active');
   socket.emit('load history', { withUser: name });
   setTimeout(function () { socket.emit('mark read', { withUser: name }); }, 300);
   renderChatList();
@@ -3337,12 +3431,13 @@ function renderBotCommandsHint(commands) {
     chip.className = 'bch-chip';
     chip.textContent = c.trigger;
     chip.onclick = function () {
-      $('msgInput').value = c.trigger;
+      const inp = $('msgInput');
+      if (inp) inp.value = c.trigger;
       sendMsg();
     };
     hint.appendChild(chip);
   });
-  inputArea.parentNode.insertBefore(hint, inputArea);
+  if (inputArea.parentNode) inputArea.parentNode.insertBefore(hint, inputArea);
   bindRipples(hint);
 }
 
@@ -3362,19 +3457,21 @@ function openSavedChat() {
   clearUnread('__saved__');
   state.lastDateShown = '';
   state.pinnedMessageId = null;
-  $('pinned-bar').classList.remove('active');
-  $('chat-top-name').innerHTML = '⭐ Избранное';
-  $('chat-top-status').textContent = 'Сохранённые сообщения';
+  const pb = $('pinned-bar'); if (pb) pb.classList.remove('active');
+  const topName = $('chat-top-name'); if (topName) topName.innerHTML = '⭐ Избранное';
+  const topStatus = $('chat-top-status'); if (topStatus) topStatus.textContent = 'Сохранённые сообщения';
   const av = $('chat-avatar');
-  av.style.backgroundImage = '';
-  av.textContent = '⭐';
-  av.style.background = '';
-  av.classList.add('saved');
-  av.classList.remove('group', 'bot', 'premium');
-  $('chat-actions').style.display = 'none';
-  $('chat-top-info').onclick = null;
-  $('messages').innerHTML = '';
-  $('chat-screen').classList.add('active');
+  if (av) {
+    av.style.backgroundImage = '';
+    av.textContent = '⭐';
+    av.style.background = '';
+    av.classList.add('saved');
+    av.classList.remove('group', 'bot', 'premium');
+  }
+  const ca = $('chat-actions'); if (ca) ca.style.display = 'none';
+  const cti = $('chat-top-info'); if (cti) cti.onclick = null;
+  const box = $('messages'); if (box) box.innerHTML = '';
+  const cs = $('chat-screen'); if (cs) cs.classList.add('active');
   socket.emit('load saved history');
   renderChatList();
   bindScrollDown();
@@ -3394,36 +3491,44 @@ function openGroupChat(g) {
   clearUnread('g:' + g.id);
   state.lastDateShown = '';
   state.pinnedMessageId = g.pinnedMessageId || null;
-  $('chat-top-name').textContent = g.name;
+  const topName = $('chat-top-name'); if (topName) topName.textContent = g.name;
   const memberWord = g.memberCount === 1 ? '' : (g.memberCount < 5 ? 'а' : 'ов');
-  $('chat-top-status').textContent = g.memberCount + ' участник' + memberWord;
-  $('chat-top-status').classList.remove('typing');
-  const av = $('chat-avatar');
-  av.classList.remove('premium');
-  if (g.avatar) {
-    av.style.backgroundImage = 'url(' + g.avatar + ')';
-    av.textContent = '';
-    av.classList.add('group');
-    av.classList.remove('saved', 'bot');
-  } else {
-    av.style.backgroundImage = '';
-    av.textContent = '👥';
-    av.style.background = '';
-    av.classList.add('group');
-    av.classList.remove('saved', 'bot');
+  const topStatus = $('chat-top-status');
+  if (topStatus) {
+    topStatus.textContent = g.memberCount + ' участник' + memberWord;
+    topStatus.classList.remove('typing');
   }
-  $('chat-actions').style.display = 'flex';
-  $('callBtn1').style.display = 'none';
-  $('callBtn2').style.display = 'none';
-  $('chat-top-info').onclick = function () { openGroupInfo(); };
-  $('messages').innerHTML = '';
-  $('chat-screen').classList.add('active');
+  const av = $('chat-avatar');
+  if (av) {
+    av.classList.remove('premium');
+    if (g.avatar) {
+      av.style.backgroundImage = 'url(' + g.avatar + ')';
+      av.textContent = '';
+      av.classList.add('group');
+      av.classList.remove('saved', 'bot');
+    } else {
+      av.style.backgroundImage = '';
+      av.textContent = '👥';
+      av.style.background = '';
+      av.classList.add('group');
+      av.classList.remove('saved', 'bot');
+    }
+  }
+  const ca = $('chat-actions'); if (ca) ca.style.display = 'flex';
+  const c1 = $('callBtn1'); if (c1) c1.style.display = 'none';
+  const c2 = $('callBtn2'); if (c2) c2.style.display = 'none';
+  const cti = $('chat-top-info'); if (cti) cti.onclick = function () { openGroupInfo(); };
+  const box = $('messages'); if (box) box.innerHTML = '';
+  const cs = $('chat-screen'); if (cs) cs.classList.add('active');
   socket.emit('load group history', { groupId: g.id });
-  if (state.pinnedMessageId) {
-    $('pinned-bar').classList.add('active');
-    $('pinned-text').textContent = 'Закреплённое сообщение';
-  } else {
-    $('pinned-bar').classList.remove('active');
+  const pb = $('pinned-bar');
+  if (pb) {
+    if (state.pinnedMessageId) {
+      pb.classList.add('active');
+      const pt = $('pinned-text'); if (pt) pt.textContent = 'Закреплённое сообщение';
+    } else {
+      pb.classList.remove('active');
+    }
   }
   renderChatList();
   bindScrollDown();
@@ -3436,7 +3541,7 @@ function closeChat() {
   if (state.currentChat) socket.emit('typing', { to: state.currentChat, isTyping: false });
   if (state.currentGroup) socket.emit('group typing', { groupId: state.currentGroup.id, isTyping: false });
   if (state.myTypingTimeout) { clearTimeout(state.myTypingTimeout); state.myTypingTimeout = null; }
-  $('chat-screen').classList.remove('active');
+  const cs = $('chat-screen'); if (cs) cs.classList.remove('active');
   state.currentChat = null;
   state.currentGroup = null;
   state.isSavedChat = false;
@@ -3654,7 +3759,6 @@ function renderMessage(msg) {
       audio.onended = function () { playing = false; pb.textContent = '▶'; vw.classList.remove('playing'); };
     }
 
-    /* 📍 Гео */
     if (msg.geo) {
       const geoBlock = renderGeoBlock(msg.geo);
       if (geoBlock) div.appendChild(geoBlock);
@@ -3756,6 +3860,7 @@ function showReactionMenu(e, messageId, wrap, isGroup) {
   state.activeReactionMsgId = messageId;
   state.activeReactionGroupId = isGroup && state.currentGroup ? state.currentGroup.id : null;
   const menu = $('reaction-menu');
+  if (!menu) return;
   const touch = (e.touches && e.touches[0]) || e;
   let x = touch.clientX, y = touch.clientY;
   menu.classList.add('active');
@@ -3767,7 +3872,8 @@ function showReactionMenu(e, messageId, wrap, isGroup) {
   menu.style.top = y + 'px';
 }
 function hideReactionMenu() {
-  $('reaction-menu').classList.remove('active');
+  const m = $('reaction-menu');
+  if (m) m.classList.remove('active');
   state.activeReactionMsgId = null;
   state.activeReactionGroupId = null;
 }
@@ -3785,16 +3891,18 @@ function showActionMenu(e, msg) {
   if (msg.deleted) return;
   state.activeMessage = msg;
   const menu = $('action-menu');
+  if (!menu) return;
   const touch = (e.touches && e.touches[0]) || e;
   let x = touch.clientX, y = touch.clientY;
   const isMine = msg.from === state.me.username;
-  $('action-edit').style.display = (isMine && !msg.voice && !msg.image && !msg.videoCircle && !msg.sticker && msg.text && !msg.geo) ? 'flex' : 'none';
-  $('action-delete').style.display = isMine ? 'flex' : 'none';
-  $('action-pin').style.display = msg.isGroup ? 'flex' : 'none';
+  const editEl = $('action-edit');
+  if (editEl) editEl.style.display = (isMine && !msg.voice && !msg.image && !msg.videoCircle && !msg.sticker && msg.text && !msg.geo) ? 'flex' : 'none';
+  const delEl = $('action-delete');
+  if (delEl) delEl.style.display = isMine ? 'flex' : 'none';
+  const pinEl = $('action-pin');
+  if (pinEl) pinEl.style.display = msg.isGroup ? 'flex' : 'none';
   const reportBtn = $('action-report');
-  if (reportBtn) {
-    reportBtn.style.display = isMine ? 'none' : 'flex';
-  }
+  if (reportBtn) reportBtn.style.display = isMine ? 'none' : 'flex';
   menu.classList.add('active');
   const rect = menu.getBoundingClientRect();
   const w = rect.width || 200, h = rect.height || 280;
@@ -3805,7 +3913,8 @@ function showActionMenu(e, msg) {
   hideReactionMenu();
 }
 function hideActionMenu() {
-  $('action-menu').classList.remove('active');
+  const m = $('action-menu');
+  if (m) m.classList.remove('active');
   state.activeMessage = null;
 }
 function actionReply() {
@@ -3818,15 +3927,15 @@ function actionReply() {
         : (state.activeMessage.voice ? '🎤 Голосовое'
           : (state.activeMessage.videoCircle ? '🎥 Кружок'
             : (state.activeMessage.geo ? '📍 Геолокация' : '')))));
-  $('rp-name').textContent = name;
-  $('rp-msg').textContent = preview;
-  $('reply-preview').classList.add('active');
-  $('msgInput').focus();
+  const rn = $('rp-name'); if (rn) rn.textContent = name;
+  const rm = $('rp-msg'); if (rm) rm.textContent = preview;
+  const rp = $('reply-preview'); if (rp) rp.classList.add('active');
+  const inp = $('msgInput'); if (inp) inp.focus();
   hideActionMenu();
 }
 function cancelReply() {
   state.replyToMessage = null;
-  $('reply-preview').classList.remove('active');
+  const rp = $('reply-preview'); if (rp) rp.classList.remove('active');
 }
 function actionCopy() {
   if (!state.activeMessage || !state.activeMessage.text) { hideActionMenu(); return; }
@@ -3847,12 +3956,14 @@ function actionSave() {
 function actionEdit() {
   if (!state.activeMessage) return;
   state.editingMessageId = state.activeMessage.id;
-  $('edit-message-text').value = state.activeMessage.text || '';
+  const t = $('edit-message-text'); if (t) t.value = state.activeMessage.text || '';
   hideActionMenu();
   openModal('edit-message-modal');
 }
 function doEditMessage() {
-  const text = $('edit-message-text').value.trim();
+  const t = $('edit-message-text');
+  if (!t) return;
+  const text = t.value.trim();
   if (!text || !state.editingMessageId) return;
   const isGroup = !!state.currentGroup;
   socket.emit('edit message', { messageId: state.editingMessageId, text: text, isGroup: isGroup }, function (res) {
@@ -3872,8 +3983,8 @@ function actionPin() {
   if (!state.activeMessage || !state.currentGroup) return;
   socket.emit('pin message', { groupId: state.currentGroup.id, messageId: state.activeMessage.id }, function () {
     state.pinnedMessageId = state.activeMessage.id;
-    $('pinned-bar').classList.add('active');
-    $('pinned-text').textContent = 'Закреплённое сообщение';
+    const pb = $('pinned-bar'); if (pb) pb.classList.add('active');
+    const pt = $('pinned-text'); if (pt) pt.textContent = 'Закреплённое сообщение';
     hideActionMenu();
   });
 }
@@ -3968,10 +4079,10 @@ function triggerReplyFromSwipe(msg) {
   };
   const name = msg.self ? 'Я' : displayNameForUser(msg.from);
   const preview = msg.text || (msg.sticker ? 'Стикер' : (msg.image ? '📷 Фото' : (msg.voice ? '🎤 Голосовое' : (msg.videoCircle ? '🎥 Кружок' : (msg.geo ? '📍 Геолокация' : '')))));
-  $('rp-name').textContent = name;
-  $('rp-msg').textContent = preview;
-  $('reply-preview').classList.add('active');
-  $('msgInput').focus();
+  const rn = $('rp-name'); if (rn) rn.textContent = name;
+  const rm = $('rp-msg'); if (rm) rm.textContent = preview;
+  const rp = $('reply-preview'); if (rp) rp.classList.add('active');
+  const inp = $('msgInput'); if (inp) inp.focus();
   vibrate(15);
 }
 
@@ -4015,6 +4126,7 @@ renderMessage = function (msg) {
   _origRenderMessage(msg);
   if (msg.self) {
     const box = document.getElementById('messages');
+    if (!box) return;
     const last = box.lastElementChild;
     if (last && last.dataset.id == msg.id) {
       last.classList.add('just-sent');
@@ -4026,6 +4138,7 @@ renderMessage = function (msg) {
 /* ─── ОТПРАВКА ─── */
 function sendMsg() {
   const input = $('msgInput');
+  if (!input) return;
   const text = input.value.trim();
   if (!text) return;
   if (state.me.mute) {
@@ -4129,8 +4242,8 @@ async function toggleVoiceRecording() {
       stream.getTracks().forEach(function (t) { t.stop(); });
       clearInterval(state.recordingTimer);
       const duration = Math.round((now() - state.recordingStartTime) / 1000);
-      $('recording-bar').classList.remove('active');
-      $('micBtnInput').classList.remove('recording');
+      const rb = $('recording-bar'); if (rb) rb.classList.remove('active');
+      const mb = $('micBtnInput'); if (mb) mb.classList.remove('recording');
       if (state.cancelledRecording) {
         state.cancelledRecording = false;
         state.audioChunks = [];
@@ -4158,8 +4271,8 @@ async function toggleVoiceRecording() {
     state.isRecording = true;
     state.cancelledRecording = false;
     state.recordingStartTime = now();
-    $('recording-bar').classList.add('active');
-    $('micBtnInput').classList.add('recording');
+    const rb = $('recording-bar'); if (rb) rb.classList.add('active');
+    const mb = $('micBtnInput'); if (mb) mb.classList.add('recording');
     updateRecordingTimer();
     state.recordingTimer = setInterval(function () {
       const elapsed = Math.round((now() - state.recordingStartTime) / 1000);
@@ -4176,13 +4289,13 @@ function stopVoiceRecording(cancel) {
   if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') state.mediaRecorder.stop();
   state.isRecording = false;
   clearInterval(state.recordingTimer);
-  $('recording-bar').classList.remove('active');
-  $('micBtnInput').classList.remove('recording');
+  const rb = $('recording-bar'); if (rb) rb.classList.remove('active');
+  const mb = $('micBtnInput'); if (mb) mb.classList.remove('recording');
 }
 function updateRecordingTimer() {
   const elapsed = Math.round((now() - state.recordingStartTime) / 1000);
   const m = Math.floor(elapsed / 60), s = elapsed % 60;
-  $('recording-time').textContent = m + ':' + s.toString().padStart(2, '0');
+  const rt = $('recording-time'); if (rt) rt.textContent = m + ':' + s.toString().padStart(2, '0');
 }
 
 function getBestVideoMime() {
@@ -4207,9 +4320,10 @@ async function startCircleRecording() {
     return;
   }
   const preview = $('circle-video-preview');
+  if (!preview) return;
   preview.srcObject = state.circleStream;
   preview.muted = true;
-  $('circle-preview').classList.add('active');
+  const cp = $('circle-preview'); if (cp) cp.classList.add('active');
   state.circleChunks = [];
   state.circleMime = getBestVideoMime();
   state.circleRecorder = state.circleMime
@@ -4230,7 +4344,7 @@ async function startCircleRecording() {
 function updateCircleTimer() {
   const elapsed = Math.round((now() - state.circleStartTime) / 1000);
   const m = Math.floor(elapsed / 60), s = elapsed % 60;
-  $('circle-timer').textContent = m + ':' + s.toString().padStart(2, '0');
+  const ct = $('circle-timer'); if (ct) ct.textContent = m + ':' + s.toString().padStart(2, '0');
 }
 function cancelCircle() {
   if (state.circleRecorder && state.circleRecorder.state !== 'inactive') state.circleRecorder.stop();
@@ -4261,8 +4375,8 @@ function sendCircle() {
 function cleanupCircle() {
   clearInterval(state.circleTimer);
   if (state.circleStream) { state.circleStream.getTracks().forEach(function (t) { t.stop(); }); state.circleStream = null; }
-  $('circle-preview').classList.remove('active');
-  $('circle-video-preview').srcObject = null;
+  const cp = $('circle-preview'); if (cp) cp.classList.remove('active');
+  const pv = $('circle-video-preview'); if (pv) pv.srcObject = null;
   state.circleRecorder = null;
   state.circleChunks = [];
 }
@@ -4335,8 +4449,8 @@ function renderStickersContent() {
     addBtn.textContent = '+';
     addBtn.onclick = function () {
       const choice = confirm('OK — загрузить видео (MP4/WebM → GIF), Отмена — загрузить картинку');
-      if (choice) $('stickerFileVideo').click();
-      else $('stickerFileImage').click();
+      if (choice) { const f = $('stickerFileVideo'); if (f) f.click(); }
+      else { const f = $('stickerFileImage'); if (f) f.click(); }
     };
     grid.appendChild(addBtn);
     items.forEach(function (s) {
@@ -4371,8 +4485,8 @@ function renderStickersContent() {
     addBtn.className = 'sticker-add-btn';
     addBtn.textContent = '+';
     addBtn.onclick = function () {
-      $('gif-url-input').value = '';
-      $('gif-url-error').textContent = '';
+      const i = $('gif-url-input'); if (i) i.value = '';
+      const e = $('gif-url-error'); if (e) e.textContent = '';
       openModal('gif-url-modal');
     };
     grid.appendChild(addBtn);
@@ -4468,13 +4582,15 @@ function removeSticker(id) {
   });
 }
 function submitGifUrl() {
-  const url = $('gif-url-input').value.trim();
+  const inp = $('gif-url-input');
+  if (!inp) return;
+  const url = inp.value.trim();
   const errEl = $('gif-url-error');
-  errEl.textContent = '';
-  if (!url) { errEl.textContent = 'Введи ссылку'; return; }
-  if (!/^https?:\/\//i.test(url)) { errEl.textContent = 'Ссылка должна начинаться с http:// или https://'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!url) { if (errEl) errEl.textContent = 'Введи ссылку'; return; }
+  if (!/^https?:\/\//i.test(url)) { if (errEl) errEl.textContent = 'Ссылка должна начинаться с http:// или https://'; return; }
   socket.emit('add sticker', { data: url, type: /\.(mp4|webm)(\?|$)/i.test(url) ? 'video' : 'image' }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     state.stickersData.unshift({ id: res.id, url: res.url, type: res.type || 'image', emoji: null, time: now() });
     closeModal('gif-url-modal');
     if (state.stickerCurrentTab !== 'my') switchStickerTab('my');
@@ -4487,13 +4603,14 @@ function openCreateGroupModal() {
   if (!state.canCreateGroup) { alert('Ты уже создал группу. Максимум — одна.'); return; }
   if (state.contacts.length === 0) { alert('Сначала добавь контакты'); return; }
   state.createSelected.clear();
-  $('group-name').value = '';
-  $('create-error').textContent = '';
+  const g = $('group-name'); if (g) g.value = '';
+  const e = $('create-error'); if (e) e.textContent = '';
   renderCreateMembers();
   openModal('create-group-modal');
 }
 function renderCreateMembers() {
   const box = $('create-members');
+  if (!box) return;
   box.innerHTML = '';
   state.contacts.forEach(function (c) {
     if (c.isBot) return;
@@ -4515,13 +4632,15 @@ function renderCreateMembers() {
   });
 }
 function doCreateGroup() {
-  const name = $('group-name').value.trim();
+  const n = $('group-name');
+  if (!n) return;
+  const name = n.value.trim();
   const errEl = $('create-error');
-  errEl.textContent = '';
-  if (!name) { errEl.textContent = 'Введи название'; return; }
-  if (state.createSelected.size === 0) { errEl.textContent = 'Выбери хотя бы одного'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!name) { if (errEl) errEl.textContent = 'Введи название'; return; }
+  if (state.createSelected.size === 0) { if (errEl) errEl.textContent = 'Выбери хотя бы одного'; return; }
   socket.emit('create group', { name: name, members: Array.from(state.createSelected) }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('create-group-modal');
     showToast('✓ Группа создана');
   });
@@ -4529,38 +4648,47 @@ function doCreateGroup() {
 function openGroupInfo() {
   if (!state.currentGroup) return;
   const g = state.currentGroup;
-  $('group-info-title').textContent = g.name;
-  $('group-info-desc').textContent = g.description || '';
+  const title = $('group-info-title'); if (title) title.textContent = g.name;
+  const desc = $('group-info-desc'); if (desc) desc.textContent = g.description || '';
   const list = $('group-info-members');
-  list.innerHTML = '';
-  g.members.forEach(function (u) {
-    const c = state.contacts.find(function (c) { return c.name === u; });
-    const displayName = u === state.me.username ? 'Я (@' + state.me.username + ')' : ((c && c.displayName || u) + ' (@' + u + ')');
-    const av = c && c.avatar;
-    const badges = renderBadges(c || {});
-    const row = document.createElement('div');
-    row.className = 'member-row';
-    row.innerHTML = '<div class="member-avatar" style="' + (av ? 'background-image:url(' + av + ')' : 'background:var(--accent)') + '">' + (av ? '' : initials(c && c.displayName || u)) + '</div>' +
-      '<div class="member-name">' + escapeHtml(displayName) + ' ' + badges + '</div>';
-    list.appendChild(row);
-  });
+  if (list) {
+    list.innerHTML = '';
+    g.members.forEach(function (u) {
+      const c = state.contacts.find(function (c) { return c.name === u; });
+      const displayName = u === state.me.username ? 'Я (@' + state.me.username + ')' : ((c && c.displayName || u) + ' (@' + u + ')');
+      const av = c && c.avatar;
+      const badges = renderBadges(c || {});
+      const row = document.createElement('div');
+      row.className = 'member-row';
+      row.innerHTML = '<div class="member-avatar" style="' + (av ? 'background-image:url(' + av + ')' : 'background:var(--accent)') + '">' + (av ? '' : initials(c && c.displayName || u)) + '</div>' +
+        '<div class="member-name">' + escapeHtml(displayName) + ' ' + badges + '</div>';
+      list.appendChild(row);
+    });
+  }
   const delBtn = $('delete-group-btn');
   const editBtn = $('edit-group-btn');
-  if (g.creator === state.me.username) { delBtn.style.display = 'block'; editBtn.style.display = 'block'; }
-  else { delBtn.style.display = 'none'; editBtn.style.display = 'none'; }
+  if (g.creator === state.me.username) {
+    if (delBtn) delBtn.style.display = 'block';
+    if (editBtn) editBtn.style.display = 'block';
+  } else {
+    if (delBtn) delBtn.style.display = 'none';
+    if (editBtn) editBtn.style.display = 'none';
+  }
   openModal('group-info-modal');
 }
 function openEditGroup() {
   if (!state.currentGroup) return;
-  $('edit-group-name').value = state.currentGroup.name;
-  $('edit-group-desc').value = state.currentGroup.description || '';
+  const n = $('edit-group-name'); if (n) n.value = state.currentGroup.name;
+  const d = $('edit-group-desc'); if (d) d.value = state.currentGroup.description || '';
   closeModal('group-info-modal');
   openModal('edit-group-modal');
 }
 function doEditGroup() {
   if (!state.currentGroup) return;
-  const name = $('edit-group-name').value.trim();
-  const description = $('edit-group-desc').value.trim();
+  const n = $('edit-group-name');
+  const d = $('edit-group-desc');
+  const name = n ? n.value.trim() : '';
+  const description = d ? d.value.trim() : '';
   socket.emit('update group', { groupId: state.currentGroup.id, name: name, description: description }, function () {
     closeModal('edit-group-modal');
   });
@@ -4569,9 +4697,10 @@ function openAddMembers() {
   closeModal('group-info-modal');
   if (!state.currentGroup) return;
   state.addMembersSelected.clear();
-  $('add-members-error').textContent = '';
+  const errEl = $('add-members-error'); if (errEl) errEl.textContent = '';
   const available = state.contacts.filter(function (c) { return !c.isBot && state.currentGroup.members.indexOf(c.name) === -1; });
   const box = $('add-members-list');
+  if (!box) return;
   box.innerHTML = '';
   if (available.length === 0) {
     box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Все контакты уже в группе</div>';
@@ -4599,10 +4728,10 @@ function openAddMembers() {
 function doAddMembers() {
   if (!state.currentGroup) return;
   const errEl = $('add-members-error');
-  errEl.textContent = '';
-  if (state.addMembersSelected.size === 0) { errEl.textContent = 'Выбери хотя бы одного'; return; }
+  if (errEl) errEl.textContent = '';
+  if (state.addMembersSelected.size === 0) { if (errEl) errEl.textContent = 'Выбери хотя бы одного'; return; }
   socket.emit('add group members', { groupId: state.currentGroup.id, members: Array.from(state.addMembersSelected) }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('add-members-modal');
   });
 }
@@ -4627,22 +4756,26 @@ function confirmDeleteGroup() {
 /* ─── КАНАЛЫ ─── */
 function openCreateChannelModal() {
   if (!state.canCreateChannel) { alert('Ты уже создал канал. Максимум — один.'); return; }
-  $('channel-slug').value = '';
-  $('channel-name').value = '';
-  $('channel-desc').value = '';
-  $('create-channel-error').textContent = '';
+  const s = $('channel-slug'); if (s) s.value = '';
+  const n = $('channel-name'); if (n) n.value = '';
+  const d = $('channel-desc'); if (d) d.value = '';
+  const e = $('create-channel-error'); if (e) e.textContent = '';
   openModal('create-channel-modal');
 }
 function doCreateChannel() {
-  const slug = $('channel-slug').value.trim().toLowerCase().replace(/^@/, '');
-  const name = $('channel-name').value.trim();
-  const description = $('channel-desc').value.trim();
+  const s = $('channel-slug');
+  const n = $('channel-name');
+  const d = $('channel-desc');
+  if (!s || !n) return;
+  const slug = s.value.trim().toLowerCase().replace(/^@/, '');
+  const name = n.value.trim();
+  const description = d ? d.value.trim() : '';
   const errEl = $('create-channel-error');
-  errEl.textContent = '';
-  if (!slug) { errEl.textContent = 'Введи ID канала'; return; }
-  if (!name) { errEl.textContent = 'Введи название'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!slug) { if (errEl) errEl.textContent = 'Введи ID канала'; return; }
+  if (!name) { if (errEl) errEl.textContent = 'Введи название'; return; }
   socket.emit('create channel', { slug: slug, name: name, description: description }, function (res) {
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('create-channel-modal');
     showToast('📢 Канал создан!');
   });
@@ -4654,14 +4787,18 @@ function openChannelChat(ch) {
   state.isSavedChat = false;
   state.isBotChat = false;
   removeBotCommandsHint();
-  $('channel-top-name').innerHTML = escapeHtml(ch.name) + (ch.verified ? ' <span class="verified-badge big">✓</span>' : '');
-  $('channel-top-status').textContent = '@' + ch.slug + ' · ' + ch.memberCount + ' подписчиков';
+  const tn = $('channel-top-name');
+  if (tn) tn.innerHTML = escapeHtml(ch.name) + (ch.verified ? ' <span class="verified-badge big">✓</span>' : '');
+  const ts = $('channel-top-status'); if (ts) ts.textContent = '@' + ch.slug + ' · ' + ch.memberCount + ' подписчиков';
   const av = $('channel-avatar');
-  if (ch.avatar) { av.style.backgroundImage = 'url(' + ch.avatar + ')'; av.textContent = ''; }
-  else { av.style.backgroundImage = ''; av.textContent = '📢'; av.style.background = ''; }
-  $('channel-screen').style.display = 'flex';
+  if (av) {
+    if (ch.avatar) { av.style.backgroundImage = 'url(' + ch.avatar + ')'; av.textContent = ''; }
+    else { av.style.backgroundImage = ''; av.textContent = '📢'; av.style.background = ''; }
+  }
+  const cs = $('channel-screen'); if (cs) cs.style.display = 'flex';
   socket.emit('load channel posts', { channelId: ch.id }, function (res) {
     const box = $('channel-posts');
+    if (!box) return;
     box.innerHTML = '';
     if (!res || !res.ok) {
       box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Не удалось загрузить</div>';
@@ -4671,15 +4808,16 @@ function openChannelChat(ch) {
       box.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);font-size:15px;">Пока нет публикаций</div>';
     } else res.posts.forEach(function (p) { renderChannelPost(p); });
   });
-  if (ch.creator === state.me.username) $('channel-input-area').style.display = 'flex';
-  else $('channel-input-area').style.display = 'none';
+  const cia = $('channel-input-area');
+  if (cia) cia.style.display = ch.creator === state.me.username ? 'flex' : 'none';
 }
 function closeChannelChat() {
-  $('channel-screen').style.display = 'none';
+  const cs = $('channel-screen'); if (cs) cs.style.display = 'none';
   state.currentChannel = null;
 }
 function renderChannelPost(p) {
   const box = $('channel-posts');
+  if (!box) return;
   const wrap = document.createElement('div');
   wrap.style.cssText = 'margin-bottom:18px;padding:14px;background:var(--bg-panel);border-radius:14px;border:1px solid rgba(255,255,255,0.05);';
   let html = '';
@@ -4722,6 +4860,7 @@ function renderChannelPost(p) {
 function sendChannelPost() {
   if (!state.currentChannel) return;
   const input = $('channel-post-input');
+  if (!input) return;
   const text = input.value.trim();
   if (!text) return;
   socket.emit('create channel post', { channelId: state.currentChannel.id, text: text }, function (res) {
@@ -4732,14 +4871,14 @@ function sendChannelPost() {
 function openChannelInfo() {
   if (!state.currentChannel) return;
   const ch = state.currentChannel;
-  $('channel-info-title').textContent = ch.name + (ch.verified ? ' ✓' : '');
-  $('channel-info-desc').textContent = ch.description || '';
-  $('channel-info-stats').innerHTML = '@' + escapeHtml(ch.slug) + '<br>' + ch.memberCount + ' подписчиков';
+  const t = $('channel-info-title'); if (t) t.textContent = ch.name + (ch.verified ? ' ✓' : '');
+  const d = $('channel-info-desc'); if (d) d.textContent = ch.description || '';
+  const s = $('channel-info-stats'); if (s) s.innerHTML = '@' + escapeHtml(ch.slug) + '<br>' + ch.memberCount + ' подписчиков';
   const isOwner = ch.creator === state.me.username;
-  $('channel-invite-btn').style.display = isOwner ? 'block' : 'none';
-  $('channel-edit-btn').style.display = isOwner ? 'block' : 'none';
-  $('channel-delete-btn').style.display = isOwner ? 'block' : 'none';
-  $('channel-leave-btn').style.display = isOwner ? 'none' : 'block';
+  const ib = $('channel-invite-btn'); if (ib) ib.style.display = isOwner ? 'block' : 'none';
+  const eb = $('channel-edit-btn'); if (eb) eb.style.display = isOwner ? 'block' : 'none';
+  const db = $('channel-delete-btn'); if (db) db.style.display = isOwner ? 'block' : 'none';
+  const lb = $('channel-leave-btn'); if (lb) lb.style.display = isOwner ? 'none' : 'block';
   openModal('channel-info-modal');
 }
 function createChannelInvite() {
@@ -4747,7 +4886,7 @@ function createChannelInvite() {
   socket.emit('create channel invite', { channelId: state.currentChannel.id }, function (res) {
     if (!res || !res.ok) { alert((res && res.error) || 'Ошибка'); return; }
     state.currentInviteCode = res.code;
-    $('channel-invite-code').textContent = res.code;
+    const c = $('channel-invite-code'); if (c) c.textContent = res.code;
     closeModal('channel-info-modal');
     openModal('channel-invite-result-modal');
   });
@@ -4758,15 +4897,17 @@ function copyInviteCode() {
 }
 function openEditChannel() {
   if (!state.currentChannel) return;
-  $('edit-channel-name').value = state.currentChannel.name;
-  $('edit-channel-desc').value = state.currentChannel.description || '';
+  const n = $('edit-channel-name'); if (n) n.value = state.currentChannel.name;
+  const d = $('edit-channel-desc'); if (d) d.value = state.currentChannel.description || '';
   closeModal('channel-info-modal');
   openModal('edit-channel-modal');
 }
 function doEditChannel() {
   if (!state.currentChannel) return;
-  const name = $('edit-channel-name').value.trim();
-  const description = $('edit-channel-desc').value.trim();
+  const n = $('edit-channel-name');
+  const d = $('edit-channel-desc');
+  const name = n ? n.value.trim() : '';
+  const description = d ? d.value.trim() : '';
   socket.emit('update channel', { channelId: state.currentChannel.id, name: name, description: description }, function (res) {
     if (!res || !res.ok) { alert((res && res.error) || 'Ошибка'); return; }
     closeModal('edit-channel-modal');
@@ -4792,24 +4933,26 @@ function confirmLeaveChannel() {
   });
 }
 function openFindChannelModal() {
-  $('find-channel-input').value = '';
-  $('find-channel-error').textContent = '';
+  const i = $('find-channel-input'); if (i) i.value = '';
+  const e = $('find-channel-error'); if (e) e.textContent = '';
   openModal('find-channel-modal');
 }
 function doFindChannel() {
-  const q = $('find-channel-input').value.trim();
+  const inp = $('find-channel-input');
+  if (!inp) return;
+  const q = inp.value.trim();
   const errEl = $('find-channel-error');
-  errEl.textContent = '';
-  if (!q) { errEl.textContent = 'Введи ID или код'; return; }
+  if (errEl) errEl.textContent = '';
+  if (!q) { if (errEl) errEl.textContent = 'Введи ID или код'; return; }
   if (/^[A-Z0-9]{8,12}$/i.test(q)) {
     socket.emit('resolve channel invite', { code: q }, function (res) {
-      if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+      if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
       closeModal('find-channel-modal');
       showChannelFoundModal(res.channel);
     });
   } else {
     socket.emit('find channel by slug', { slug: q }, function (res) {
-      if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+      if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
       closeModal('find-channel-modal');
       showChannelFoundModal(res.channel);
     });
@@ -4826,13 +4969,14 @@ function showChannelFoundModal(ch) {
 }
 function openChannelComments(postId) {
   state.currentChannelPostId = postId;
-  $('channel-comment-input').value = '';
+  const i = $('channel-comment-input'); if (i) i.value = '';
   loadChannelComments(postId);
   openModal('channel-comments-modal');
 }
 function loadChannelComments(postId) {
   socket.emit('load channel comments', { postId: postId }, function (res) {
     const box = $('channel-comments-list');
+    if (!box) return;
     if (!res || !res.ok || !res.comments || res.comments.length === 0) {
       box.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Пока нет комментариев</div>';
       return;
@@ -4846,7 +4990,7 @@ function loadChannelComments(postId) {
       div.innerHTML = '<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:4px;">' + escapeHtml(displayNameForUser(c.from_user)) + ' ' + cBadges + '</div>' +
         '<div style="font-size:14px;word-wrap:break-word;">' + highlightMentions(c.text || '') + '</div>' +
         '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">' + new Date(c.time).toLocaleString('ru-RU') + '</div>';
-      box.appendChild(c div);
+      box.appendChild(div);
     });
     box.scrollTop = box.scrollHeight;
   });
@@ -4854,6 +4998,7 @@ function loadChannelComments(postId) {
 function submitChannelComment() {
   if (!state.currentChannelPostId) return;
   const input = $('channel-comment-input');
+  if (!input) return;
   const text = input.value.trim();
   if (!text) return;
   socket.emit('create channel comment', { postId: state.currentChannelPostId, text: text }, function (res) {
@@ -4865,10 +5010,12 @@ function submitChannelComment() {
 /* ─── ПОИСК / ГАЛЕРЕЯ / ОБОИ ─── */
 function openSearchInChat() {
   if (!state.currentChat && !state.currentGroup) return;
-  $('search-input').value = '';
-  $('search-results').innerHTML = '';
+  const i = $('search-input'); if (i) i.value = '';
+  const r = $('search-results'); if (r) r.innerHTML = '';
   openModal('search-modal');
-  setTimeout(function () { $('search-input').focus(); }, 100);
+  setTimeout(function () {
+    const el = $('search-input'); if (el) el.focus();
+  }, 100);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -4877,6 +5024,7 @@ document.addEventListener('DOMContentLoaded', function () {
     si.addEventListener('input', function (e) {
       const q = e.target.value.trim();
       const results = $('search-results');
+      if (!results) return;
       if (q.length < 2) { results.innerHTML = ''; return; }
       const params = state.currentGroup
         ? { query: q, groupId: state.currentGroup.id }
@@ -4906,8 +5054,8 @@ document.addEventListener('DOMContentLoaded', function () {
 function openGallery() {
   if (!state.currentChat && !state.currentGroup && !state.isSavedChat) return;
   state.galleryWaiting = true;
-  $('gallery-content').innerHTML = '';
-  $('gallery-empty').style.display = 'none';
+  const g = $('gallery-content'); if (g) g.innerHTML = '';
+  const ge = $('gallery-empty'); if (ge) ge.style.display = 'none';
   openModal('gallery-modal');
   if (state.isSavedChat) socket.emit('load saved history');
   else if (state.currentChat) socket.emit('load history', { withUser: state.currentChat });
@@ -4916,6 +5064,7 @@ function openGallery() {
 function fillGallery(messages) {
   const box = $('gallery-content');
   const emptyEl = $('gallery-empty');
+  if (!box || !emptyEl) return;
   box.innerHTML = '';
   const media = messages.filter(function (m) { return (m.image || m.video_circle) && !m.deleted && !m.sticker; });
   if (media.length === 0) { emptyEl.style.display = 'block'; return; }
@@ -4944,8 +5093,8 @@ function fillGallery(messages) {
   });
 }
 function openLightbox(src) {
-  $('lightbox-img').src = src;
-  $('lightbox').classList.add('active');
+  const img = $('lightbox-img'); if (img) img.src = src;
+  const lb = $('lightbox'); if (lb) lb.classList.add('active');
 }
 
 function currentChatKey() {
@@ -4961,10 +5110,10 @@ function openChatMenuV2() {
   const isArchived = obj && obj.archived;
   const isPinned = obj && obj.pinned;
   const title = state.currentGroup ? state.currentGroup.name : ((obj && obj.displayName) || state.currentChat);
-  $('chat-menu-title').textContent = title;
-  $('chat-menu-mute').textContent = isMuted ? '🔔 Включить уведомления' : '🔕 Отключить уведомления';
-  $('chat-menu-pin').textContent = isPinned ? '📌 Открепить чат' : '📌 Закрепить чат';
-  $('chat-menu-archive').textContent = isArchived ? '📤 Убрать из архива' : '📦 В архив';
+  const t = $('chat-menu-title'); if (t) t.textContent = title;
+  const m = $('chat-menu-mute'); if (m) m.textContent = isMuted ? '🔔 Включить уведомления' : '🔕 Отключить уведомления';
+  const p = $('chat-menu-pin'); if (p) p.textContent = isPinned ? '📌 Открепить чат' : '📌 Закрепить чат';
+  const a = $('chat-menu-archive'); if (a) a.textContent = isArchived ? '📤 Убрать из архива' : '📦 В архив';
   openModal('chat-menu-modal');
 }
 function chatMenuToggleMute() {
@@ -5059,36 +5208,43 @@ function openWallpaperPicker() {
   document.body.appendChild(modal);
   if (currentWp) {
     const preview = modal.querySelector('#wallpaper-preview');
-    preview.style.backgroundImage = 'url(' + currentWp + ')';
-    preview.textContent = '';
+    if (preview) {
+      preview.style.backgroundImage = 'url(' + currentWp + ')';
+      preview.textContent = '';
+    }
   }
-  modal.querySelector('#wallpaper-file').addEventListener('change', function (e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function (ev) {
-      const img = new Image();
-      img.onload = function () {
-        const canvas = document.createElement('canvas');
-        const maxW = 1080;
-        let w = img.width, h = img.height;
-        if (w > maxW) { h = h * maxW / w; w = maxW; }
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        const preview = modal.querySelector('#wallpaper-preview');
-        preview.style.backgroundImage = 'url(' + dataUrl + ')';
-        preview.textContent = '';
-        setChatWallpaper(chatKey, dataUrl);
-        showToast('🎨 Обои установлены');
-        vibrate(15);
-        setTimeout(function () { modal.remove(); }, 500);
+  const wf = modal.querySelector('#wallpaper-file');
+  if (wf) {
+    wf.addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        const img = new Image();
+        img.onload = function () {
+          const canvas = document.createElement('canvas');
+          const maxW = 1080;
+          let w = img.width, h = img.height;
+          if (w > maxW) { h = h * maxW / w; w = maxW; }
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          const preview = modal.querySelector('#wallpaper-preview');
+          if (preview) {
+            preview.style.backgroundImage = 'url(' + dataUrl + ')';
+            preview.textContent = '';
+          }
+          setChatWallpaper(chatKey, dataUrl);
+          showToast('🎨 Обои установлены');
+          vibrate(15);
+          setTimeout(function () { modal.remove(); }, 500);
+        };
+        img.src = ev.target.result;
       };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
+      reader.readAsDataURL(file);
+    });
+  }
   modal.addEventListener('click', function (e) {
     if (e.target === modal) modal.remove();
   });
@@ -5152,12 +5308,12 @@ function renderStoriesBar() {
   });
 }
 function openStoryAddModal() {
-  $('story-file').value = '';
-  $('story-preview-wrap').style.display = 'none';
-  $('story-caption-input').value = '';
-  $('story-add-error').textContent = '';
-  $('story-submit-btn').disabled = true;
-  $('story-submit-btn').textContent = '📤 Опубликовать';
+  const f = $('story-file'); if (f) f.value = '';
+  const pw = $('story-preview-wrap'); if (pw) pw.style.display = 'none';
+  const ci = $('story-caption-input'); if (ci) ci.value = '';
+  const e = $('story-add-error'); if (e) e.textContent = '';
+  const sb = $('story-submit-btn');
+  if (sb) { sb.disabled = true; sb.textContent = '📤 Опубликовать'; }
   window._storyImageData = null;
   openModal('story-add-modal');
 }
@@ -5178,9 +5334,9 @@ function onStoryFileSelected(event) {
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
       window._storyImageData = dataUrl;
-      $('story-preview-img').src = dataUrl;
-      $('story-preview-wrap').style.display = 'block';
-      $('story-submit-btn').disabled = false;
+      const pi = $('story-preview-img'); if (pi) pi.src = dataUrl;
+      const pw = $('story-preview-wrap'); if (pw) pw.style.display = 'block';
+      const sb = $('story-submit-btn'); if (sb) sb.disabled = false;
     };
     img.src = e.target.result;
   };
@@ -5188,15 +5344,15 @@ function onStoryFileSelected(event) {
 }
 function submitStory() {
   if (!window._storyImageData) return;
-  const caption = $('story-caption-input').value.trim();
+  const ci = $('story-caption-input');
+  const caption = ci ? ci.value.trim() : '';
   const errEl = $('story-add-error');
-  errEl.textContent = '';
-  $('story-submit-btn').disabled = true;
-  $('story-submit-btn').textContent = 'Публикую…';
+  if (errEl) errEl.textContent = '';
+  const sb = $('story-submit-btn');
+  if (sb) { sb.disabled = true; sb.textContent = 'Публикую…'; }
   socket.emit('post story', { image: window._storyImageData, caption: caption }, function (res) {
-    $('story-submit-btn').textContent = '📤 Опубликовать';
-    $('story-submit-btn').disabled = false;
-    if (!res || !res.ok) { errEl.textContent = (res && res.error) || 'Ошибка'; return; }
+    if (sb) { sb.textContent = '📤 Опубликовать'; sb.disabled = false; }
+    if (!res || !res.ok) { if (errEl) errEl.textContent = (res && res.error) || 'Ошибка'; return; }
     closeModal('story-add-modal');
     window._storyImageData = null;
     loadStories();
@@ -5206,7 +5362,7 @@ function openStoryViewer(userIdx, storyIdx) {
   if (!state.storiesUsers[userIdx] || !state.storiesUsers[userIdx].stories[storyIdx]) return;
   state.currentStoryUserIdx = userIdx;
   state.currentStoryIdx = storyIdx;
-  $('story-viewer').classList.add('active');
+  const sv = $('story-viewer'); if (sv) sv.classList.add('active');
   renderCurrentStory();
   startStoryTimer();
 }
@@ -5216,45 +5372,53 @@ function renderCurrentStory() {
   const s = u.stories[state.currentStoryIdx];
   if (!s) return closeStoryViewer();
   const bar = $('story-progress-bar');
-  bar.innerHTML = '';
-  u.stories.forEach(function (_, i) {
-    const seg = document.createElement('div');
-    seg.className = 'story-progress-segment' + (i < state.currentStoryIdx ? ' done' : '');
-    const fill = document.createElement('div');
-    fill.className = 'fill';
-    if (i < state.currentStoryIdx) fill.style.width = '100%';
-    seg.appendChild(fill);
-    bar.appendChild(seg);
-  });
-  const av = $('story-avatar');
-  if (u.avatar) { av.style.backgroundImage = 'url(' + u.avatar + ')'; av.textContent = ''; }
-  else {
-    av.style.backgroundImage = '';
-    av.textContent = initials(u.firstName || u.username);
-    av.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
+  if (bar) {
+    bar.innerHTML = '';
+    u.stories.forEach(function (_, i) {
+      const seg = document.createElement('div');
+      seg.className = 'story-progress-segment' + (i < state.currentStoryIdx ? ' done' : '');
+      const fill = document.createElement('div');
+      fill.className = 'fill';
+      if (i < state.currentStoryIdx) fill.style.width = '100%';
+      seg.appendChild(fill);
+      bar.appendChild(seg);
+    });
   }
-  av.classList.toggle('premium', !!u.premium);
+  const av = $('story-avatar');
+  if (av) {
+    if (u.avatar) { av.style.backgroundImage = 'url(' + u.avatar + ')'; av.textContent = ''; }
+    else {
+      av.style.backgroundImage = '';
+      av.textContent = initials(u.firstName || u.username);
+      av.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
+    }
+    av.classList.toggle('premium', !!u.premium);
+  }
   const displayName = (u.firstName || u.lastName)
     ? ((u.firstName || '') + ' ' + (u.lastName || '')).trim()
     : u.username;
-  $('story-name').textContent = displayName;
-  $('story-time').textContent = timeAgo(s.time);
-  $('story-image').src = s.image;
+  const sn = $('story-name'); if (sn) sn.textContent = displayName;
+  const st = $('story-time'); if (st) st.textContent = timeAgo(s.time);
+  const si = $('story-image'); if (si) si.src = s.image;
   const cap = $('story-caption');
-  if (s.caption) { cap.textContent = s.caption; cap.classList.add('show'); }
-  else cap.classList.remove('show');
+  if (cap) {
+    if (s.caption) { cap.textContent = s.caption; cap.classList.add('show'); }
+    else cap.classList.remove('show');
+  }
   const isMine = u.username === state.me.username;
   const delBtn = $('story-delete-btn');
   const viewsBtn = $('story-views-btn');
   if (isMine) {
-    delBtn.style.display = 'flex';
-    viewsBtn.style.display = 'flex';
-    socket.emit('get story views', { storyId: s.id }, function (res) {
-      if (res && res.ok) viewsBtn.textContent = '👁 ' + res.viewers.length;
-    });
+    if (delBtn) delBtn.style.display = 'flex';
+    if (viewsBtn) {
+      viewsBtn.style.display = 'flex';
+      socket.emit('get story views', { storyId: s.id }, function (res) {
+        if (res && res.ok) viewsBtn.textContent = '👁 ' + res.viewers.length;
+      });
+    }
   } else {
-    delBtn.style.display = 'none';
-    viewsBtn.style.display = 'none';
+    if (delBtn) delBtn.style.display = 'none';
+    if (viewsBtn) viewsBtn.style.display = 'none';
     if (!s.viewed) { s.viewed = true; socket.emit('view story', { storyId: s.id }); }
   }
 }
@@ -5316,7 +5480,7 @@ function prevStory() {
 }
 function closeStoryViewer() {
   stopStoryTimer();
-  $('story-viewer').classList.remove('active');
+  const sv = $('story-viewer'); if (sv) sv.classList.remove('active');
   renderStoriesBar();
 }
 function deleteCurrentStory() {
@@ -5343,6 +5507,7 @@ function openStoryViewers() {
   if (!s) return;
   socket.emit('get story views', { storyId: s.id }, function (res) {
     const box = $('story-viewers-list');
+    if (!box) return;
     if (!res || !res.ok || !res.viewers || res.viewers.length === 0) {
       box.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Пока никто не смотрел</div>';
     } else {
@@ -5448,10 +5613,10 @@ async function startCall(video) {
     if (e.candidate) socket.emit('ice-candidate', { to: state.currentChat, candidate: e.candidate });
   };
   state.peerConnection.ontrack = function (e) {
-    $('remoteVideo').srcObject = e.streams[0];
-    $('remote-video-wrap').classList.remove('audio-only');
-    $('call-avatar-big').style.display = 'none';
-    $('call-status').textContent = 'В разговоре';
+    const rv = $('remoteVideo'); if (rv) rv.srcObject = e.streams[0];
+    const rw = $('remote-video-wrap'); if (rw) rw.classList.remove('audio-only');
+    const ab = $('call-avatar-big'); if (ab) ab.style.display = 'none';
+    const st = $('call-status'); if (st) st.textContent = 'В разговоре';
     if (!state.callTimerInterval) startCallTimer();
   };
   const offer = await state.peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: video });
@@ -5461,30 +5626,32 @@ async function startCall(video) {
 function showCallScreen(peerName, contact, video, statusText) {
   const badges = renderBadgesBig(contact || {});
   const displayName = (contact && contact.displayName) || peerName;
-  $('call-peer-name').innerHTML = escapeHtml(displayName) + ' ' + badges;
-  $('call-status').textContent = statusText;
-  $('call-screen').classList.add('active');
+  const pn = $('call-peer-name'); if (pn) pn.innerHTML = escapeHtml(displayName) + ' ' + badges;
+  const st = $('call-status'); if (st) st.textContent = statusText;
+  const cs = $('call-screen'); if (cs) cs.classList.add('active');
   const lw = $('local-video-wrap');
   if (video && state.localStream) {
-    lw.classList.add('active');
-    $('localVideo').srcObject = state.localStream;
-  } else lw.classList.remove('active');
+    if (lw) lw.classList.add('active');
+    const lv = $('localVideo'); if (lv) lv.srcObject = state.localStream;
+  } else if (lw) lw.classList.remove('active');
   const ba = $('call-avatar-big');
   const rw = $('remote-video-wrap');
   if (video) {
-    rw.classList.remove('audio-only');
-    ba.style.display = 'none';
+    if (rw) rw.classList.remove('audio-only');
+    if (ba) ba.style.display = 'none';
   } else {
-    rw.classList.add('audio-only');
-    ba.style.display = 'flex';
-    ba.classList.toggle('premium', !!(contact && contact.premium));
-    if (contact && contact.avatar) {
-      ba.style.backgroundImage = 'url(' + contact.avatar + ')';
-      ba.textContent = '';
-    } else {
-      ba.style.backgroundImage = '';
-      ba.textContent = initials(displayName);
-      ba.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
+    if (rw) rw.classList.add('audio-only');
+    if (ba) {
+      ba.style.display = 'flex';
+      ba.classList.toggle('premium', !!(contact && contact.premium));
+      if (contact && contact.avatar) {
+        ba.style.backgroundImage = 'url(' + contact.avatar + ')';
+        ba.textContent = '';
+      } else {
+        ba.style.backgroundImage = '';
+        ba.textContent = initials(displayName);
+        ba.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
+      }
     }
   }
   updateCallButtons();
@@ -5496,30 +5663,32 @@ socket.on('incoming-call', function (data) {
   const contact = state.contacts.find(function (c) { return c.name === data.from; });
   const displayName = (contact && contact.displayName) || data.from;
   const badges = renderBadgesBig(contact || {});
-  $('incoming-name').innerHTML = escapeHtml(displayName) + ' ' + badges;
-  $('incoming-type').textContent = data.video ? 'Видеозвонок' : 'Аудиозвонок';
+  const iname = $('incoming-name'); if (iname) iname.innerHTML = escapeHtml(displayName) + ' ' + badges;
+  const itype = $('incoming-type'); if (itype) itype.textContent = data.video ? 'Видеозвонок' : 'Аудиозвонок';
   const av = $('incoming-avatar');
-  av.classList.toggle('premium', !!(contact && contact.premium));
-  if (contact && contact.avatar) {
-    av.style.backgroundImage = 'url(' + contact.avatar + ')';
-    av.textContent = '';
-  } else {
-    av.style.backgroundImage = '';
-    av.textContent = initials(displayName);
-    av.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
+  if (av) {
+    av.classList.toggle('premium', !!(contact && contact.premium));
+    if (contact && contact.avatar) {
+      av.style.backgroundImage = 'url(' + contact.avatar + ')';
+      av.textContent = '';
+    } else {
+      av.style.backgroundImage = '';
+      av.textContent = initials(displayName);
+      av.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
+    }
   }
-  $('incoming-screen').classList.add('active');
+  const is = $('incoming-screen'); if (is) is.classList.add('active');
   playPing();
   vibrate();
 });
 function declineIncoming() {
-  $('incoming-screen').classList.remove('active');
+  const is = $('incoming-screen'); if (is) is.classList.remove('active');
   if (state.incomingFrom) socket.emit('end-call', { to: state.incomingFrom });
   state.pendingOffer = null;
   state.incomingFrom = null;
 }
 async function acceptIncoming() {
-  $('incoming-screen').classList.remove('active');
+  const is = $('incoming-screen'); if (is) is.classList.remove('active');
   if (!state.pendingOffer || !state.incomingFrom) return;
   const from = state.incomingFrom;
   const video = state.incomingVideo;
@@ -5545,10 +5714,10 @@ async function acceptIncoming() {
     if (e.candidate) socket.emit('ice-candidate', { to: from, candidate: e.candidate });
   };
   state.peerConnection.ontrack = function (e) {
-    $('remoteVideo').srcObject = e.streams[0];
-    $('remote-video-wrap').classList.remove('audio-only');
-    $('call-avatar-big').style.display = 'none';
-    $('call-status').textContent = 'В разговоре';
+    const rv = $('remoteVideo'); if (rv) rv.srcObject = e.streams[0];
+    const rw = $('remote-video-wrap'); if (rw) rw.classList.remove('audio-only');
+    const ab = $('call-avatar-big'); if (ab) ab.style.display = 'none';
+    const st = $('call-status'); if (st) st.textContent = 'В разговоре';
     if (!state.callTimerInterval) startCallTimer();
   };
   await state.peerConnection.setRemoteDescription(offer);
@@ -5559,7 +5728,7 @@ async function acceptIncoming() {
 socket.on('call-answered', async function (data) {
   if (state.peerConnection) {
     await state.peerConnection.setRemoteDescription(data.answer);
-    $('call-status').textContent = 'В разговоре';
+    const st = $('call-status'); if (st) st.textContent = 'В разговоре';
     if (!state.callTimerInterval) startCallTimer();
   }
 });
@@ -5579,11 +5748,11 @@ function cleanupCall() {
   if (state.isScreenSharing) stopScreenShare();
   if (state.peerConnection) { state.peerConnection.close(); state.peerConnection = null; }
   if (state.localStream) { state.localStream.getTracks().forEach(function (t) { t.stop(); }); state.localStream = null; }
-  $('call-screen').classList.remove('active');
-  $('incoming-screen').classList.remove('active');
-  $('localVideo').srcObject = null;
-  $('remoteVideo').srcObject = null;
-  $('local-video-wrap').classList.remove('active');
+  const cs = $('call-screen'); if (cs) cs.classList.remove('active');
+  const is = $('incoming-screen'); if (is) is.classList.remove('active');
+  const lv = $('localVideo'); if (lv) lv.srcObject = null;
+  const rv = $('remoteVideo'); if (rv) rv.srcObject = null;
+  const lw = $('local-video-wrap'); if (lw) lw.classList.remove('active');
 }
 function toggleMic() {
   if (!state.localStream) return;
@@ -5635,6 +5804,7 @@ socket.on('history', function (data) {
   if (state.galleryWaiting) { fillGallery(data.messages); state.galleryWaiting = false; return; }
   if (data.withUser !== state.currentChat) return;
   const box = $('messages');
+  if (!box) return;
   box.innerHTML = '';
   state.lastDateShown = '';
   data.messages.forEach(function (m) {
@@ -5658,6 +5828,7 @@ socket.on('saved history', function (data) {
   if (state.galleryWaiting) { fillGallery(data.messages); state.galleryWaiting = false; return; }
   if (!state.isSavedChat) return;
   const box = $('messages');
+  if (!box) return;
   box.innerHTML = '';
   state.lastDateShown = '';
   data.messages.forEach(function (m) {
@@ -5680,6 +5851,7 @@ socket.on('group history', function (data) {
   if (state.galleryWaiting) { fillGallery(data.messages); state.galleryWaiting = false; return; }
   if (!state.currentGroup || state.currentGroup.id !== data.groupId) return;
   const box = $('messages');
+  if (!box) return;
   box.innerHTML = '';
   state.lastDateShown = '';
   data.messages.forEach(function (m) {
@@ -5787,8 +5959,10 @@ socket.on('message deleted', function (data) {
   const wrap = document.querySelector('.msg-wrap[data-id="' + data.messageId + '"]');
   if (!wrap) return;
   const msgEl = wrap.querySelector('.msg');
-  msgEl.classList.add('deleted');
-  msgEl.innerHTML = '<i>Сообщение удалено</i>';
+  if (msgEl) {
+    msgEl.classList.add('deleted');
+    msgEl.innerHTML = '<i>Сообщение удалено</i>';
+  }
 });
 socket.on('message blocked', function (data) { alert(data.reason); });
 
@@ -5873,6 +6047,7 @@ socket.on('typing', function (data) {
 socket.on('group typing', function (data) {
   if (!state.currentGroup || state.currentGroup.id !== data.groupId) return;
   const el = $('chat-top-status');
+  if (!el) return;
   if (data.isTyping) {
     el.textContent = displayNameForUser(data.from) + ' печатает…';
     el.classList.add('typing');
@@ -5905,6 +6080,7 @@ socket.on('channel post new', function (p) {
     socket.emit('load channel posts', { channelId: state.currentChannel.id }, function (res) {
       if (!res || !res.ok) return;
       const box = $('channel-posts');
+      if (!box) return;
       box.innerHTML = '';
       res.posts.forEach(function (x) { renderChannelPost(x); });
     });
@@ -5915,6 +6091,7 @@ socket.on('channel post deleted', function () {
   socket.emit('load channel posts', { channelId: state.currentChannel.id }, function (res) {
     if (!res || !res.ok) return;
     const box = $('channel-posts');
+    if (!box) return;
     box.innerHTML = '';
     res.posts.forEach(function (p) { renderChannelPost(p); });
   });
@@ -5924,12 +6101,14 @@ socket.on('channel post reaction', function () {
   socket.emit('load channel posts', { channelId: state.currentChannel.id }, function (res) {
     if (!res || !res.ok) return;
     const box = $('channel-posts');
+    if (!box) return;
     box.innerHTML = '';
     res.posts.forEach(function (p) { renderChannelPost(p); });
   });
 });
 socket.on('channel comment new', function (data) {
-  if ($('channel-comments-modal').classList.contains('active') && state.currentChannelPostId === data.postId) {
+  const ccm = $('channel-comments-modal');
+  if (ccm && ccm.classList.contains('active') && state.currentChannelPostId === data.postId) {
     loadChannelComments(data.postId);
   }
 });
@@ -5941,7 +6120,8 @@ socket.on('story deleted', function (data) {
   });
   state.storiesUsers = state.storiesUsers.filter(function (u) { return u.stories.length > 0; });
   renderStoriesBar();
-  if ($('story-viewer').classList.contains('active')) {
+  const sv = $('story-viewer');
+  if (sv && sv.classList.contains('active')) {
     if (!state.storiesUsers[state.currentStoryUserIdx]) return closeStoryViewer();
     renderCurrentStory();
     startStoryTimer();
@@ -5953,14 +6133,16 @@ socket.on('settings', function (s) {
   if (state.settings.stars !== undefined) state.me.stars = Number(state.settings.stars);
   saveJson(STORAGE.SETTINGS, state.settings);
   applyLocalSettings();
-  if ($('settings-screen').classList.contains('active')) renderSettings();
+  const ss = $('settings-screen');
+  if (ss && ss.classList.contains('active')) renderSettings();
   if (state.activeTab === 'settings') renderSettingsTab();
 });
 socket.on('stars updated', function (data) {
   state.me.stars = Number((data && data.stars) || 0);
   const b = $('gifts-catalog-balance');
   if (b) b.textContent = state.me.stars;
-  if ($('settings-screen').classList.contains('active')) renderSettings();
+  const ss = $('settings-screen');
+  if (ss && ss.classList.contains('active')) renderSettings();
   if (state.activeTab === 'settings') renderSettingsTab();
 });
 socket.on('me updated', function (data) {
@@ -6061,7 +6243,8 @@ socket.on('gift received', function (payload) {
   }
 });
 socket.on('my gifts updated', function () {
-  if ($('my-gifts-modal').classList.contains('active')) openMyGifts();
+  const mgm = $('my-gifts-modal');
+  if (mgm && mgm.classList.contains('active')) openMyGifts();
 });
 
 socket.on('session terminated', function () {
@@ -6076,42 +6259,48 @@ socket.on('account deleted', function () {
 
 /* ─── ИНИЦИАЛИЗАЦИЯ ─── */
 window.addEventListener('load', function () {
-  loadUnread();
-  initNotifications();
-  showChatListSkeleton();
+  try {
+    loadUnread();
+    initNotifications();
+    showChatListSkeleton();
 
-  const cc = loadJson(STORAGE.CONTACTS_CACHE);
-  if (cc) state.contacts = cc;
-  const gc = loadJson(STORAGE.GROUPS_CACHE);
-  if (gc) state.groups = gc;
-  const sc = loadJson(STORAGE.SETTINGS);
-  if (sc) {
-    state.settings = sc;
-    applyLocalSettings();
-  }
-  state.stickerRecent = loadJson(STORAGE.RECENT_STICKERS, []) || [];
-  state.chatWallpapers = loadJson(STORAGE.WALLPAPERS, {}) || {};
+    const cc = loadJson(STORAGE.CONTACTS_CACHE);
+    if (cc) state.contacts = cc;
+    const gc = loadJson(STORAGE.GROUPS_CACHE);
+    if (gc) state.groups = gc;
+    const sc = loadJson(STORAGE.SETTINGS);
+    if (sc) {
+      state.settings = sc;
+      applyLocalSettings();
+    }
+    state.stickerRecent = loadJson(STORAGE.RECENT_STICKERS, []) || [];
+    state.chatWallpapers = loadJson(STORAGE.WALLPAPERS, {}) || {};
 
-  bindRipples();
+    bindRipples();
 
-  const params = new URLSearchParams(window.location.search);
-  const addUser = params.get('add');
-  if (addUser) {
-    setTimeout(function () {
-      if (confirm('Добавить @' + addUser + ' в контакты?')) {
-        socket.emit('add contact', { username: addUser.toLowerCase(), displayName: addUser }, function (res) {
-          if (res && res.ok) showToast('✓ Контакт добавлен');
-          else alert((res && res.error) || 'Ошибка');
-        });
-      }
-      window.history.replaceState({}, '', window.location.pathname);
-    }, 1500);
-  }
+    const params = new URLSearchParams(window.location.search);
+    const addUser = params.get('add');
+    if (addUser) {
+      setTimeout(function () {
+        if (confirm('Добавить @' + addUser + ' в контакты?')) {
+          socket.emit('add contact', { username: addUser.toLowerCase(), displayName: addUser }, function (res) {
+            if (res && res.ok) showToast('✓ Контакт добавлен');
+            else alert((res && res.error) || 'Ошибка');
+          });
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+      }, 1500);
+    }
 
-  const creds = loadJson(STORAGE.SESSION);
-  if (!creds || !creds.sessionId) {
+    const creds = loadJson(STORAGE.SESSION);
+    if (!creds || !creds.sessionId) {
+      hideSplash();
+      const auth = $('auth'); if (auth) auth.classList.add('active');
+    }
+  } catch (e) {
+    console.error('Init error:', e);
     hideSplash();
-    $('auth').classList.add('active');
+    const auth = $('auth'); if (auth) auth.classList.add('active');
   }
 });
 
