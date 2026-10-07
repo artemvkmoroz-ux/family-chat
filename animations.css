@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.4 — animations.css
+   🌌 AZERTA v13.6 — animations.css
    Плавность + Premium + ТГ-настройки + баннеры
+   + Геолокация + Жалобы + Модерация + Бан
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── БАЗОВЫЕ SPRING-КРИВЫЕ ─── */
@@ -833,7 +834,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   23. 🎨 ТГ-НАСТРОЙКИ
+   23. ТГ-НАСТРОЙКИ
    ═══════════════════════════════════════════════════════════ */
 
 .settings-profile-card-tg {
@@ -872,7 +873,6 @@ body.light .skeleton {
   .settings-profile-card-tg:hover .tg-banner {
     transform: scale(1.03);
   }
-  /* ⭐ Premium hover — золотая тень */
   .settings-profile-card-tg.premium:hover {
     box-shadow: 0 12px 32px rgba(251, 191, 36, 0.4);
   }
@@ -896,7 +896,6 @@ body.light .skeleton {
   }
 }
 
-/* ⭐ Premium — пульсация золотой рамки аватара в настройках */
 .settings-profile-card-tg.premium .tg-profile-avatar {
   animation: tgAvatarIn 0.7s var(--spring-bouncy) 0.1s backwards,
              premiumAvatarPulse 3s ease-in-out 0.8s infinite;
@@ -906,42 +905,24 @@ body.light .skeleton {
   animation: tgNameIn 0.5s var(--spring-smooth) 0.25s backwards;
 }
 @keyframes tgNameIn {
-  0% {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  0% { opacity: 0; transform: translateX(-12px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 
 .settings-profile-card-tg .tg-profile-username {
   animation: tgUsernameIn 0.5s var(--spring-smooth) 0.35s backwards;
 }
 @keyframes tgUsernameIn {
-  0% {
-    opacity: 0;
-    transform: translateX(-8px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  0% { opacity: 0; transform: translateX(-8px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 
 .settings-profile-card-tg .tg-profile-status {
   animation: tgStatusIn 0.5s var(--spring-smooth) 0.45s backwards;
 }
 @keyframes tgStatusIn {
-  0% {
-    opacity: 0;
-    transform: translateX(-6px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  0% { opacity: 0; transform: translateX(-6px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 .settings-profile-card-tg .tg-profile-status .dot {
   animation: tgDotPulse 2.4s ease-in-out infinite;
@@ -995,14 +976,8 @@ body.light .skeleton {
   animation: starsRowIn 0.5s var(--spring-smooth) 0.15s backwards;
 }
 @keyframes starsRowIn {
-  0% {
-    opacity: 0;
-    transform: translateX(-14px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  0% { opacity: 0; transform: translateX(-14px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 .settings-stars-row .stars-icon {
   animation: starsIconTwinkle 3s ease-in-out infinite;
@@ -1023,14 +998,8 @@ body.light .skeleton {
   animation: tgSectionIn 0.5s var(--spring-smooth) backwards;
 }
 @keyframes tgSectionIn {
-  0% {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  0% { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 .settings-tg-section:nth-of-type(1) { animation-delay: 0.20s; }
@@ -1061,14 +1030,8 @@ body.light .skeleton {
   will-change: transform, opacity;
 }
 @keyframes tgRowIn {
-  0% {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  0% { opacity: 0; transform: translateX(-10px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 
 .settings-tg-group .settings-tg-row:nth-child(1) { animation-delay: 0.32s; }
@@ -1129,12 +1092,12 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   24. ⭐ PREMIUM — АНИМАЦИИ БЕЙДЖЕЙ
+   24. PREMIUM — АНИМАЦИИ БЕЙДЖЕЙ
    ═══════════════════════════════════════════════════════════ */
 
-/* Мерцание звезды Premium */
 .premium-badge {
-  animation: premiumTwinkle 2.6s ease-in-out infinite;
+  animation: premiumBadgeIn 0.5s var(--spring-bouncy),
+             premiumTwinkle 2.6s ease-in-out 0.5s infinite;
 }
 @keyframes premiumTwinkle {
   0%, 100% {
@@ -1147,9 +1110,15 @@ body.light .skeleton {
     transform: scale(1.08);
   }
 }
+@keyframes premiumBadgeIn {
+  0% { opacity: 0; transform: scale(0.4) rotate(-45deg); }
+  60% { opacity: 1; transform: scale(1.2) rotate(10deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
 
 .premium-badge.big {
-  animation: premiumTwinkleBig 2.6s ease-in-out infinite;
+  animation: premiumBadgeIn 0.5s var(--spring-bouncy),
+             premiumTwinkleBig 2.6s ease-in-out 0.5s infinite;
 }
 @keyframes premiumTwinkleBig {
   0%, 100% {
@@ -1163,18 +1132,6 @@ body.light .skeleton {
   }
 }
 
-/* Плавное появление премиум-бейджа */
-.premium-badge {
-  animation: premiumBadgeIn 0.5s var(--spring-bouncy),
-             premiumTwinkle 2.6s ease-in-out 0.5s infinite;
-}
-@keyframes premiumBadgeIn {
-  0% { opacity: 0; transform: scale(0.4) rotate(-45deg); }
-  60% { opacity: 1; transform: scale(1.2) rotate(10deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
-}
-
-/* Галочка — плавное появление */
 .verified-badge {
   animation: verifiedBadgeIn 0.45s var(--spring-bouncy);
 }
@@ -1184,7 +1141,6 @@ body.light .skeleton {
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* SCAM — плашка появляется с shake */
 .scam-badge {
   animation: scamBadgeIn 0.55s var(--spring-bouncy);
 }
@@ -1196,7 +1152,6 @@ body.light .skeleton {
   100% { opacity: 1; transform: scale(1) translateX(0); }
 }
 
-/* ⭐ Premium — мерцание имени (золотой текст) */
 .profile-name.premium {
   background-size: 200% 100%;
   animation: premiumNameShimmer 3s ease-in-out infinite;
@@ -1206,7 +1161,6 @@ body.light .skeleton {
   100% { background-position: -200% 50%; }
 }
 
-/* ⭐ Premium — пульсация карточки профиля в настройках */
 .settings-profile-card-tg.premium {
   animation: profileCardIn 0.55s var(--spring-bouncy),
              premiumCardGlow 4s ease-in-out 1s infinite;
@@ -1220,7 +1174,6 @@ body.light .skeleton {
   }
 }
 
-/* ⭐ Premium — свечение аватара в разных местах */
 .profile-avatar-big.premium,
 .avatar.premium {
   animation: premiumAvatarGlow 3s ease-in-out infinite;
@@ -1234,25 +1187,21 @@ body.light .skeleton {
   }
 }
 
-/* ⭐ Premium — в карточке контакта (сверху баннера) */
 .contact-profile-with-banner .profile-avatar-big.premium {
   animation: avatarOverBanner 0.7s var(--spring-bouncy) 0.15s backwards,
              premiumAvatarGlow 3s ease-in-out 1s infinite;
 }
 
-/* ⭐ Premium — звонок */
 #call-avatar-big.premium {
   animation: callAvatarPulse 2s ease-in-out infinite,
              premiumAvatarGlow 3s ease-in-out infinite;
 }
 
-/* ⭐ Premium — входящий */
 #incoming-screen .avatar-big.premium {
   animation: incomingPulse 1.5s ease-in-out infinite,
              premiumAvatarGlow 3s ease-in-out infinite;
 }
 
-/* ⭐ Premium — иконка в badge-picker (модалка выдачи) */
 .badge-icon-premium {
   animation: badgeIconPremium 2.4s ease-in-out infinite;
 }
@@ -1267,7 +1216,6 @@ body.light .skeleton {
   }
 }
 
-/* ⭐ Premium — опция в badge-picker активная */
 .badge-option[data-badge="premium"].active {
   background: rgba(251, 191, 36, 0.15);
   border-color: var(--gold);
@@ -1281,7 +1229,6 @@ body.light .skeleton {
   color: var(--gold);
 }
 
-/* ⭐ Premium — пульсация золотой полосы сообщения */
 .msg-wrap.from-premium .msg.other {
   animation: msgStagger 0.45s var(--spring-smooth) backwards,
              premiumMsgBorder 3s ease-in-out infinite;
@@ -1291,7 +1238,6 @@ body.light .skeleton {
   50% { border-left-color: rgba(251, 191, 36, 1); }
 }
 
-/* ⭐ Premium — свечение рамки в story */
 .story-ring.premium {
   background: linear-gradient(135deg, var(--gold), #fde68a, var(--gold));
   background-size: 300% 300%;
@@ -1304,7 +1250,6 @@ body.light .skeleton {
   100% { background-position: 0% 50%; }
 }
 
-/* ⭐ Premium — лёгкое покачивание ⭐ */
 .premium-badge,
 .premium-badge.big {
   will-change: transform, box-shadow;
@@ -1560,12 +1505,11 @@ body.light .skeleton {
   transform: translateZ(0);
   backface-visibility: hidden;
 }
+
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.6 — Новые анимации
-   Геолокация + Жалобы + Модерация + Бан
+   40. ГЕОЛОКАЦИЯ
    ═══════════════════════════════════════════════════════════ */
 
-/* ─── 📍 ГЕОЛОКАЦИЯ ─── */
 .geo-block {
   animation: geoBlockIn 0.45s var(--spring-smooth) backwards;
   will-change: transform, opacity;
@@ -1590,7 +1534,6 @@ body.light .skeleton {
   transition: transform var(--dur-ultra-fast) var(--spring-soft);
 }
 
-/* Пульсация метки на карте */
 .geo-block .geo-img::after {
   animation: geoPulse 2s ease-in-out infinite;
 }
@@ -1605,7 +1548,6 @@ body.light .skeleton {
   }
 }
 
-/* Кнопка 📍 */
 #input-area #geoBtn {
   transition: transform var(--dur-quick) var(--spring-soft),
               color var(--dur-instant);
@@ -1614,7 +1556,10 @@ body.light .skeleton {
   transform: scale(0.85) rotate(-8deg);
 }
 
-/* ─── 🚨 ЖАЛОБЫ ─── */
+/* ═══════════════════════════════════════════════════════════
+   41. ЖАЛОБЫ
+   ═══════════════════════════════════════════════════════════ */
+
 .report-reason-btn {
   animation: reportReasonIn 0.4s var(--spring-smooth) backwards;
 }
@@ -1656,7 +1601,10 @@ body.light .skeleton {
   box-shadow: 0 4px 16px rgba(251, 191, 36, 0.3);
 }
 
-/* ─── 🛡️ MOD PANEL ─── */
+/* ═══════════════════════════════════════════════════════════
+   42. ПАНЕЛЬ МОДЕРАТОРА
+   ═══════════════════════════════════════════════════════════ */
+
 #mod-panel-modal .modal-box {
   animation: modPanelIn 0.5s var(--spring-bouncy);
 }
@@ -1675,7 +1623,6 @@ body.light .skeleton {
   }
 }
 
-/* Статистика */
 .mod-stat {
   animation: modStatIn 0.4s var(--spring-bouncy) backwards;
 }
@@ -1706,7 +1653,6 @@ body.light .skeleton {
   50% { opacity: 0.85; }
 }
 
-/* Табы */
 .mod-tabs {
   animation: modTabsIn 0.4s var(--spring-smooth) 0.2s backwards;
 }
@@ -1738,7 +1684,6 @@ body.light .skeleton {
   100% { transform: scale(1); }
 }
 
-/* Фильтры */
 .mod-filter {
   animation: modFilterIn 0.4s var(--spring-smooth) 0.25s backwards;
 }
@@ -1757,7 +1702,6 @@ body.light .skeleton {
   transform: scale(0.94);
 }
 
-/* Список жалоб */
 .mod-report-card {
   animation: modCardIn 0.45s var(--spring-smooth) backwards;
   will-change: transform, opacity;
@@ -1784,7 +1728,6 @@ body.light .skeleton {
   }
 }
 
-/* Пульсация статуса «новое» */
 .mrc-status.new {
   animation: mrcStatusPulse 1.8s ease-in-out infinite;
   display: inline-block;
@@ -1800,7 +1743,6 @@ body.light .skeleton {
   }
 }
 
-/* Кнопки действий в жалобе */
 .mrc-btn {
   transition: transform var(--dur-fast) var(--spring-soft),
               background var(--dur-instant),
@@ -1816,7 +1758,10 @@ body.light .skeleton {
   box-shadow: 0 4px 14px rgba(251, 191, 36, 0.4);
 }
 
-/* ─── ⚖️ НАКАЗАНИЯ ─── */
+/* ═══════════════════════════════════════════════════════════
+   43. НАКАЗАНИЯ
+   ═══════════════════════════════════════════════════════════ */
+
 .mod-punish-card {
   animation: modPunishIn 0.45s var(--spring-smooth) backwards;
   will-change: transform, opacity;
@@ -1848,7 +1793,6 @@ body.light .skeleton {
   }
 }
 
-/* Кнопки выбора срока */
 .punish-duration-btn {
   transition: background var(--dur-quick) var(--spring-soft),
               border-color var(--dur-quick),
@@ -1879,7 +1823,6 @@ body.light .skeleton {
   }
 }
 
-/* Опции в модалке бана */
 #mod-ban-durations {
   animation: banDurationsIn 0.4s var(--spring-smooth) 0.15s backwards;
 }
@@ -1895,7 +1838,10 @@ body.light .skeleton {
   }
 }
 
-/* ─── 📜 ЛОГИ ─── */
+/* ═══════════════════════════════════════════════════════════
+   44. ЛОГИ
+   ═══════════════════════════════════════════════════════════ */
+
 .mod-log-row {
   animation: modLogIn 0.4s var(--spring-smooth) backwards;
 }
@@ -1920,7 +1866,10 @@ body.light .skeleton {
   transition: color var(--dur-base);
 }
 
-/* ─── 🚫 BAN SCREEN ─── */
+/* ═══════════════════════════════════════════════════════════
+   45. БАН-ЭКРАН
+   ═══════════════════════════════════════════════════════════ */
+
 #ban-screen {
   animation: banScreenIn 0.6s var(--ease-out);
 }
@@ -1957,6 +1906,10 @@ body.light .skeleton {
   animation: banPulse 2s ease-in-out infinite,
              banEmojiShake 6s ease-in-out infinite;
 }
+@keyframes banPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.85; }
+}
 @keyframes banEmojiShake {
   0%, 90%, 100% { transform: rotate(0deg); }
   92% { transform: rotate(-8deg); }
@@ -1991,7 +1944,10 @@ body.light .skeleton {
   transform: scale(0.96);
 }
 
-/* ─── 🔇 MUTE BANNER ─── */
+/* ═══════════════════════════════════════════════════════════
+   46. МУТ
+   ═══════════════════════════════════════════════════════════ */
+
 #mute-banner {
   animation: muteBannerIn 0.4s var(--spring-smooth);
 }
@@ -2030,7 +1986,6 @@ body.light .skeleton {
   }
 }
 
-/* ─── PUNISHMENT MODAL ─── */
 #punishment-modal .modal-box {
   animation: punishModalIn 0.5s var(--spring-bouncy);
   border: 1px solid rgba(248, 113, 113, 0.3);
@@ -2060,7 +2015,10 @@ body.light .skeleton {
   95% { transform: rotate(10deg); }
 }
 
-/* ─── 🚨 НОВАЯ ЖАЛОБА (уведомление модератору) ─── */
+/* ═══════════════════════════════════════════════════════════
+   47. НОВАЯ ЖАЛОБА (уведомление модератору)
+   ═══════════════════════════════════════════════════════════ */
+
 @keyframes newReportPulse {
   0%, 100% {
     box-shadow: 0 0 0 0 rgba(139, 127, 255, 0.5);
@@ -2076,7 +2034,6 @@ body.light .skeleton {
   animation: newReportPulse 2s ease-in-out infinite;
 }
 
-/* ─── ⭐ ПОДСВЕТКА ПАНЕЛИ МОДЕРАТОРА ─── */
 #mod-panel-modal .mod-stats {
   background: linear-gradient(135deg,
     rgba(139, 127, 255, 0.04) 0%,
@@ -2087,7 +2044,10 @@ body.light .skeleton {
   margin-bottom: 12px;
 }
 
-/* ─── REDUCED MOTION ─── */
+/* ═══════════════════════════════════════════════════════════
+   48. REDUCED MOTION (для новых блоков)
+   ═══════════════════════════════════════════════════════════ */
+
 @media (prefers-reduced-motion: reduce) {
   .geo-block,
   .geo-block .geo-img::after,
@@ -2114,7 +2074,10 @@ body.light .skeleton {
   }
 }
 
-/* ─── GPU-УСКОРЕНИЕ ─── */
+/* ═══════════════════════════════════════════════════════════
+   49. GPU-УСКОРЕНИЕ (для новых блоков)
+   ═══════════════════════════════════════════════════════════ */
+
 .mod-report-card,
 .mod-punish-card,
 .geo-block,
