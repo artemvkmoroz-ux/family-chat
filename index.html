@@ -221,22 +221,32 @@
   <h3 id="badge-modal-title">🏅 Выдать значок</h3>
   <div class="modal-desc">Введи ник того, кому хочешь дать значок</div>
   <input id="badge-username" type="text" placeholder="Ник" autocapitalize="none" />
+
   <div class="modal-desc" style="margin-top:10px;">Выбери значок</div>
   <div class="badge-picker" id="badge-picker">
     <button class="badge-option active" data-badge="verified" onclick="selectBadgeType('verified')">
-      <span class="badge-icon-verified">✓</span><span class="badge-label">Галочка</span>
+      <span class="badge-icon-verified">✓</span>
+      <span class="badge-label">Галочка</span>
     </button>
     <button class="badge-option" data-badge="hammer" onclick="selectBadgeType('hammer')">
-      <span class="badge-icon-hammer">🔨</span><span class="badge-label">Молоток</span>
+      <span class="badge-icon-hammer">🔨</span>
+      <span class="badge-label">Молоток</span>
     </button>
     <button class="badge-option" data-badge="scam" onclick="selectBadgeType('scam')">
-      <span class="badge-icon-scam">💀</span><span class="badge-label">Скам</span>
+      <span class="badge-icon-scam">SCAM</span>
+      <span class="badge-label">Скам</span>
+    </button>
+    <button class="badge-option" data-badge="premium" onclick="selectBadgeType('premium')">
+      <span class="badge-icon-premium">⭐</span>
+      <span class="badge-label">Премиум</span>
     </button>
   </div>
+
   <div class="badge-actions">
     <button class="modal-primary" onclick="giveBadgeAction()">Выдать</button>
     <button class="modal-danger" onclick="removeBadgeAction()">Снять</button>
   </div>
+
   <div class="modal-error" id="badge-error"></div>
   <button class="modal-secondary" onclick="closeModal('badge-modal')">Отмена</button>
 </div></div>
@@ -467,7 +477,7 @@
 <!-- ═══ GIFTS ═══ -->
 <div class="modal" id="gift-modal"><div class="modal-box">
   <h3>🎁 Премиум по коду</h3>
-  <div class="modal-desc">Введи подарочный код (+25 ⭐)</div>
+  <div class="modal-desc">Введи подарочный код (+25 ⭐ + Premium)</div>
   <input id="gift-code-input" placeholder="AZERTA-XXXX-XXXX" autocapitalize="characters" />
   <div class="modal-error" id="gift-error"></div>
   <button class="modal-primary" onclick="redeemGiftCode()">✅ Активировать</button>
