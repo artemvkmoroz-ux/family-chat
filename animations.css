@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.3 — animations.css
-   Плавность + ТГ-настройки + баннеры профиля
+   🌌 AZERTA v13.4 — animations.css
+   Плавность + Premium + ТГ-настройки + баннеры
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── БАЗОВЫЕ SPRING-КРИВЫЕ ─── */
@@ -143,6 +143,11 @@ body.light .skeleton {
   100% { transform: scale(1) translateY(0); opacity: 1; }
 }
 
+/* ⭐ Premium — золотое свечение сообщений */
+.msg-wrap.from-premium .msg.other {
+  box-shadow: -3px 0 12px rgba(251, 191, 36, 0.15);
+}
+
 /* ═══════════════════════════════════════════════════════════
    4. CHAT-LIST STAGGER
    ═══════════════════════════════════════════════════════════ */
@@ -161,6 +166,19 @@ body.light .skeleton {
 .chat-item:nth-child(5) { animation-delay: 120ms; }
 .chat-item:nth-child(6) { animation-delay: 150ms; }
 .chat-item:nth-child(n+7) { animation-delay: 180ms; }
+
+/* ⭐ Premium — пульсация рамки в чате */
+.chat-item.premium-user .avatar {
+  animation: premiumAvatarPulse 3s ease-in-out infinite;
+}
+@keyframes premiumAvatarPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px var(--gold), 0 0 12px rgba(251, 191, 36, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 2px var(--gold), 0 0 20px rgba(251, 191, 36, 0.7);
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════
    5. RIPPLE-КНОПКИ
@@ -488,6 +506,21 @@ body.light .skeleton {
   50% { box-shadow: 0 0 0 6px rgba(139, 127, 255, 0); }
 }
 
+/* ⭐ Premium — золотое пульсирующее кольцо story */
+.story-ring.premium {
+  animation: premiumStoryRing 3s ease-in-out infinite;
+}
+@keyframes premiumStoryRing {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.5),
+                0 0 15px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(251, 191, 36, 0),
+                0 0 25px rgba(251, 191, 36, 0.6);
+  }
+}
+
 #story-viewer.active {
   animation: storyViewerIn 0.4s var(--spring-smooth);
 }
@@ -501,6 +534,19 @@ body.light .skeleton {
 }
 #story-image-wrap:active #story-image {
   transform: scale(1.02);
+}
+
+/* ⭐ Premium — свечение аватара в story */
+#story-header .story-avatar.premium {
+  animation: storyPremiumAvatar 3s ease-in-out infinite;
+}
+@keyframes storyPremiumAvatar {
+  0%, 100% {
+    box-shadow: 0 0 0 2px var(--gold), 0 0 10px rgba(251, 191, 36, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(251, 191, 36, 0.9);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -776,11 +822,20 @@ body.light .skeleton {
   100% { left: 100%; opacity: 0; }
 }
 
+/* ⭐ Premium — золотой shimmer по баннеру */
+.contact-banner.premium::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(251, 191, 36, 0.3) 50%,
+    transparent 100%
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════
-   23. 🎨 ТГ-НАСТРОЙКИ — АНИМАЦИИ
+   23. 🎨 ТГ-НАСТРОЙКИ
    ═══════════════════════════════════════════════════════════ */
 
-/* ─── Карточка профиля ─── */
 .settings-profile-card-tg {
   animation: profileCardIn 0.55s var(--spring-bouncy);
   will-change: transform, opacity;
@@ -801,7 +856,6 @@ body.light .skeleton {
   }
 }
 
-/* Плавное появление карточки профиля при возврате в настройки */
 .settings-profile-card-tg.returning {
   animation: profileCardReturn 0.5s var(--spring-smooth);
 }
@@ -810,7 +864,6 @@ body.light .skeleton {
   100% { opacity: 1; transform: translateY(0); }
 }
 
-/* Лёгкий подъём при hover (десктоп) */
 @media (hover: hover) {
   .settings-profile-card-tg:hover {
     transform: translateY(-2px);
@@ -819,9 +872,12 @@ body.light .skeleton {
   .settings-profile-card-tg:hover .tg-banner {
     transform: scale(1.03);
   }
+  /* ⭐ Premium hover — золотая тень */
+  .settings-profile-card-tg.premium:hover {
+    box-shadow: 0 12px 32px rgba(251, 191, 36, 0.4);
+  }
 }
 
-/* Баннер и аватар — плавный вход */
 .settings-profile-card-tg .tg-profile-avatar {
   animation: tgAvatarIn 0.7s var(--spring-bouncy) 0.1s backwards;
 }
@@ -840,7 +896,12 @@ body.light .skeleton {
   }
 }
 
-/* Имя — выезжает справа */
+/* ⭐ Premium — пульсация золотой рамки аватара в настройках */
+.settings-profile-card-tg.premium .tg-profile-avatar {
+  animation: tgAvatarIn 0.7s var(--spring-bouncy) 0.1s backwards,
+             premiumAvatarPulse 3s ease-in-out 0.8s infinite;
+}
+
 .settings-profile-card-tg .tg-profile-name {
   animation: tgNameIn 0.5s var(--spring-smooth) 0.25s backwards;
 }
@@ -855,7 +916,6 @@ body.light .skeleton {
   }
 }
 
-/* Юзернейм — ещё позже */
 .settings-profile-card-tg .tg-profile-username {
   animation: tgUsernameIn 0.5s var(--spring-smooth) 0.35s backwards;
 }
@@ -870,7 +930,6 @@ body.light .skeleton {
   }
 }
 
-/* Статус — ещё позже, с pulse для точки */
 .settings-profile-card-tg .tg-profile-status {
   animation: tgStatusIn 0.5s var(--spring-smooth) 0.45s backwards;
 }
@@ -900,7 +959,6 @@ body.light .skeleton {
   }
 }
 
-/* Плейсхолдер «+ Сменить баннер» — мягкая пульсация */
 .settings-profile-card-tg .tg-no-banner-hint {
   animation: noBannerHintIn 0.6s var(--spring-bouncy) 0.5s backwards;
 }
@@ -919,7 +977,6 @@ body.light .skeleton {
   }
 }
 
-/* Плейсхолдер — «дышащий» градиент */
 .settings-profile-card-tg.no-banner .tg-banner {
   animation: noBannerBreathe 3.2s ease-in-out infinite;
 }
@@ -934,7 +991,6 @@ body.light .skeleton {
   }
 }
 
-/* ─── Звёзды-строка ─── */
 .settings-stars-row {
   animation: starsRowIn 0.5s var(--spring-smooth) 0.15s backwards;
 }
@@ -963,7 +1019,6 @@ body.light .skeleton {
   }
 }
 
-/* ─── Секции и строки ─── */
 .settings-tg-section {
   animation: tgSectionIn 0.5s var(--spring-smooth) backwards;
 }
@@ -978,7 +1033,6 @@ body.light .skeleton {
   }
 }
 
-/* Stagger для секций */
 .settings-tg-section:nth-of-type(1) { animation-delay: 0.20s; }
 .settings-tg-section:nth-of-type(2) { animation-delay: 0.26s; }
 .settings-tg-section:nth-of-type(3) { animation-delay: 0.32s; }
@@ -987,7 +1041,6 @@ body.light .skeleton {
 .settings-tg-section:nth-of-type(6) { animation-delay: 0.50s; }
 .settings-tg-section:nth-of-type(n+7) { animation-delay: 0.56s; }
 
-/* Группа строк — фон мягко появляется */
 .settings-tg-group {
   animation: tgGroupIn 0.45s var(--spring-smooth) backwards;
 }
@@ -1003,7 +1056,6 @@ body.light .skeleton {
   }
 }
 
-/* ─── Строки ─── */
 .settings-tg-row {
   animation: tgRowIn 0.4s var(--spring-smooth) backwards;
   will-change: transform, opacity;
@@ -1019,7 +1071,6 @@ body.light .skeleton {
   }
 }
 
-/* Stagger строк внутри группы */
 .settings-tg-group .settings-tg-row:nth-child(1) { animation-delay: 0.32s; }
 .settings-tg-group .settings-tg-row:nth-child(2) { animation-delay: 0.36s; }
 .settings-tg-group .settings-tg-row:nth-child(3) { animation-delay: 0.40s; }
@@ -1028,13 +1079,11 @@ body.light .skeleton {
 .settings-tg-group .settings-tg-row:nth-child(6) { animation-delay: 0.52s; }
 .settings-tg-group .settings-tg-row:nth-child(n+7) { animation-delay: 0.56s; }
 
-/* Иконка строки — лёгкий scale при tap */
 .settings-tg-row:active .tg-row-icon {
   transform: scale(1.15);
   transition: transform var(--dur-ultra-fast) var(--spring-soft);
 }
 
-/* Стрелка — плавный сдвиг */
 .settings-tg-row .tg-row-arrow {
   transition: transform var(--dur-quick) var(--spring-soft),
               color var(--dur-quick);
@@ -1044,12 +1093,10 @@ body.light .skeleton {
   color: var(--accent);
 }
 
-/* Ripple по всей строке */
 .settings-tg-row.ripple-container .ripple {
   background: rgba(139, 127, 255, 0.15);
 }
 
-/* Danger-строка — мягкое свечение при hover */
 @media (hover: hover) {
   .settings-tg-row.danger:hover {
     background: rgba(248, 113, 113, 0.08);
@@ -1059,13 +1106,12 @@ body.light .skeleton {
   }
 }
 
-/* ─── Свитч в строке — bounce при переключении ─── */
 .settings-tg-row .tg-row-switch input:checked + .slider {
   animation: switchOn 0.45s var(--spring-bouncy);
 }
 @keyframes switchOn {
-  0% { transform:0 scale (1);3 }
-  40% {px transform rgba: scale(1(.08); }
+  0% { transform: scale(1); }
+  40% { transform: scale(1.08); }
   100% { transform: scale(1); }
 }
 
@@ -1073,7 +1119,6 @@ body.light .skeleton {
   transition: transform 0.35s var(--spring-bouncy);
 }
 
-/* ─── Цвет-дот в строке ─── */
 .settings-tg-row .tg-row-color-dot {
   transition: transform var(--dur-quick) var(--spring-bouncy),
               box-shadow var(--dur-quick);
@@ -1084,7 +1129,189 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   24. СКРОЛЛ
+   24. ⭐ PREMIUM — АНИМАЦИИ БЕЙДЖЕЙ
+   ═══════════════════════════════════════════════════════════ */
+
+/* Мерцание звезды Premium */
+.premium-badge {
+  animation: premiumTwinkle 2.6s ease-in-out infinite;
+}
+@keyframes premiumTwinkle {
+  0%, 100% {
+    box-shadow: 0 1px 6px rgba(251, 191, 36, 0.6);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 1px 12px rgba(251, 191, 36, 1),
+                0 0 20px rgba(251, 191, 36, 0.6);
+    transform: scale(1.08);
+  }
+}
+
+.premium-badge.big {
+  animation: premiumTwinkleBig 2.6s ease-in-out infinite;
+}
+@keyframes premiumTwinkleBig {
+  0%, 100% {
+    box-shadow: 0 1px 8px rgba(251, 191, 36, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 1px 16px rgba(251, 191, 36, 1),
+                0 0 28px rgba(251, 191, 36, 0.7);
+    transform: scale(1.1);
+  }
+}
+
+/* Плавное появление премиум-бейджа */
+.premium-badge {
+  animation: premiumBadgeIn 0.5s var(--spring-bouncy),
+             premiumTwinkle 2.6s ease-in-out 0.5s infinite;
+}
+@keyframes premiumBadgeIn {
+  0% { opacity: 0; transform: scale(0.4) rotate(-45deg); }
+  60% { opacity: 1; transform: scale(1.2) rotate(10deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+/* Галочка — плавное появление */
+.verified-badge {
+  animation: verifiedBadgeIn 0.45s var(--spring-bouncy);
+}
+@keyframes verifiedBadgeIn {
+  0% { opacity: 0; transform: scale(0.5); }
+  60% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* SCAM — плашка появляется с shake */
+.scam-badge {
+  animation: scamBadgeIn 0.55s var(--spring-bouncy);
+}
+@keyframes scamBadgeIn {
+  0% { opacity: 0; transform: scale(0.5) translateX(-4px); }
+  40% { opacity: 1; transform: scale(1.15) translateX(2px); }
+  60% { transform: scale(1) translateX(-2px); }
+  80% { transform: scale(1) translateX(1px); }
+  100% { opacity: 1; transform: scale(1) translateX(0); }
+}
+
+/* ⭐ Premium — мерцание имени (золотой текст) */
+.profile-name.premium {
+  background-size: 200% 100%;
+  animation: premiumNameShimmer 3s ease-in-out infinite;
+}
+@keyframes premiumNameShimmer {
+  0% { background-position: 200% 50%; }
+  100% { background-position: -200% 50%; }
+}
+
+/* ⭐ Premium — пульсация карточки профиля в настройках */
+.settings-profile-card-tg.premium {
+  animation: profileCardIn 0.55s var(--spring-bouncy),
+             premiumCardGlow 4s ease-in-out 1s infinite;
+}
+@keyframes premiumCardGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px 4px rgba(251, 191, 36, 0.4);
+  }
+}
+
+/* ⭐ Premium — свечение аватара в разных местах */
+.profile-avatar-big.premium,
+.avatar.premium {
+  animation: premiumAvatarGlow 3s ease-in-out infinite;
+}
+@keyframes premiumAvatarGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 2px var(--gold), 0 0 12px rgba(251, 191, 36, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 2px var(--gold), 0 0 24px rgba(251, 191, 36, 0.8);
+  }
+}
+
+/* ⭐ Premium — в карточке контакта (сверху баннера) */
+.contact-profile-with-banner .profile-avatar-big.premium {
+  animation: avatarOverBanner 0.7s var(--spring-bouncy) 0.15s backwards,
+             premiumAvatarGlow 3s ease-in-out 1s infinite;
+}
+
+/* ⭐ Premium — звонок */
+#call-avatar-big.premium {
+  animation: callAvatarPulse 2s ease-in-out infinite,
+             premiumAvatarGlow 3s ease-in-out infinite;
+}
+
+/* ⭐ Premium — входящий */
+#incoming-screen .avatar-big.premium {
+  animation: incomingPulse 1.5s ease-in-out infinite,
+             premiumAvatarGlow 3s ease-in-out infinite;
+}
+
+/* ⭐ Premium — иконка в badge-picker (модалка выдачи) */
+.badge-icon-premium {
+  animation: badgeIconPremium 2.4s ease-in-out infinite;
+}
+@keyframes badgeIconPremium {
+  0%, 100% {
+    box-shadow: 0 1px 6px rgba(251, 191, 36, 0.5);
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    box-shadow: 0 1px 14px rgba(251, 191, 36, 1);
+    transform: rotate(12deg) scale(1.08);
+  }
+}
+
+/* ⭐ Premium — опция в badge-picker активная */
+.badge-option[data-badge="premium"].active {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: var(--gold);
+  animation: premiumOptionActive 2.4s ease-in-out infinite;
+}
+@keyframes premiumOptionActive {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
+  50% { box-shadow: 0 0 16px 3px rgba(251, 191, 36, 0.5); }
+}
+.badge-option[data-badge="premium"].active .badge-label {
+  color: var(--gold);
+}
+
+/* ⭐ Premium — пульсация золотой полосы сообщения */
+.msg-wrap.from-premium .msg.other {
+  animation: msgStagger 0.45s var(--spring-smooth) backwards,
+             premiumMsgBorder 3s ease-in-out infinite;
+}
+@keyframes premiumMsgBorder {
+  0%, 100% { border-left-color: rgba(251, 191, 36, 0.6); }
+  50% { border-left-color: rgba(251, 191, 36, 1); }
+}
+
+/* ⭐ Premium — свечение рамки в story */
+.story-ring.premium {
+  background: linear-gradient(135deg, var(--gold), #fde68a, var(--gold));
+  background-size: 300% 300%;
+  animation: goldGradient 4s ease-in-out infinite,
+             premiumStoryRing 3s ease-in-out infinite;
+}
+@keyframes goldGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ⭐ Premium — лёгкое покачивание ⭐ */
+.premium-badge,
+.premium-badge.big {
+  will-change: transform, box-shadow;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   25. СКРОЛЛ
    ═══════════════════════════════════════════════════════════ */
 
 #chat-list,
@@ -1100,16 +1327,16 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   25. INPUT FOCUS
+   26. INPUT FOCUS
    ═══════════════════════════════════════════════════════════ */
 
 #msgInput:focus {
   transform: scale(1.005);
-  box-shadow: 0 0 139, 127, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(139, 127, 255, 0.1);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   26. SWITCH
+   27. SWITCH
    ═══════════════════════════════════════════════════════════ */
 
 .switch .slider {
@@ -1124,7 +1351,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   27. AVATARS
+   28. AVATARS
    ═══════════════════════════════════════════════════════════ */
 
 .avatar {
@@ -1135,22 +1362,24 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   28. BADGES
+   29. BADGES
    ═══════════════════════════════════════════════════════════ */
 
 .verified-badge,
 .hammer-badge,
-.scam-badge {
+.scam-badge,
+.premium-badge {
   transition: transform var(--dur-quick) var(--spring-bouncy);
 }
 .chat-item:hover .verified-badge,
 .chat-item:hover .hammer-badge,
-.chat-item:hover .scam-badge {
+.chat-item:hover .scam-badge,
+.chat-item:hover .premium-badge {
   transform: scale(1.15);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   29. CHANNEL POSTS
+   30. CHANNEL POSTS
    ═══════════════════════════════════════════════════════════ */
 
 #channel-posts > div {
@@ -1166,7 +1395,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   30. CIRCLE
+   31. CIRCLE
    ═══════════════════════════════════════════════════════════ */
 
 #circle-preview.active {
@@ -1185,7 +1414,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   31. CALLS
+   32. CALLS
    ═══════════════════════════════════════════════════════════ */
 
 #call-screen.active {
@@ -1205,7 +1434,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   32. MENTIONS
+   33. MENTIONS
    ═══════════════════════════════════════════════════════════ */
 
 .mention {
@@ -1218,7 +1447,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   33. BREATHE
+   34. BREATHE
    ═══════════════════════════════════════════════════════════ */
 
 @keyframes breathe {
@@ -1228,7 +1457,7 @@ body.light .skeleton {
 .breathing { animation: breathe 2.4s ease-in-out infinite; }
 
 /* ═══════════════════════════════════════════════════════════
-   34. TYPING PULSE
+   35. TYPING PULSE
    ═══════════════════════════════════════════════════════════ */
 
 #chat-top-status.typing {
@@ -1240,7 +1469,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   35. AUTH
+   36. AUTH
    ═══════════════════════════════════════════════════════════ */
 
 .auth-card {
@@ -1259,7 +1488,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   36. FOCUS RING
+   37. FOCUS RING
    ═══════════════════════════════════════════════════════════ */
 
 .auth-input:focus,
@@ -1277,7 +1506,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   37. REDUCED MOTION
+   38. REDUCED MOTION
    ═══════════════════════════════════════════════════════════ */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1289,10 +1518,25 @@ body.light .skeleton {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+  .premium-badge,
+  .premium-badge.big,
+  .profile-name.premium,
+  .settings-profile-card-tg.premium,
+  .settings-profile-card-tg.premium .tg-profile-avatar,
+  .avatar.premium,
+  .profile-avatar-big.premium,
+  .story-ring.premium,
+  #story-header .story-avatar.premium,
+  #call-avatar-big.premium,
+  #incoming-screen .avatar-big.premium,
+  .badge-icon-premium,
+  .msg-wrap.from-premium .msg.other {
+    animation: none !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   38. GPU-УСКОРЕНИЕ
+   39. GPU-УСКОРЕНИЕ
    ═══════════════════════════════════════════════════════════ */
 
 .modal-box,
@@ -1308,7 +1552,10 @@ body.light .skeleton {
 .contact-banner,
 .settings-profile-card-tg,
 .settings-tg-row,
-.settings-tg-section {
+.settings-tg-section,
+.premium-badge,
+.verified-badge,
+.scam-badge {
   will-change: transform, opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
