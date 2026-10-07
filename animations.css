@@ -1560,3 +1560,566 @@ body.light .skeleton {
   transform: translateZ(0);
   backface-visibility: hidden;
 }
+/* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA v13.6 — Новые анимации
+   Геолокация + Жалобы + Модерация + Бан
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── 📍 ГЕОЛОКАЦИЯ ─── */
+.geo-block {
+  animation: geoBlockIn 0.45s var(--spring-smooth) backwards;
+  will-change: transform, opacity;
+}
+@keyframes geoBlockIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(8px);
+    filter: blur(3px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.geo-block:active {
+  transition: transform var(--dur-ultra-fast) var(--spring-soft);
+}
+
+/* Пульсация метки на карте */
+.geo-block .geo-img::after {
+  animation: geoPulse 2s ease-in-out infinite;
+}
+@keyframes geoPulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.15);
+    filter: drop-shadow(0 4px 14px rgba(139, 127, 255, 0.8));
+  }
+}
+
+/* Кнопка 📍 */
+#input-area #geoBtn {
+  transition: transform var(--dur-quick) var(--spring-soft),
+              color var(--dur-instant);
+}
+#input-area #geoBtn:active {
+  transform: scale(0.85) rotate(-8deg);
+}
+
+/* ─── 🚨 ЖАЛОБЫ ─── */
+.report-reason-btn {
+  animation: reportReasonIn 0.4s var(--spring-smooth) backwards;
+}
+.report-reason-btn:nth-child(1) { animation-delay: 0ms; }
+.report-reason-btn:nth-child(2) { animation-delay: 50ms; }
+.report-reason-btn:nth-child(3) { animation-delay: 100ms; }
+.report-reason-btn:nth-child(4) { animation-delay: 150ms; }
+.report-reason-btn:nth-child(5) { animation-delay: 200ms; }
+.report-reason-btn:nth-child(6) { animation-delay: 250ms; }
+@keyframes reportReasonIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.report-reason-btn.active {
+  animation: reportReasonPop 0.35s var(--spring-bouncy);
+}
+@keyframes reportReasonPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+.modal-warning {
+  transition: transform var(--dur-fast) var(--spring-soft),
+              background var(--dur-instant),
+              box-shadow var(--dur-base);
+}
+.modal-warning:active {
+  transform: scale(0.96);
+}
+.modal-warning:hover {
+  box-shadow: 0 4px 16px rgba(251, 191, 36, 0.3);
+}
+
+/* ─── 🛡️ MOD PANEL ─── */
+#mod-panel-modal .modal-box {
+  animation: modPanelIn 0.5s var(--spring-bouncy);
+}
+@keyframes modPanelIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(24px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.01) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Статистика */
+.mod-stat {
+  animation: modStatIn 0.4s var(--spring-bouncy) backwards;
+}
+.mod-stat:nth-child(1) { animation-delay: 0ms; }
+.mod-stat:nth-child(2) { animation-delay: 60ms; }
+.mod-stat:nth-child(3) { animation-delay: 120ms; }
+.mod-stat:nth-child(4) { animation-delay: 180ms; }
+@keyframes modStatIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.mod-stat-value {
+  animation: modStatValuePulse 3s ease-in-out infinite;
+}
+@keyframes modStatValuePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+/* Табы */
+.mod-tabs {
+  animation: modTabsIn 0.4s var(--spring-smooth) 0.2s backwards;
+}
+@keyframes modTabsIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mod-tab {
+  transition: background var(--dur-quick) var(--spring-soft),
+              color var(--dur-quick),
+              transform var(--dur-fast);
+}
+.mod-tab:active {
+  transform: scale(0.95);
+}
+.mod-tab.active {
+  animation: modTabActivate 0.35s var(--spring-bouncy);
+}
+@keyframes modTabActivate {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Фильтры */
+.mod-filter {
+  animation: modFilterIn 0.4s var(--spring-smooth) 0.25s backwards;
+}
+@keyframes modFilterIn {
+  0% { opacity: 0; transform: translateX(-10px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+.mod-filter-btn {
+  transition: background var(--dur-quick),
+              border-color var(--dur-quick),
+              color var(--dur-quick),
+              transform var(--dur-fast);
+}
+.mod-filter-btn:active {
+  transform: scale(0.94);
+}
+
+/* Список жалоб */
+.mod-report-card {
+  animation: modCardIn 0.45s var(--spring-smooth) backwards;
+  will-change: transform, opacity;
+}
+.mod-report-card:nth-child(1) { animation-delay: 0ms; }
+.mod-report-card:nth-child(2) { animation-delay: 40ms; }
+.mod-report-card:nth-child(3) { animation-delay: 80ms; }
+.mod-report-card:nth-child(4) { animation-delay: 120ms; }
+.mod-report-card:nth-child(5) { animation-delay: 160ms; }
+.mod-report-card:nth-child(n+6) { animation-delay: 200ms; }
+@keyframes modCardIn {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+    filter: blur(2px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Пульсация статуса «новое» */
+.mrc-status.new {
+  animation: mrcStatusPulse 1.8s ease-in-out infinite;
+  display: inline-block;
+}
+@keyframes mrcStatusPulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(139, 127, 255, 0));
+  }
+  50% {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 8px rgba(139, 127, 255, 0.8));
+  }
+}
+
+/* Кнопки действий в жалобе */
+.mrc-btn {
+  transition: transform var(--dur-fast) var(--spring-soft),
+              background var(--dur-instant),
+              box-shadow var(--dur-base);
+}
+.mrc-btn:active {
+  transform: scale(0.94);
+}
+.mrc-btn.danger:hover {
+  box-shadow: 0 4px 14px rgba(248, 113, 113, 0.4);
+}
+.mrc-btn.warn:hover {
+  box-shadow: 0 4px 14px rgba(251, 191, 36, 0.4);
+}
+
+/* ─── ⚖️ НАКАЗАНИЯ ─── */
+.mod-punish-card {
+  animation: modPunishIn 0.45s var(--spring-smooth) backwards;
+  will-change: transform, opacity;
+}
+.mod-punish-card:nth-child(1) { animation-delay: 0ms; }
+.mod-punish-card:nth-child(2) { animation-delay: 50ms; }
+.mod-punish-card:nth-child(3) { animation-delay: 100ms; }
+.mod-punish-card:nth-child(n+4) { animation-delay: 150ms; }
+@keyframes modPunishIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.mpc-type {
+  animation: mpcTypeGlow 2.5s ease-in-out infinite;
+}
+@keyframes mpcTypeGlow {
+  0%, 100% {
+    text-shadow: 0 0 0 rgba(248, 113, 113, 0);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(248, 113, 113, 0.6);
+  }
+}
+
+/* Кнопки выбора срока */
+.punish-duration-btn {
+  transition: background var(--dur-quick) var(--spring-soft),
+              border-color var(--dur-quick),
+              color var(--dur-quick),
+              transform var(--dur-fast);
+}
+.punish-duration-btn:active {
+  transform: scale(0.96);
+}
+.punish-duration-btn.active {
+  animation: punishActive 0.4s var(--spring-bouncy);
+}
+@keyframes punishActive {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+.punish-duration-btn.danger.active {
+  animation: punishActive 0.4s var(--spring-bouncy),
+             punishDangerGlow 2s ease-in-out infinite;
+}
+@keyframes punishDangerGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px 4px rgba(248, 113, 113, 0.3);
+  }
+}
+
+/* Опции в модалке бана */
+#mod-ban-durations {
+  animation: banDurationsIn 0.4s var(--spring-smooth) 0.15s backwards;
+}
+@keyframes banDurationsIn {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.9);
+    transform-origin: top;
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* ─── 📜 ЛОГИ ─── */
+.mod-log-row {
+  animation: modLogIn 0.4s var(--spring-smooth) backwards;
+}
+.mod-log-row:nth-child(1) { animation-delay: 0ms; }
+.mod-log-row:nth-child(2) { animation-delay: 30ms; }
+.mod-log-row:nth-child(3) { animation-delay: 60ms; }
+.mod-log-row:nth-child(4) { animation-delay: 90ms; }
+.mod-log-row:nth-child(5) { animation-delay: 120ms; }
+.mod-log-row:nth-child(n+6) { animation-delay: 150ms; }
+@keyframes modLogIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.mlr-action {
+  transition: color var(--dur-base);
+}
+
+/* ─── 🚫 BAN SCREEN ─── */
+#ban-screen {
+  animation: banScreenIn 0.6s var(--ease-out);
+}
+@keyframes banScreenIn {
+  0% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    backdrop-filter: blur(6px);
+  }
+}
+
+.ban-screen-inner {
+  animation: banInnerIn 0.7s var(--spring-bouncy);
+}
+@keyframes banInnerIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(30px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ban-screen-inner .ban-emoji {
+  animation: banPulse 2s ease-in-out infinite,
+             banEmojiShake 6s ease-in-out infinite;
+}
+@keyframes banEmojiShake {
+  0%, 90%, 100% { transform: rotate(0deg); }
+  92% { transform: rotate(-8deg); }
+  94% { transform: rotate(8deg); }
+  96% { transform: rotate(-4deg); }
+  98% { transform: rotate(4deg); }
+}
+
+.ban-screen-inner .ban-reason,
+.ban-screen-inner .ban-until {
+  animation: banBlockIn 0.5s var(--spring-smooth) backwards;
+}
+.ban-screen-inner .ban-reason { animation-delay: 0.2s; }
+.ban-screen-inner .ban-until { animation-delay: 0.35s; }
+@keyframes banBlockIn {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ban-screen-inner button {
+  animation: banBlockIn 0.5s var(--spring-smooth) 0.5s backwards;
+  transition: transform var(--dur-fast) var(--spring-soft),
+              background var(--dur-instant);
+}
+.ban-screen-inner button:active {
+  transform: scale(0.96);
+}
+
+/* ─── 🔇 MUTE BANNER ─── */
+#mute-banner {
+  animation: muteBannerIn 0.4s var(--spring-smooth);
+}
+@keyframes muteBannerIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#mute-banner::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--gold);
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+  animation: muteDotPulse 1.6s ease-in-out infinite;
+}
+@keyframes muteDotPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.85);
+    box-shadow: 0 0 8px 3px rgba(251, 191, 36, 0.3);
+  }
+}
+
+/* ─── PUNISHMENT MODAL ─── */
+#punishment-modal .modal-box {
+  animation: punishModalIn 0.5s var(--spring-bouncy);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+@keyframes punishModalIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(30px) rotateX(-10deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03) translateY(-6px) rotateX(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotateX(0);
+  }
+}
+
+.punishment-emoji {
+  animation: banPulse 2s ease-in-out infinite,
+             punishEmojiRotate 8s ease-in-out infinite;
+}
+@keyframes punishEmojiRotate {
+  0%, 85%, 100% { transform: rotate(0deg); }
+  90% { transform: rotate(-10deg); }
+  95% { transform: rotate(10deg); }
+}
+
+/* ─── 🚨 НОВАЯ ЖАЛОБА (уведомление модератору) ─── */
+@keyframes newReportPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(139, 127, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px 6px rgba(139, 127, 255, 0.3);
+  }
+}
+.settings-tg-row[onclick*="openModPanel"] {
+  position: relative;
+}
+.settings-tg-row[onclick*="openModPanel"] .tg-row-value {
+  animation: newReportPulse 2s ease-in-out infinite;
+}
+
+/* ─── ⭐ ПОДСВЕТКА ПАНЕЛИ МОДЕРАТОРА ─── */
+#mod-panel-modal .mod-stats {
+  background: linear-gradient(135deg,
+    rgba(139, 127, 255, 0.04) 0%,
+    transparent 50%,
+    rgba(139, 127, 255, 0.04) 100%);
+  padding: 8px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+}
+
+/* ─── REDUCED MOTION ─── */
+@media (prefers-reduced-motion: reduce) {
+  .geo-block,
+  .geo-block .geo-img::after,
+  .report-reason-btn,
+  .mod-stat,
+  .mod-stat-value,
+  .mod-report-card,
+  .mrc-status.new,
+  .mod-punish-card,
+  .mpc-type,
+  .punish-duration-btn.active,
+  .mod-log-row,
+  #ban-screen,
+  .ban-screen-inner,
+  .ban-screen-inner .ban-emoji,
+  .ban-screen-inner .ban-reason,
+  .ban-screen-inner .ban-until,
+  .ban-screen-inner button,
+  #mute-banner,
+  #mute-banner::before,
+  .punishment-emoji,
+  .settings-tg-row[onclick*="openModPanel"] .tg-row-value {
+    animation: none !important;
+  }
+}
+
+/* ─── GPU-УСКОРЕНИЕ ─── */
+.mod-report-card,
+.mod-punish-card,
+.geo-block,
+.ban-screen-inner {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
