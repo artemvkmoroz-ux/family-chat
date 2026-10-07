@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.2 — animations.css
-   Плавность x100000000 + анимации баннеров профиля
+   🌌 AZERTA v13.3 — animations.css
+   Плавность + ТГ-настройки + баннеры профиля
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── БАЗОВЫЕ SPRING-КРИВЫЕ ─── */
@@ -29,7 +29,7 @@ body.no-anim *::after {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   1. RIPPLE НА КНОПКАХ
+   1. RIPPLE
    ═══════════════════════════════════════════════════════════ */
 
 .ripple-container {
@@ -53,7 +53,7 @@ body.light .ripple { background: rgba(0, 0, 0, 0.15); }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   2. SKELETON-ЗАГРУЗКА
+   2. SKELETON
    ═══════════════════════════════════════════════════════════ */
 
 .skeleton {
@@ -107,7 +107,7 @@ body.light .skeleton {
 .skeleton-chat-item .sk-line.long { width: 80%; }
 
 /* ═══════════════════════════════════════════════════════════
-   3. STAGGER ПОЯВЛЕНИЕ СООБЩЕНИЙ
+   3. СООБЩЕНИЯ
    ═══════════════════════════════════════════════════════════ */
 
 .msg-wrap {
@@ -144,7 +144,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   4. ПЛАВНЫЕ ПОЯВЛЕНИЯ ЧАТ-ЛИСТА
+   4. CHAT-LIST STAGGER
    ═══════════════════════════════════════════════════════════ */
 
 .chat-item {
@@ -173,6 +173,7 @@ body.light .skeleton {
 .create-menu-btn,
 .nav-btn,
 .settings-item,
+.settings-tg-row,
 .chat-item,
 .attach,
 .mic,
@@ -245,7 +246,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   7. VIEW TRANSITIONS API
+   7. VIEW TRANSITIONS
    ═══════════════════════════════════════════════════════════ */
 
 @view-transition {
@@ -306,7 +307,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   9. GLOW НА АКТИВНОМ ТАБЕ
+   9. NAV GLOW
    ═══════════════════════════════════════════════════════════ */
 
 .nav-btn.active .nav-icon {
@@ -318,7 +319,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   10. ON-LINE ТОЧКА
+   10. ONLINE DOT
    ═══════════════════════════════════════════════════════════ */
 
 .avatar .online-dot {
@@ -330,7 +331,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   11. HOVER (десктоп)
+   11. HOVER
    ═══════════════════════════════════════════════════════════ */
 
 @media (hover: hover) {
@@ -382,7 +383,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   13. ПАНЕЛЬ СТИКЕРОВ
+   13. STICKERS PANEL
    ═══════════════════════════════════════════════════════════ */
 
 #stickers-panel {
@@ -394,7 +395,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   14. ЗАПИСЬ ГОЛОСОВОГО
+   14. RECORDING
    ═══════════════════════════════════════════════════════════ */
 
 #recording-bar {
@@ -415,7 +416,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   15. ВОЛНА ГОЛОСОВОГО
+   15. VOICE WAVE
    ═══════════════════════════════════════════════════════════ */
 
 .voice-wave span {
@@ -434,7 +435,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   16. РЕАКЦИИ
+   16. REACTIONS
    ═══════════════════════════════════════════════════════════ */
 
 .reaction-chip {
@@ -469,7 +470,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   17. СТОРИС
+   17. STORIES
    ═══════════════════════════════════════════════════════════ */
 
 .story-ring {
@@ -503,7 +504,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   18. GLOW НА ACTIVE
+   18. ACTIVE GLOW
    ═══════════════════════════════════════════════════════════ */
 
 .chat-item.active {
@@ -515,7 +516,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   19. ВКЛАДКИ В STICKERS
+   19. STICKERS TABS
    ═══════════════════════════════════════════════════════════ */
 
 .sticker-tab {
@@ -529,7 +530,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   20. TOAST / ДОСТИЖЕНИЯ
+   20. TOAST / ACHIEVEMENTS
    ═══════════════════════════════════════════════════════════ */
 
 #aurora-toast {
@@ -561,7 +562,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   21. 🤖 БОТЫ
+   21. BOTS
    ═══════════════════════════════════════════════════════════ */
 
 .bot-mark {
@@ -620,10 +621,9 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   22. 🎨 БАННЕРЫ ПРОФИЛЯ
+   22. БАННЕРЫ ПРОФИЛЯ
    ═══════════════════════════════════════════════════════════ */
 
-/* Плавное появление баннера в своём профиле */
 .profile-banner-preview {
   animation: bannerSlideIn 0.6s var(--spring-bouncy);
   will-change: transform, opacity;
@@ -644,7 +644,6 @@ body.light .skeleton {
   }
 }
 
-/* Плавное появление баннера в чужом профиле */
 .contact-banner {
   animation: contactBannerIn 0.7s var(--spring-smooth);
   will-change: transform, opacity;
@@ -665,7 +664,6 @@ body.light .skeleton {
   }
 }
 
-/* Ken Burns — медленный зум картинки баннера */
 .contact-banner img {
   animation: kenBurns 20s ease-in-out infinite alternate;
   will-change: transform;
@@ -675,14 +673,12 @@ body.light .skeleton {
   100% { transform: scale(1.08) translate(-2%, -2%); }
 }
 
-/* Остановка Ken Burns если пользователь уважает reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   .contact-banner img {
     animation: none;
   }
 }
 
-/* Hover на баннер — лёгкий зум */
 @media (hover: hover) {
   .profile-banner-preview:hover img {
     transform: scale(1.04);
@@ -693,7 +689,6 @@ body.light .skeleton {
   }
 }
 
-/* Кнопка удаления баннера — плавное появление при hover */
 .profile-banner-preview .banner-remove-btn {
   opacity: 0.85;
   transition: opacity var(--dur-instant) var(--ease-out-quart),
@@ -711,7 +706,6 @@ body.light .skeleton {
   transform: scale(0.9) rotate(90deg);
 }
 
-/* Плавное исчезновение баннера при удалении */
 .profile-banner-preview.removing {
   animation: bannerRemove 0.4s var(--ease-out-quart) forwards;
 }
@@ -727,7 +721,6 @@ body.light .skeleton {
   }
 }
 
-/* Контакт-профиль с баннером — аватар влетает снизу */
 .contact-profile-with-banner .profile-avatar-big {
   animation: avatarOverBanner 0.7s var(--spring-bouncy) 0.15s backwards;
 }
@@ -746,7 +739,6 @@ body.light .skeleton {
   }
 }
 
-/* Имя под аватаром — плавно выезжает */
 .contact-profile-with-banner .profile-name {
   animation: nameUnderBanner 0.5s var(--spring-smooth) 0.35s backwards;
 }
@@ -761,7 +753,6 @@ body.light .skeleton {
   }
 }
 
-/* Блик по баннеру при появлении */
 .contact-banner::before {
   content: '';
   position: absolute;
@@ -786,7 +777,314 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   23. СКРОЛЛ
+   23. 🎨 ТГ-НАСТРОЙКИ — АНИМАЦИИ
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Карточка профиля ─── */
+.settings-profile-card-tg {
+  animation: profileCardIn 0.55s var(--spring-bouncy);
+  will-change: transform, opacity;
+}
+@keyframes profileCardIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(20px);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Плавное появление карточки профиля при возврате в настройки */
+.settings-profile-card-tg.returning {
+  animation: profileCardReturn 0.5s var(--spring-smooth);
+}
+@keyframes profileCardReturn {
+  0% { opacity: 0; transform: translateY(-12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Лёгкий подъём при hover (десктоп) */
+@media (hover: hover) {
+  .settings-profile-card-tg:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(139, 127, 255, 0.2);
+  }
+  .settings-profile-card-tg:hover .tg-banner {
+    transform: scale(1.03);
+  }
+}
+
+/* Баннер и аватар — плавный вход */
+.settings-profile-card-tg .tg-profile-avatar {
+  animation: tgAvatarIn 0.7s var(--spring-bouncy) 0.1s backwards;
+}
+@keyframes tgAvatarIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Имя — выезжает справа */
+.settings-profile-card-tg .tg-profile-name {
+  animation: tgNameIn 0.5s var(--spring-smooth) 0.25s backwards;
+}
+@keyframes tgNameIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Юзернейм — ещё позже */
+.settings-profile-card-tg .tg-profile-username {
+  animation: tgUsernameIn 0.5s var(--spring-smooth) 0.35s backwards;
+}
+@keyframes tgUsernameIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Статус — ещё позже, с pulse для точки */
+.settings-profile-card-tg .tg-profile-status {
+  animation: tgStatusIn 0.5s var(--spring-smooth) 0.45s backwards;
+}
+@keyframes tgStatusIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.settings-profile-card-tg .tg-profile-status .dot {
+  animation: tgDotPulse 2.4s ease-in-out infinite;
+}
+@keyframes tgDotPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6);
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.9;
+    box-shadow: 0 0 10px 3px rgba(74, 222, 128, 0.3);
+  }
+}
+
+/* Плейсхолдер «+ Сменить баннер» — мягкая пульсация */
+.settings-profile-card-tg .tg-no-banner-hint {
+  animation: noBannerHintIn 0.6s var(--spring-bouncy) 0.5s backwards;
+}
+@keyframes noBannerHintIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(-6px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Плейсхолдер — «дышащий» градиент */
+.settings-profile-card-tg.no-banner .tg-banner {
+  animation: noBannerBreathe 3.2s ease-in-out infinite;
+}
+@keyframes noBannerBreathe {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.02);
+  }
+}
+
+/* ─── Звёзды-строка ─── */
+.settings-stars-row {
+  animation: starsRowIn 0.5s var(--spring-smooth) 0.15s backwards;
+}
+@keyframes starsRowIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.settings-stars-row .stars-icon {
+  animation: starsIconTwinkle 3s ease-in-out infinite;
+  display: inline-block;
+}
+@keyframes starsIconTwinkle {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+    filter: drop-shadow(0 0 0 rgba(251, 191, 36, 0));
+  }
+  50% {
+    transform: rotate(8deg) scale(1.1);
+    filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.5));
+  }
+}
+
+/* ─── Секции и строки ─── */
+.settings-tg-section {
+  animation: tgSectionIn 0.5s var(--spring-smooth) backwards;
+}
+@keyframes tgSectionIn {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Stagger для секций */
+.settings-tg-section:nth-of-type(1) { animation-delay: 0.20s; }
+.settings-tg-section:nth-of-type(2) { animation-delay: 0.26s; }
+.settings-tg-section:nth-of-type(3) { animation-delay: 0.32s; }
+.settings-tg-section:nth-of-type(4) { animation-delay: 0.38s; }
+.settings-tg-section:nth-of-type(5) { animation-delay: 0.44s; }
+.settings-tg-section:nth-of-type(6) { animation-delay: 0.50s; }
+.settings-tg-section:nth-of-type(n+7) { animation-delay: 0.56s; }
+
+/* Группа строк — фон мягко появляется */
+.settings-tg-group {
+  animation: tgGroupIn 0.45s var(--spring-smooth) backwards;
+}
+@keyframes tgGroupIn {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.94);
+    transform-origin: top;
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* ─── Строки ─── */
+.settings-tg-row {
+  animation: tgRowIn 0.4s var(--spring-smooth) backwards;
+  will-change: transform, opacity;
+}
+@keyframes tgRowIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Stagger строк внутри группы */
+.settings-tg-group .settings-tg-row:nth-child(1) { animation-delay: 0.32s; }
+.settings-tg-group .settings-tg-row:nth-child(2) { animation-delay: 0.36s; }
+.settings-tg-group .settings-tg-row:nth-child(3) { animation-delay: 0.40s; }
+.settings-tg-group .settings-tg-row:nth-child(4) { animation-delay: 0.44s; }
+.settings-tg-group .settings-tg-row:nth-child(5) { animation-delay: 0.48s; }
+.settings-tg-group .settings-tg-row:nth-child(6) { animation-delay: 0.52s; }
+.settings-tg-group .settings-tg-row:nth-child(n+7) { animation-delay: 0.56s; }
+
+/* Иконка строки — лёгкий scale при tap */
+.settings-tg-row:active .tg-row-icon {
+  transform: scale(1.15);
+  transition: transform var(--dur-ultra-fast) var(--spring-soft);
+}
+
+/* Стрелка — плавный сдвиг */
+.settings-tg-row .tg-row-arrow {
+  transition: transform var(--dur-quick) var(--spring-soft),
+              color var(--dur-quick);
+}
+.settings-tg-row:active .tg-row-arrow {
+  transform: translateX(3px);
+  color: var(--accent);
+}
+
+/* Ripple по всей строке */
+.settings-tg-row.ripple-container .ripple {
+  background: rgba(139, 127, 255, 0.15);
+}
+
+/* Danger-строка — мягкое свечение при hover */
+@media (hover: hover) {
+  .settings-tg-row.danger:hover {
+    background: rgba(248, 113, 113, 0.08);
+  }
+  .settings-tg-row:hover {
+    background: var(--bg-hover);
+  }
+}
+
+/* ─── Свитч в строке — bounce при переключении ─── */
+.settings-tg-row .tg-row-switch input:checked + .slider {
+  animation: switchOn 0.45s var(--spring-bouncy);
+}
+@keyframes switchOn {
+  0% { transform:0 scale (1);3 }
+  40% {px transform rgba: scale(1(.08); }
+  100% { transform: scale(1); }
+}
+
+.settings-tg-row .tg-row-switch .slider::before {
+  transition: transform 0.35s var(--spring-bouncy);
+}
+
+/* ─── Цвет-дот в строке ─── */
+.settings-tg-row .tg-row-color-dot {
+  transition: transform var(--dur-quick) var(--spring-bouncy),
+              box-shadow var(--dur-quick);
+}
+.settings-tg-row:active .tg-row-color-dot {
+  transform: scale(1.15);
+  box-shadow: 0 0 12px currentColor;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   24. СКРОЛЛ
    ═══════════════════════════════════════════════════════════ */
 
 #chat-list,
@@ -794,23 +1092,24 @@ body.light .skeleton {
 #contacts-list,
 #channel-posts,
 #stickers-content,
-#gallery-content {
+#gallery-content,
+#settings-content {
   scroll-behavior: smooth;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   24. INPUT FOCUS
+   25. INPUT FOCUS
    ═══════════════════════════════════════════════════════════ */
 
 #msgInput:focus {
   transform: scale(1.005);
-  box-shadow: 0 0 0 3px rgba(139, 127, 255, 0.1);
+  box-shadow: 0 0 139, 127, 255, 0.1);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   25. СВИТЧИ
+   26. SWITCH
    ═══════════════════════════════════════════════════════════ */
 
 .switch .slider {
@@ -825,7 +1124,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   26. АВАТАРКИ
+   27. AVATARS
    ═══════════════════════════════════════════════════════════ */
 
 .avatar {
@@ -836,7 +1135,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   27. CREDIT-BADGE
+   28. BADGES
    ═══════════════════════════════════════════════════════════ */
 
 .verified-badge,
@@ -851,7 +1150,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   28. КАНАЛЫ
+   29. CHANNEL POSTS
    ═══════════════════════════════════════════════════════════ */
 
 #channel-posts > div {
@@ -867,7 +1166,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   29. КРУЖОК
+   30. CIRCLE
    ═══════════════════════════════════════════════════════════ */
 
 #circle-preview.active {
@@ -886,7 +1185,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   30. ЗВОНКИ
+   31. CALLS
    ═══════════════════════════════════════════════════════════ */
 
 #call-screen.active {
@@ -906,7 +1205,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   31. УПОМИНАНИЯ
+   32. MENTIONS
    ═══════════════════════════════════════════════════════════ */
 
 .mention {
@@ -919,7 +1218,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   32. BREATHE
+   33. BREATHE
    ═══════════════════════════════════════════════════════════ */
 
 @keyframes breathe {
@@ -929,7 +1228,7 @@ body.light .skeleton {
 .breathing { animation: breathe 2.4s ease-in-out infinite; }
 
 /* ═══════════════════════════════════════════════════════════
-   33. TYPING PULSE
+   34. TYPING PULSE
    ═══════════════════════════════════════════════════════════ */
 
 #chat-top-status.typing {
@@ -941,7 +1240,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   34. АВТОРИЗАЦИЯ
+   35. AUTH
    ═══════════════════════════════════════════════════════════ */
 
 .auth-card {
@@ -960,7 +1259,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   35. FOCUS RING
+   36. FOCUS RING
    ═══════════════════════════════════════════════════════════ */
 
 .auth-input:focus,
@@ -978,7 +1277,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   36. REDUCED MOTION
+   37. REDUCED MOTION
    ═══════════════════════════════════════════════════════════ */
 
 @media (prefers-reduced-motion: reduce) {
@@ -993,7 +1292,7 @@ body.light .skeleton {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   37. GPU-УСКОРЕНИЕ
+   38. GPU-УСКОРЕНИЕ
    ═══════════════════════════════════════════════════════════ */
 
 .modal-box,
@@ -1006,7 +1305,10 @@ body.light .skeleton {
 .avatar,
 .chat-item,
 .profile-banner-preview,
-.contact-banner {
+.contact-banner,
+.settings-profile-card-tg,
+.settings-tg-row,
+.settings-tg-section {
   will-change: transform, opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
