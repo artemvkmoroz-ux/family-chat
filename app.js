@@ -1,8 +1,9 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.2 — Client
-   ✓ 🎨 Баннеры профиля
+   🌌 AZERTA v13.3 — Client
+   ✓ 🎨 ТГ-стиль настроек
+   ✓ 🎨 Баннер профиля в карточке настроек
    ✓ Боты (создание, чат, команды)
    ✓ Ripple + Skeleton + Spring
    ✓ Достижения, статистика, упоминания
@@ -191,7 +192,7 @@ function attachRipple(el) {
 }
 
 function bindRipples(root) {
-  const sel = '.auth-btn-primary, .modal-primary, .modal-secondary, .modal-danger, .create-menu-btn, .nav-btn, .settings-item, .chat-item, .back-btn, .icon-btn, #burger, #send-btn, .attach, .mic, .camera, .reaction-chip, .action-item, .my-bot-card, .bch-chip';
+  const sel = '.auth-btn-primary, .modal-primary, .modal-secondary, .modal-danger, .create-menu-btn, .nav-btn, .settings-item, .settings-tg-row, .chat-item, .back-btn, .icon-btn, #burger, #send-btn, .attach, .mic, .camera, .reaction-chip, .action-item, .my-bot-card, .bch-chip';
   (root || document).querySelectorAll(sel).forEach(attachRipple);
 }
 
@@ -885,83 +886,281 @@ function renderSettingsTab() {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   🎨 ТГ-СТИЛЬ НАСТРОЕК
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Вспомогательная: одна ТГ-строка ─── */
+function renderTgRow(opts) {
+  // opts = { icon, text, value, onClick, type: 'switch'|'arrow'|'color'|'danger'|'disabled', checked, color }
+  const type = opts.type || 'arrow';
+  const danger = opts.type === 'danger' ? ' danger' : '';
+  const disabled = opts.type === 'disabled' ? ' disabled' : '';
+  const onClick = opts.onClick ? ' onclick="' + opts.onClick + '"' : '';
+
+  let rightHtml = '';
+  if (type === 'switch') {
+    rightHtml = '<label class="tg-row-switch" onclick="event.stopPropagation()">' +
+      '<input type="checkbox" ' + (opts.checked ? 'checked' : '') +
+      ' onchange="' + (opts.onToggle || '') + '" />' +
+      '<span class="slider"></span></label>';
+  } else if (type === 'color') {
+    rightHtml = '<span class="tg-row-color-dot" style="background:' + (opts.color || '#8b7fff') + ';"></span>' +
+      '<span class="tg-row-arrow">›</span>';
+  } else if (type === 'arrow') {
+    if (opts.value !== undefined && opts.value !== null && opts.value !== '') {
+      rightHtml += '<span class="tg-row-value">' + escapeHtml(String(opts.value)) + '</span>';
+    }
+    rightHtml += '<span class="tg-row-arrow">›</span>';
+  } else if (type === 'value') {
+    rightHtml = '<span class="tg-row-value">' + escapeHtml(String(opts.value || '')) + '</span>';
+  }
+
+  return '<div class="settings-tg-row' + danger + disabled + '"' + onClick + '>' +
+    '<span class="tg-row-icon">' + (opts.icon || '') + '</span>' +
+    '<span class="tg-row-text">' + escapeHtml(opts.text || '') + '</span>' +
+    rightHtml +
+    '</div>';
+}
+
+/* ─── Главная функция рендера настроек ─── */
 function renderSettings() {
   const box = $('settings-content');
   if (!box) return;
   const me = state.me;
   const s = state.settings;
+  const isAdmin = me.username === 'moroz';
+
+  /* ─── Карточка профиля с баннером ─── */
   const displayName = (me.firstName || me.lastName)
-    ? (me.firstName + ' ' + me.lastName).trim()
+    ? (me.firstName + ' ' + (me.lastName || '')).trim()
     : '@' + me.username;
   const emojiStr = me.emoji ? ' ' + me.emoji : '';
   const tick = renderBadges(me);
-  const isAdmin = me.username === 'moroz';
+  const hasBanner = !!me.banner;
+  const bannerStyle = hasBanner ? 'background-image:url(' + me.banner + ')' : '';
   const avatarStyle = me.avatar ? 'background-image:url(' + me.avatar + ')' : '';
   const avatarContent = me.avatar ? '' : initials(me.username);
+
+  const profileCardHtml =
+    '<div class="settings-profile-card-tg' + (hasBanner ? '' : ' no-banner') + '" onclick="openProfile()">' +
+      '<div class="tg-banner" style="' + bannerStyle + '"></div>' +
+      '<div class="tg-banner-overlay"></div>' +
+      (hasBanner ? '' : '<span class="tg-no-banner-hint">+ Сменить баннер</span>') +
+      '<div class="tg-profile-row">' +
+        '<div class="tg-profile-avatar" style="' + avatarStyle + '">' + avatarContent + '</div>' +
+        '<div class="tg-profile-info">' +
+          '<div class="tg-profile-name">' + escapeHtml(displayName) + emojiStr + ' ' + tick + '</div>' +
+          '<div class="tg-profile-username">@' + escapeHtml(me.username) + '</div>' +
+          '<div class="tg-profile-status"><span class="dot"></span>в сети</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  /* ─── Звёзды ─── */
+  const starsHtml =
+    '<div class="settings-stars-row" onclick="openStarsHistory()">' +
+      '<span class="stars-icon">⭐</span>' +
+      '<div class="stars-info">' +
+        '<div class="stars-count">' + me.stars + (isAdmin ? '∞' : '') + '</div>' +
+        '<div class="stars-label">звёзды · нажми для истории</div>' +
+      '</div>' +
+      '<span class="stars-arrow">›</span>' +
+    '</div>';
+
+  /* ─── Секция: Мои боты ─── */
+  const botsSection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-section-title">🤖 Боты</div>' +
+      '<div class="settings-tg-group">' +
+        renderTgRow({ icon: '🤖', text: 'Мои боты', value: state.myBots.length + '/3', onClick: 'openMyBots()' }) +
+        renderTgRow({ icon: '➕', text: 'Создать бота', onClick: 'openCreateBotModal()' }) +
+        renderTgRow({ icon: '🔍', text: 'Найти бота', onClick: 'openFindBotModal()' }) +
+      '</div>' +
+    '</div>';
+
+  /* ─── Секция: Прогресс ─── */
+  const progressSection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-section-title">📈 Прогресс</div>' +
+      '<div class="settings-tg-group">' +
+        renderTgRow({ icon: '🏆', text: 'Достижения', onClick: 'openAchievements()' }) +
+        renderTgRow({ icon: '📊', text: 'Статистика', onClick: 'openStats()' }) +
+      '</div>' +
+    '</div>';
+
+  /* ─── Секция: Подарки ─── */
+  let giftsGroup = '';
+  giftsGroup += renderTgRow({ icon: '🎁', text: 'Мои подарки', onClick: 'openMyGifts()' });
+  giftsGroup += renderTgRow({ icon: '💳', text: 'Активировать премиум по коду', onClick: 'openGiftModal()' });
+  if (isAdmin) {
+    giftsGroup += renderTgRow({ icon: '🔑', text: 'Управление кодами', onClick: 'openGiftAdminModal()' });
+  }
+  const giftsSection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-section-title">🎁 Подарки</div>' +
+      '<div class="settings-tg-group">' + giftsGroup + '</div>' +
+    '</div>';
+
+  /* ─── Секция: Уведомления ─── */
+  const notifSection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-section-title">🔔 Уведомления и звуки</div>' +
+      '<div class="settings-tg-group">' +
+        renderTgRow({
+          icon: '🔔', text: 'Звук', type: 'switch',
+          checked: s.sound == 1,
+          onToggle: 'toggleSetting(\'sound\')',
+          onClick: 'toggleSetting(\'sound\')'
+        }) +
+        renderTgRow({
+          icon: '📳', text: 'Вибрация', type: 'switch',
+          checked: s.vibration == 1,
+          onToggle: 'toggleSetting(\'vibration\')',
+          onClick: 'toggleSetting(\'vibration\')'
+        }) +
+        renderTgRow({
+          icon: '💬', text: 'Личные чаты', type: 'switch',
+          checked: s.notif_private == 1,
+          onToggle: 'toggleSetting(\'notif_private\')',
+          onClick: 'toggleSetting(\'notif_private\')'
+        }) +
+        renderTgRow({
+          icon: '👥', text: 'Группы', type: 'switch',
+          checked: s.notif_groups == 1,
+          onToggle: 'toggleSetting(\'notif_groups\')',
+          onClick: 'toggleSetting(\'notif_groups\')'
+        }) +
+      '</div>' +
+    '</div>';
+
+  /* ─── Секция: Конфиденциальность ─── */
+  const privacySection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-section-title">🔒 Конфиденциальность</div>' +
+      '<div class="settings-tg-group">' +
+        renderTgRow({
+          icon: '🔐', text: 'Код-пароль',
+          value: s.passcode ? 'Включён' : 'Выключен',
+          onClick: 'openPasscodeModal()'
+        }) +
+        renderTgRow({
+          icon: '👁', text: 'Последнее посещение',
+          value: lastSeenLabel(),
+          onClick: 'changeLastSeen()'
+        }) +
+        renderTgRow({
+          icon: '🚫', text: 'Заблокированные',
+          value: state.blockedList.length,
+          onClick: 'openBlockedList()'
+        }) +
+      '</div>' +
+    '</div>';
+
+  /* ─── Секция: Устройства ─── */
+  const devicesSection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-section-title">📱 Устройства</div>' +
+      '<div class="settings-tg-group">' +
+        renderTgRow({ icon: '📱', text: 'Активные сеансы', onClick: 'openSessions()' }) +
+      '</div>' +
+    '</div>';
+
+  /* ─── Секция: Данные и память ─── */
+  const dataSection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-section-title">💾 Данные и память</div>' +
+      '<div class="settings-tg-group">' +
+        '<div class="settings-tg-row" onclick="showCacheSize()">' +
+          '<span class="tg-row-icon">💾</span>' +
+          '<span class="tg-row-text">Размер кэша</span>' +
+          '<span class="tg-row-value" id="cache-size">…</span>' +
+        '</div>' +
+        renderTgRow({ icon: '🧹', text: 'Очистить кэш', onClick: 'clearCache()' }) +
+      '</div>' +
+    '</div>';
+
+  /* ─── Секция: Оформление ─── */
+  const appearanceSection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-section-title">🎨 Оформление</div>' +
+      '<div class="settings-tg-group">' +
+        renderTgRow({
+          icon: '🎨', text: 'Тема',
+          value: s.theme === 'light' ? 'Светлая' : 'Тёмная',
+          onClick: 'changeTheme()'
+        }) +
+        renderTgRow({
+          icon: '📏', text: 'Размер текста',
+          value: fontLabel(),
+          onClick: 'changeFontSize()'
+        }) +
+        renderTgRow({
+          icon: '🎯', text: 'Акцентный цвет',
+          type: 'color',
+          color: s.accent_color || '#8b7fff',
+          onClick: 'openColorPicker(\'accent_color\')'
+        }) +
+        renderTgRow({
+          icon: '⚡', text: 'Отключить анимации', type: 'switch',
+          checked: s.animations == 0,
+          onToggle: 'toggleSetting(\'animations\')',
+          onClick: 'toggleSetting(\'animations\')'
+        }) +
+      '</div>' +
+    '</div>';
+
+  /* ─── Секция: QR ─── */
+  const qrSection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-group">' +
+        renderTgRow({ icon: '📱', text: 'Мой QR-код', onClick: 'showMyQr()' }) +
+      '</div>' +
+    '</div>';
+
+  /* ─── Секция: Аккаунт ─── */
+  const accountSection =
+    '<div class="settings-tg-section">' +
+      '<div class="settings-tg-group">' +
+        renderTgRow({ icon: '🚪', text: 'Выйти', type: 'danger', onClick: 'logout()' }) +
+        renderTgRow({
+          icon: '🗑', text: 'Удалить аккаунт', type: 'danger',
+          onClick: 'openModal(\'delete-account-modal\')'
+        }) +
+      '</div>' +
+    '</div>';
+
+  /* ─── Финальная сборка ─── */
   let html = '';
-
-  html += '<div class="stars-balance" onclick="openStarsHistory()"><span class="star-icon">⭐</span><div class="stars-info"><div class="stars-count">' + me.stars + (isAdmin ? '∞' : '') + '</div><div class="stars-label">звёзды · нажми для истории</div></div><div class="si-arrow" style="color:var(--text-muted);font-size:16px;">›</div></div>';
-
-  html += '<div class="settings-profile-card" onclick="openProfile()"><div class="avatar" style="' + avatarStyle + '">' + avatarContent + '</div><div class="info"><div class="name">' + escapeHtml(displayName) + emojiStr + tick + '</div><div class="sub">@' + escapeHtml(me.username) + '</div></div><div class="si-arrow">›</div></div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Мой QR-код</div><div class="settings-item" onclick="showMyQr()"><div class="si-icon">📱</div><div class="si-text">Показать QR-код</div><div class="si-arrow">›</div></div></div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">🤖 Боты</div>';
-  html += '<div class="settings-item" onclick="openMyBots()"><div class="si-icon">🤖</div><div class="si-text">Мои боты</div><div class="si-value">' + state.myBots.length + '/3</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="openCreateBotModal()"><div class="si-icon">➕</div><div class="si-text">Создать бота</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="openFindBotModal()"><div class="si-icon">🔍</div><div class="si-text">Найти бота</div><div class="si-arrow">›</div></div>';
-  html += '</div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Прогресс</div>';
-  html += '<div class="settings-item" onclick="openAchievements()"><div class="si-icon">🏆</div><div class="si-text">Достижения</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="openStats()"><div class="si-icon">📊</div><div class="si-text">Статистика</div><div class="si-arrow">›</div></div>';
-  html += '</div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Подарки</div>';
-  html += '<div class="settings-item" onclick="openMyGifts()"><div class="si-icon">🎁</div><div class="si-text">Мои подарки</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="openGiftModal()"><div class="si-icon">💳</div><div class="si-text">Активировать премиум по коду</div><div class="si-arrow">›</div></div>';
-  if (isAdmin) html += '<div class="settings-item" onclick="openGiftAdminModal()"><div class="si-icon">🔑</div><div class="si-text">Управление кодами</div><div class="si-arrow">›</div></div>';
-  html += '</div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Уведомления и звуки</div>';
-  html += '<div class="settings-item" onclick="toggleSetting(\'sound\')"><div class="si-icon">🔔</div><div class="si-text">Звук</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ' + (s.sound == 1 ? 'checked' : '') + ' onchange="toggleSetting(\'sound\')" /><span class="slider"></span></label></div>';
-  html += '<div class="settings-item" onclick="toggleSetting(\'vibration\')"><div class="si-icon">📳</div><div class="si-text">Вибрация</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ' + (s.vibration == 1 ? 'checked' : '') + ' onchange="toggleSetting(\'vibration\')" /><span class="slider"></span></label></div>';
-  html += '<div class="settings-item" onclick="toggleSetting(\'notif_private\')"><div class="si-icon">💬</div><div class="si-text">Личные чаты</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ' + (s.notif_private == 1 ? 'checked' : '') + ' onchange="toggleSetting(\'notif_private\')" /><span class="slider"></span></label></div>';
-  html += '<div class="settings-item" onclick="toggleSetting(\'notif_groups\')"><div class="si-icon">👥</div><div class="si-text">Группы</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ' + (s.notif_groups == 1 ? 'checked' : '') + ' onchange="toggleSetting(\'notif_groups\')" /><span class="slider"></span></label></div>';
-  html += '</div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Конфиденциальность</div>';
-  html += '<div class="settings-item" onclick="openPasscodeModal()"><div class="si-icon">🔐</div><div class="si-text">Код-пароль</div><div class="si-value">' + (s.passcode ? 'Включён' : 'Выключен') + '</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="changeLastSeen()"><div class="si-icon">👁</div><div class="si-text">Последнее посещение</div><div class="si-value">' + lastSeenLabel() + '</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="openBlockedList()"><div class="si-icon">🚫</div><div class="si-text">Заблокированные</div><div class="si-value">' + state.blockedList.length + '</div><div class="si-arrow">›</div></div>';
-  html += '</div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Устройства</div><div class="settings-item" onclick="openSessions()"><div class="si-icon">📱</div><div class="si-text">Активные сеансы</div><div class="si-arrow">›</div></div></div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Данные и память</div><div class="settings-item"><div class="si-icon">💾</div><div class="si-text">Размер кэша</div><div class="si-value" id="cache-size">…</div></div><div class="settings-item" onclick="clearCache()"><div class="si-icon">🧹</div><div class="si-text">Очистить кэш</div><div class="si-arrow">›</div></div></div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Энергосбережение</div><div class="settings-item" onclick="toggleSetting(\'animations\')"><div class="si-icon">⚡</div><div class="si-text">Отключить анимации</div><label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ' + (s.animations == 0 ? 'checked' : '') + ' onchange="toggleSetting(\'animations\')" /><span class="slider"></span></label></div></div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Оформление</div>';
-  html += '<div class="settings-item" onclick="changeTheme()"><div class="si-icon">🎨</div><div class="si-text">Тема</div><div class="si-value">' + (s.theme === 'light' ? 'Светлая' : 'Тёмная') + '</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="changeFontSize()"><div class="si-icon">📏</div><div class="si-text">Размер текста</div><div class="si-value">' + fontLabel() + '</div><div class="si-arrow">›</div></div>';
-  html += '<div class="settings-item" onclick="openColorPicker(\'accent_color\')"><div class="si-icon">🎯</div><div class="si-text">Акцентный цвет</div><div class="si-value" style="color:' + (s.accent_color || '#8b7fff') + ';font-size:20px;">●</div><div class="si-arrow">›</div></div>';
-  html += '</div>';
-
-  html += '<div class="settings-section"><div class="settings-section-title">Аккаунт</div><div class="settings-item" onclick="logout()"><div class="si-icon">🚪</div><div class="si-text">Выйти</div><div class="si-arrow">›</div></div><div class="settings-item danger" onclick="openModal(\'delete-account-modal\')"><div class="si-icon">🗑</div><div class="si-text">Удалить аккаунт</div><div class="si-arrow">›</div></div></div>';
-
-  html += '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.2<br><br>Сделано с ❤️</div>';
+  html += profileCardHtml;
+  html += starsHtml;
+  html += botsSection;
+  html += progressSection;
+  html += giftsSection;
+  html += notifSection;
+  html += privacySection;
+  html += devicesSection;
+  html += dataSection;
+  html += appearanceSection;
+  html += qrSection;
+  html += accountSection;
+  html += '<div style="padding:30px 20px 10px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.3<br><br>Сделано с ❤️</div>';
 
   box.innerHTML = html;
+
   setTimeout(showCacheSize, 100);
+  bindRipples(box);
+
+  /* Обновляем счётчик ботов, если пришёл свежий список */
   socket.emit('get my bots', function (res) {
     if (res && res.ok) {
       state.myBots = res.bots || [];
-      const valueEls = box.querySelectorAll('.settings-item');
+      const valueEls = box.querySelectorAll('.settings-tg-row');
       valueEls.forEach(el => {
-        if (el.querySelector('.si-text') && el.querySelector('.si-text').textContent === 'Мои боты') {
-          const val = el.querySelector('.si-value');
-          if (val) val.textContent = state.myBots.length + '/3';
+        const textEl = el.querySelector('.tg-row-text');
+        const valEl = el.querySelector('.tg-row-value');
+        if (textEl && textEl.textContent === 'Мои боты' && valEl) {
+          valEl.textContent = state.myBots.length + '/3';
         }
       });
     }
@@ -1090,7 +1289,6 @@ function openProfile() {
   $('my-birthday').value = state.me.birthday || '';
   $('my-emoji').value = state.me.emoji || '';
 
-  // 🎨 Превью баннера
   const bannerPreview = $('profile-banner-preview');
   const bannerImg = $('profile-banner-img');
   if (state.me.banner) {
@@ -1120,7 +1318,6 @@ function uploadBanner(event) {
   reader.onload = function (e) {
     const img = new Image();
     img.onload = function () {
-      // 🎨 Сжатие: 1200×400, JPEG 0.75
       const targetW = 1200;
       const targetH = 400;
       const canvas = document.createElement('canvas');
@@ -1128,7 +1325,6 @@ function uploadBanner(event) {
       canvas.height = targetH;
       const ctx = canvas.getContext('2d');
 
-      // Cover: заполняем полностью, обрезаем лишнее
       const scale = Math.max(targetW / img.width, targetH / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
@@ -1139,20 +1335,17 @@ function uploadBanner(event) {
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
 
-      // Проверка размера
       if (dataUrl.length > 2_000_000) {
         showToast('⚠️ Баннер слишком большой. Выбери картинку поменьше.');
         return;
       }
 
-      // Показываем превью сразу
       const bannerPreview = $('profile-banner-preview');
       const bannerImg = $('profile-banner-img');
       bannerImg.src = dataUrl;
       bannerPreview.style.display = 'block';
       bannerPreview.classList.remove('removing');
 
-      // Сохраняем
       socket.emit('set banner', { banner: dataUrl }, function (res) {
         if (res && res.ok) {
           state.me.banner = dataUrl;
@@ -1160,7 +1353,6 @@ function uploadBanner(event) {
           vibrate([50, 30, 50]);
         } else {
           showToast('❌ ' + ((res && res.error) || 'Ошибка'));
-          // Откат
           if (!state.me.banner) {
             bannerPreview.style.display = 'none';
           }
@@ -1483,7 +1675,6 @@ function openContactProfile(username) {
       botCmdsHtml += '</div>';
     }
 
-    // 🎨 Баннер профиля
     let bannerHtml = '';
     const hasBanner = !!data.banner && !isBotUser;
     if (hasBanner) {
@@ -1577,7 +1768,7 @@ function addFromQr() {
 function openSessions() {
   socket.emit('get sessions', function (sessions) {
     const box = $('settings-content');
-    let html = '<div class="settings-section-title">Активные сеансы</div>';
+    let html = '<div class="settings-tg-section-title">Активные сеансы</div>';
     if (!sessions || sessions.length === 0) {
       html += '<div style="text-align:center;padding:40px;color:var(--text-muted);">Нет активных сессий</div>';
     } else {
@@ -1609,7 +1800,7 @@ function openBlockedList() {
   socket.emit('get blocked', function (list) {
     state.blockedList = list || [];
     const box = $('settings-content');
-    let html = '<div class="settings-section-title">Заблокированные (' + state.blockedList.length + ')</div>';
+    let html = '<div class="settings-tg-section-title">Заблокированные (' + state.blockedList.length + ')</div>';
     if (state.blockedList.length === 0) {
       html += '<div style="text-align:center;padding:40px;color:var(--text-muted);">Список пуст</div>';
     } else {
@@ -5237,8 +5428,9 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-console.log('✅ Azerta v13.2 — Client загружен');
-console.log('🎨 Баннеры профиля: ВКЛЮЧЕНЫ');
+console.log('✅ Azerta v13.3 — Client загружен');
+console.log('🎨 ТГ-стиль настроек: ВКЛЮЧЁН');
+console.log('🎨 Баннер профиля в карточке: ВКЛЮЧЁН');
 console.log('🤖 Боты: создание, чат, команды');
 console.log('✨ Плавность: ripple, skeleton, spring, stagger');
 console.log('✓ ГОТОВО');
