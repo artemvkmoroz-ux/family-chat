@@ -1,10 +1,11 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v14.4 — Server
+   🌌 AZERTA v14.5 — Server
    ✓ Кружки как base64
    ✓ Автоудаление старых таблиц каналов
    ✓ 🤖 Управление ботами (операторы + чаты от имени бота)
+   ✓ 🏅 Бейджи ботов (галочка, молоток, скам, премиум)
    ═══════════════════════════════════════════════════════════ */
 
 const express = require('express');
@@ -215,7 +216,7 @@ for (const dir of [STORIES_DIR, STICKERS_DIR]) {
 app.use('/stories', express.static(STORIES_DIR));
 app.use('/stickers', express.static(STICKERS_DIR));
 
-console.log('🚀 Azerta v14.4: старт...');
+console.log('🚀 Azerta v14.5: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? '✓' : '✗');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? '✓' : '✗');
 
@@ -474,12 +475,18 @@ async function initDB() {
   await db.execute(`CREATE TABLE IF NOT EXISTS bots (
     username TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL,
     description TEXT, avatar TEXT, emoji TEXT, commands TEXT DEFAULT '[]',
-    is_public INTEGER DEFAULT 1, created_at INTEGER NOT NULL
+    is_public INTEGER DEFAULT 1, created_at INTEGER NOT NULL,
+    verified INTEGER DEFAULT 0, premium INTEGER DEFAULT 0,
+    badge_hammer INTEGER DEFAULT 0, badge_scam INTEGER DEFAULT 0
   )`);
-  await migrate('bots', ['owner TEXT', 'name TEXT', 'description TEXT', 'avatar TEXT', 'emoji TEXT', `commands TEXT DEFAULT '[]'`, 'is_public INTEGER DEFAULT 1', 'created_at INTEGER']);
+  await migrate('bots', [
+    'owner TEXT', 'name TEXT', 'description TEXT', 'avatar TEXT', 'emoji TEXT',
+    `commands TEXT DEFAULT '[]'`, 'is_public INTEGER DEFAULT 1', 'created_at INTEGER',
+    'verified INTEGER DEFAULT 0', 'premium INTEGER DEFAULT 0',
+    'badge_hammer INTEGER DEFAULT 0', 'badge_scam INTEGER DEFAULT 0'
+  ]);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_bots_owner ON bots(owner)`).catch(() => {});
 
-  /* ═══════════════ 🤖 УПРАВЛЕНИЕ БОТАМИ — ТАБЛИЦЫ ═══════════════ */
   await db.execute(`CREATE TABLE IF NOT EXISTS bot_operators (
     bot_username TEXT NOT NULL,
     operator TEXT NOT NULL,
@@ -550,6 +557,12 @@ async function initDB() {
       console.log('🤖 Системный бот создан:', uname);
     }
   }
+
+  /* 🏅 COALESCE для старых ботов без бейджей */
+  await db.execute(`UPDATE bots SET verified = COALESCE(verified, 0)`).catch(() => {});
+  await db.execute(`UPDATE bots SET premium = COALESCE(premium, 0)`).catch(() => {});
+  await db.execute(`UPDATE bots SET badge_hammer = COALESCE(badge_hammer, 0)`).catch(() => {});
+  await db.execute(`UPDATE bots SET badge_scam = COALESCE(badge_scam, 0)`).catch(() => {});
 
   const supportUser = await db.execute({
     sql: 'SELECT 1 FROM users WHERE username = ?',
@@ -1284,7 +1297,7 @@ async function sendContactsTo(username) {
     });
     const usersMap = {};
     usersR.rows.forEach(u => { usersMap[u.username] = u; });
-    const botsR = await db.execute({ sql: `SELECT username, name, description, avatar, emoji FROM bots WHERE username IN (${ph})`, args: names }).catch(() => ({ rows: [] }));
+    const botsR = await db.execute({ sql: `SELECT username, name, description, avatar, emoji, verified, premium, badge_hammer, badge_scam FROM bots WHERE username IN (${ph})`, args: names }).catch(() => ({ rows: [] }));
     const botsMap = {};
     botsR.rows.forEach(b => { botsMap[b.username] = b; });
     const settingsR = await db.execute({ sql: `SELECT chat_key, archived, muted, pinned, pin_order FROM chat_settings WHERE owner = ? AND chat_key IN (${ph})`, args: [username, ...names] });
@@ -1301,7 +1314,8 @@ async function sendContactsTo(username) {
       if (bot) {
         return {
           name: bot.username, displayName: bot.name, avatar: bot.avatar, banner: null,
-          premium: false, verified: false, hammer: false, scam: false,
+          premium: !!bot.premium, verified: !!bot.verified,
+          hammer: !!bot.badge_hammer, scam: !!bot.badge_scam,
           firstName: null, lastName: null, emojiStatus: bot.emoji, online: true,
           archived: !!settings.archived, muted: !!settings.muted,
           pinned: !!settings.pinned, pinOrder: Number(settings.pin_order) || 0,
@@ -1456,6 +1470,44 @@ async function removeBadge(username, badgeType) {
   if (!column) return { ok: false, error: 'Неизвестный значок' };
   await db.execute({ sql: `UPDATE users SET ${column} = 0 WHERE username = ?`, args: [username] });
   return { ok: true };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🏅 УНИВЕРСАЛЬНЫЙ БЕЙДЖ — работает и для юзеров, и для ботов
+   ═══════════════════════════════════════════════════════════ */
+
+async function findUserOrBot(username) {
+  const user = await getUser(username);
+  if (user) return { kind: 'user', row: user };
+  const bot = await getBot(username);
+  if (bot) return { kind: 'bot', row: bot };
+  return null;
+}
+
+async function grantBadgeUniversal(username, badgeType) {
+  const found = await findUserOrBot(username);
+  if (!found) return { ok: false, error: 'Не найден ни юзер, ни бот' };
+  const column = badgeType === 'verified' ? 'verified'
+                : badgeType === 'hammer'   ? 'badge_hammer'
+                : badgeType === 'scam'     ? 'badge_scam'
+                : badgeType === 'premium'  ? 'premium' : null;
+  if (!column) return { ok: false, error: 'Неизвестный значок' };
+  const table = found.kind === 'user' ? 'users' : 'bots';
+  await db.execute({ sql: `UPDATE ${table} SET ${column} = 1 WHERE username = ?`, args: [username] });
+  return { ok: true, kind: found.kind };
+}
+
+async function removeBadgeUniversal(username, badgeType) {
+  const found = await findUserOrBot(username);
+  if (!found) return { ok: false, error: 'Не найден ни юзер, ни бот' };
+  const column = badgeType === 'verified' ? 'verified'
+                : badgeType === 'hammer'   ? 'badge_hammer'
+                : badgeType === 'scam'     ? 'badge_scam'
+                : badgeType === 'premium'  ? 'premium' : null;
+  if (!column) return { ok: false, error: 'Неизвестный значок' };
+  const table = found.kind === 'user' ? 'users' : 'bots';
+  await db.execute({ sql: `UPDATE ${table} SET ${column} = 0 WHERE username = ?`, args: [username] });
+  return { ok: true, kind: found.kind };
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1805,7 +1857,8 @@ io.on('connection', (socket) => {
       if (bot) {
         return cb && cb({
           username: bot.username, avatar: bot.avatar, banner: null,
-          premium: false, verified: false, hammer: false, scam: false,
+          premium: !!bot.premium, verified: !!bot.verified,
+          hammer: !!bot.badge_hammer, scam: !!bot.badge_scam,
           bio: bot.description, firstName: bot.name, lastName: null,
           emojiStatus: bot.emoji, online: true,
           blockedByMe: false, blockedMe: false, gifts: [], isBot: true,
@@ -1974,7 +2027,9 @@ io.on('connection', (socket) => {
           username: b.username, name: b.name, description: b.description,
           avatar: b.avatar, emoji: b.emoji,
           commands: safeParseCommands(b.commands),
-          is_public: !!b.is_public, created_at: b.created_at
+          is_public: !!b.is_public, created_at: b.created_at,
+          verified: !!b.verified, premium: !!b.premium,
+          hammer: !!b.badge_hammer, scam: !!b.badge_scam
         }))
       });
     } catch (e) { console.error(e); cb && cb({ ok: false, bots: [] }); }
@@ -2090,7 +2145,9 @@ io.on('connection', (socket) => {
           username: bot.username, name: bot.name, description: bot.description,
           avatar: bot.avatar, emoji: bot.emoji,
           commands: safeParseCommands(bot.commands),
-          is_public: !!bot.is_public
+          is_public: !!bot.is_public,
+          verified: !!bot.verified, premium: !!bot.premium,
+          hammer: !!bot.badge_hammer, scam: !!bot.badge_scam
         }
       });
     } catch (e) { cb && cb({ ok: false }); }
@@ -2109,108 +2166,122 @@ io.on('connection', (socket) => {
     return true;
   }
 
+  /* ═══════════════════════════════════════════════════════════
+     🏅 БЕЙДЖИ — работают и для юзеров, и для ботов
+     ═══════════════════════════════════════════════════════════ */
+
   socket.on('verify', async ({ username }, cb) => {
     try {
       if (!(await checkAdmin(cb))) return;
-      username = String(username || '').trim().toLowerCase();
+      username = String(username || '').trim().toLowerCase().replace(/^@/, '');
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
-      const target = await getUser(username);
-      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      if (target.verified) return cb && cb({ ok: false, error: 'Уже есть' });
-      await grantBadge(username, 'verified');
-      await broadcastBadgeChange(username, 'verified', true);
-      cb && cb({ ok: true, username });
+      const found = await findUserOrBot(username);
+      if (!found) return cb && cb({ ok: false, error: 'Не найден ни юзер, ни бот' });
+      if (found.row.verified) return cb && cb({ ok: false, error: 'Уже есть' });
+      const res = await grantBadgeUniversal(username, 'verified');
+      if (!res.ok) return cb && cb(res);
+      if (res.kind === 'user') await broadcastBadgeChange(username, 'verified', true);
+      cb && cb({ ok: true, username, kind: res.kind });
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
   socket.on('unverify', async ({ username }, cb) => {
     try {
       if (!(await checkAdmin(cb))) return;
-      username = String(username || '').trim().toLowerCase();
-      const target = await getUser(username);
-      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      await removeBadge(username, 'verified');
-      await broadcastBadgeChange(username, 'verified', false);
-      cb && cb({ ok: true, username });
+      username = String(username || '').trim().toLowerCase().replace(/^@/, '');
+      const found = await findUserOrBot(username);
+      if (!found) return cb && cb({ ok: false, error: 'Не найден ни юзер, ни бот' });
+      const res = await removeBadgeUniversal(username, 'verified');
+      if (!res.ok) return cb && cb(res);
+      if (res.kind === 'user') await broadcastBadgeChange(username, 'verified', false);
+      cb && cb({ ok: true, username, kind: res.kind });
     } catch (e) { cb && cb({ ok: false }); }
   });
 
   socket.on('give hammer', async ({ username }, cb) => {
     try {
       if (!(await checkAdmin(cb))) return;
-      username = String(username || '').trim().toLowerCase();
+      username = String(username || '').trim().toLowerCase().replace(/^@/, '');
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
-      const target = await getUser(username);
-      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      if (target.badge_hammer) return cb && cb({ ok: false, error: 'Уже есть' });
-      await grantBadge(username, 'hammer');
-      await broadcastBadgeChange(username, 'hammer', true);
-      cb && cb({ ok: true, username });
+      const found = await findUserOrBot(username);
+      if (!found) return cb && cb({ ok: false, error: 'Не найден ни юзер, ни бот' });
+      if (found.row.badge_hammer) return cb && cb({ ok: false, error: 'Уже есть' });
+      const res = await grantBadgeUniversal(username, 'hammer');
+      if (!res.ok) return cb && cb(res);
+      if (res.kind === 'user') await broadcastBadgeChange(username, 'hammer', true);
+      cb && cb({ ok: true, username, kind: res.kind });
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
   socket.on('remove hammer', async ({ username }, cb) => {
     try {
       if (!(await checkAdmin(cb))) return;
-      username = String(username || '').trim().toLowerCase();
-      const target = await getUser(username);
-      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      await removeBadge(username, 'hammer');
-      await broadcastBadgeChange(username, 'hammer', false);
-      cb && cb({ ok: true, username });
+      username = String(username || '').trim().toLowerCase().replace(/^@/, '');
+      const found = await findUserOrBot(username);
+      if (!found) return cb && cb({ ok: false, error: 'Не найден ни юзер, ни бот' });
+      const res = await removeBadgeUniversal(username, 'hammer');
+      if (!res.ok) return cb && cb(res);
+      if (res.kind === 'user') await broadcastBadgeChange(username, 'hammer', false);
+      cb && cb({ ok: true, username, kind: res.kind });
     } catch (e) { cb && cb({ ok: false }); }
   });
 
   socket.on('give scam', async ({ username }, cb) => {
     try {
       if (!(await checkAdmin(cb))) return;
-      username = String(username || '').trim().toLowerCase();
+      username = String(username || '').trim().toLowerCase().replace(/^@/, '');
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
-      const target = await getUser(username);
-      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      if (target.badge_scam) return cb && cb({ ok: false, error: 'Уже скам' });
-      await grantBadge(username, 'scam');
-      await broadcastBadgeChange(username, 'scam', true);
-      cb && cb({ ok: true, username });
+      const found = await findUserOrBot(username);
+      if (!found) return cb && cb({ ok: false, error: 'Не найден ни юзер, ни бот' });
+      if (found.row.badge_scam) return cb && cb({ ok: false, error: 'Уже скам' });
+      const res = await grantBadgeUniversal(username, 'scam');
+      if (!res.ok) return cb && cb(res);
+      if (res.kind === 'user') await broadcastBadgeChange(username, 'scam', true);
+      cb && cb({ ok: true, username, kind: res.kind });
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
   socket.on('remove scam', async ({ username }, cb) => {
     try {
       if (!(await checkAdmin(cb))) return;
-      username = String(username || '').trim().toLowerCase();
-      const target = await getUser(username);
-      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      await removeBadge(username, 'scam');
-      await broadcastBadgeChange(username, 'scam', false);
-      cb && cb({ ok: true, username });
+      username = String(username || '').trim().toLowerCase().replace(/^@/, '');
+      const found = await findUserOrBot(username);
+      if (!found) return cb && cb({ ok: false, error: 'Не найден ни юзер, ни бот' });
+      const res = await removeBadgeUniversal(username, 'scam');
+      if (!res.ok) return cb && cb(res);
+      if (res.kind === 'user') await broadcastBadgeChange(username, 'scam', false);
+      cb && cb({ ok: true, username, kind: res.kind });
     } catch (e) { cb && cb({ ok: false }); }
   });
 
   socket.on('give premium', async ({ username }, cb) => {
     try {
       if (!(await checkAdmin(cb))) return;
-      username = String(username || '').trim().toLowerCase();
+      username = String(username || '').trim().toLowerCase().replace(/^@/, '');
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
-      const target = await getUser(username);
-      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      if (target.premium) return cb && cb({ ok: false, error: 'Уже премиум' });
-      await grantBadge(username, 'premium');
-      await broadcastBadgeChange(username, 'premium', true);
-      findSocketsByUsername(username).forEach(sid => io.to(sid).emit('server toast', { text: '⭐ Тебе выдан Azerta Premium!' }));
-      cb && cb({ ok: true, username });
+      const found = await findUserOrBot(username);
+      if (!found) return cb && cb({ ok: false, error: 'Не найден ни юзер, ни бот' });
+      if (found.row.premium) return cb && cb({ ok: false, error: 'Уже премиум' });
+      const res = await grantBadgeUniversal(username, 'premium');
+      if (!res.ok) return cb && cb(res);
+      if (res.kind === 'user') {
+        await broadcastBadgeChange(username, 'premium', true);
+        findSocketsByUsername(username).forEach(sid => io.to(sid).emit('server toast', { text: '⭐ Тебе выдан Azerta Premium!' }));
+      }
+      cb && cb({ ok: true, username, kind: res.kind });
     } catch (e) { console.error(e); cb && cb({ ok: false }); }
   });
 
   socket.on('remove premium', async ({ username }, cb) => {
     try {
       if (!(await checkAdmin(cb))) return;
-      username = String(username || '').trim().toLowerCase();
-      const target = await getUser(username);
-      if (!target) return cb && cb({ ok: false, error: 'Пользователь не найден' });
-      await removeBadge(username, 'premium');
-      await broadcastBadgeChange(username, 'premium', false);
-      cb && cb({ ok: true, username });
+      username = String(username || '').trim().toLowerCase().replace(/^@/, '');
+      const found = await findUserOrBot(username);
+      if (!found) return cb && cb({ ok: false, error: 'Не найден ни юзер, ни бот' });
+      const res = await removeBadgeUniversal(username, 'premium');
+      if (!res.ok) return cb && cb(res);
+      if (res.kind === 'user') await broadcastBadgeChange(username, 'premium', false);
+      cb && cb({ ok: true, username, kind: res.kind });
     } catch (e) { cb && cb({ ok: false }); }
   });
 
@@ -3874,10 +3945,11 @@ initDB()
     cleanupExpiredPunishments().catch(() => {});
     cleanupExpiredPolls().catch(() => {});
     server.listen(CONFIG.PORT, () => {
-      console.log('🌌 Azerta v14.4 запущена на порту ' + CONFIG.PORT);
+      console.log('🌌 Azerta v14.5 запущена на порту ' + CONFIG.PORT);
       console.log('🎥 Кружки: как base64 в БД');
       console.log('💬 Поддержка: @' + CONFIG.SUPPORT_USERNAME);
       console.log('🤖 Управление ботами: активно');
+      console.log('🏅 Бейджи ботов: активно');
     });
   })
   .catch(err => {
