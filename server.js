@@ -1,9 +1,10 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v14.3 — Server
-   ✓ Кружки как base64 (как раньше)
-   ✓ [FIX] Автоудаление старых таблиц каналов
+   🌌 AZERTA v14.4 — Server
+   ✓ Кружки как base64
+   ✓ Автоудаление старых таблиц каналов
+   ✓ 🤖 Управление ботами (операторы + чаты от имени бота)
    ═══════════════════════════════════════════════════════════ */
 
 const express = require('express');
@@ -214,7 +215,7 @@ for (const dir of [STORIES_DIR, STICKERS_DIR]) {
 app.use('/stories', express.static(STORIES_DIR));
 app.use('/stickers', express.static(STICKERS_DIR));
 
-console.log('🚀 Azerta v14.3: старт...');
+console.log('🚀 Azerta v14.4: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? '✓' : '✗');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? '✓' : '✗');
 
@@ -236,7 +237,6 @@ async function initDB() {
   console.log('📦 Инициализация базы...');
   const start = now();
 
-  /* ⚠️ ФИКС: удаляем старые таблицы каналов с неправильной схемой */
   try {
     const info = await db.execute("PRAGMA table_info(channels)");
     const cols = info.rows.map(r => r.name);
@@ -390,7 +390,6 @@ async function initDB() {
   )`);
   await migrate('gift_codes', ['created_by TEXT', 'used_by TEXT', 'used_at INTEGER', 'time INTEGER']);
 
-  /* ✅ НОВАЯ СХЕМА КАНАЛОВ (без owner) */
   await db.execute(`CREATE TABLE IF NOT EXISTS channels (
     id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
     description TEXT, avatar TEXT, creator TEXT NOT NULL,
@@ -480,6 +479,27 @@ async function initDB() {
   await migrate('bots', ['owner TEXT', 'name TEXT', 'description TEXT', 'avatar TEXT', 'emoji TEXT', `commands TEXT DEFAULT '[]'`, 'is_public INTEGER DEFAULT 1', 'created_at INTEGER']);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_bots_owner ON bots(owner)`).catch(() => {});
 
+  /* ═══════════════ 🤖 УПРАВЛЕНИЕ БОТАМИ — ТАБЛИЦЫ ═══════════════ */
+  await db.execute(`CREATE TABLE IF NOT EXISTS bot_operators (
+    bot_username TEXT NOT NULL,
+    operator TEXT NOT NULL,
+    added_by TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (bot_username, operator)
+  )`);
+  await migrate('bot_operators', ['added_by TEXT', 'added_at INTEGER']);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_botops_user ON bot_operators(operator)`).catch(() => {});
+
+  await db.execute(`CREATE TABLE IF NOT EXISTS bot_chat_members (
+    bot_username TEXT NOT NULL,
+    chat_key TEXT NOT NULL,
+    chat_type TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (bot_username, chat_key)
+  )`);
+  await migrate('bot_chat_members', ['chat_type TEXT', 'added_at INTEGER']);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_botchats_bot ON bot_chat_members(bot_username)`).catch(() => {});
+
   await db.execute(`CREATE TABLE IF NOT EXISTS reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT, reporter TEXT NOT NULL,
     target_user TEXT, target_message_id INTEGER, target_is_group INTEGER DEFAULT 0,
@@ -554,7 +574,6 @@ async function initDB() {
 
   console.log(`✅ Схема БД готова за ${Date.now() - start}мс`);
 }
-
 /* ─── Вспомогательные ─── */
 async function ensureSupportContact(username) {
   try {
@@ -1439,6 +1458,33 @@ async function removeBadge(username, badgeType) {
   return { ok: true };
 }
 
+/* ═══════════════════════════════════════════════════════════
+   🤖 УПРАВЛЕНИЕ БОТАМИ — ХЕЛПЕРЫ
+   ═══════════════════════════════════════════════════════════ */
+
+async function isBotOperator(botUsername, username) {
+  const bot = await getBot(botUsername);
+  if (!bot) return false;
+  if (bot.owner === username) return true;
+  const r = await db.execute({
+    sql: 'SELECT 1 FROM bot_operators WHERE bot_username = ? AND operator = ?',
+    args: [botUsername, username]
+  });
+  return r.rows.length > 0;
+}
+
+async function shouldBotAutoReply(botUsername, toUser) {
+  const t = now();
+  const r = await db.execute({
+    sql: `SELECT from_user, time FROM messages
+          WHERE ((from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?))
+          AND time > ?
+          ORDER BY time DESC LIMIT 1`,
+    args: [botUsername, toUser, toUser, botUsername, t - 60000]
+  });
+  if (r.rows.length === 0) return true;
+  return r.rows[0].from_user !== botUsername;
+}
 io.on('connection', (socket) => {
   console.log('🔗 Подключился:', socket.id);
 
@@ -2692,11 +2738,20 @@ io.on('connection', (socket) => {
       if (videoCircle) await incrementStat(from, 'circles_sent');
       if (sticker) await incrementStat(from, 'stickers_sent');
       if (spoilerFlag) await incrementStat(from, 'spoilers_sent');
+
+      /* 🤖 Если получатель — бот, регистрируем чат и (опционально) автоответ */
       if (await isBot(to)) {
-        const reply = await tryBotReply(to, from, text);
-        if (reply) {
-          const delay = Math.min(1500, 400 + reply.length * 3);
-          setTimeout(() => { sendBotMessage(to, from, reply).catch(() => {}); }, delay);
+        db.execute({
+          sql: 'INSERT OR IGNORE INTO bot_chat_members (bot_username, chat_key, chat_type, added_at) VALUES (?, ?, ?, ?)',
+          args: [to, from, 'private', now()]
+        }).catch(() => {});
+        const _shouldReply = await shouldBotAutoReply(to, from);
+        if (_shouldReply) {
+          const reply = await tryBotReply(to, from, text);
+          if (reply) {
+            const delay = Math.min(1500, 400 + reply.length * 3);
+            setTimeout(() => { sendBotMessage(to, from, reply).catch(() => {}); }, delay);
+          }
         }
       }
     } catch (e) { console.error('private message:', e); }
@@ -3550,6 +3605,238 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false }); }
   });
 
+  /* ═══════════════════════════════════════════════════════════
+     🤖 УПРАВЛЕНИЕ БОТАМИ — SOCKET-СОБЫТИЯ
+     ═══════════════════════════════════════════════════════════ */
+
+  socket.on('get bot operators', async ({ botUsername }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      const bot = await getBot(botUsername);
+      if (!bot) return cb && cb({ ok: false, error: 'Бот не найден' });
+      if (bot.owner !== socket.username) return cb && cb({ ok: false, error: 'Только владелец' });
+      const r = await db.execute({
+        sql: `SELECT bo.operator, bo.added_at, u.avatar, u.first_name, u.last_name
+              FROM bot_operators bo
+              LEFT JOIN users u ON u.username = bo.operator
+              WHERE bo.bot_username = ?
+              ORDER BY bo.added_at ASC`,
+        args: [botUsername]
+      });
+      cb && cb({
+        ok: true, owner: bot.owner,
+        operators: r.rows.map(row => ({
+          username: row.operator, avatar: row.avatar,
+          firstName: row.first_name, lastName: row.last_name, addedAt: row.added_at
+        }))
+      });
+    } catch (e) { console.error('get bot operators:', e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('add bot operator', async ({ botUsername, operator }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      const bot = await getBot(botUsername);
+      if (!bot) return cb && cb({ ok: false, error: 'Бот не найден' });
+      if (bot.owner !== socket.username) return cb && cb({ ok: false, error: 'Только владелец' });
+      operator = String(operator || '').trim().toLowerCase().replace(/^@/, '');
+      if (!operator) return cb && cb({ ok: false, error: 'Введи ник' });
+      if (operator === bot.owner) return cb && cb({ ok: false, error: 'Это владелец' });
+      const target = await getUser(operator);
+      if (!target) return cb && cb({ ok: false, error: 'Юзер не найден' });
+      await db.execute({
+        sql: 'INSERT OR IGNORE INTO bot_operators (bot_username, operator, added_by, added_at) VALUES (?, ?, ?, ?)',
+        args: [botUsername, operator, socket.username, now()]
+      });
+      cb && cb({ ok: true, operator });
+    } catch (e) { console.error('add bot operator:', e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('remove bot operator', async ({ botUsername, operator }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const bot = await getBot(botUsername);
+      if (!bot || bot.owner !== socket.username) return cb && cb({ ok: false });
+      await db.execute({
+        sql: 'DELETE FROM bot_operators WHERE bot_username = ? AND operator = ?',
+        args: [botUsername, operator]
+      });
+      cb && cb({ ok: true });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  socket.on('get bot chats', async ({ botUsername }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      const allowed = await isBotOperator(botUsername, socket.username);
+      if (!allowed) return cb && cb({ ok: false, error: 'Нет доступа' });
+      const r = await db.execute({
+        sql: `SELECT chat_key, chat_type, added_at FROM bot_chat_members
+              WHERE bot_username = ? ORDER BY added_at DESC`,
+        args: [botUsername]
+      });
+      const chats = [];
+      for (const row of r.rows) {
+        if (row.chat_type === 'private') {
+          const target = row.chat_key;
+          const contact = await db.execute({
+            sql: `SELECT display_name FROM contacts WHERE owner = ? AND contact = ?`,
+            args: [botUsername, target]
+          });
+          const u = await getContactInfo(target);
+          chats.push({
+            key: row.chat_key, type: 'private', target,
+            displayName: (contact.rows[0] && contact.rows[0].display_name) || (u && u.first_name) || target,
+            avatar: u ? u.avatar : null, addedAt: row.added_at
+          });
+        } else if (row.chat_type === 'group') {
+          const gid = Number(String(row.chat_key).replace('g:', ''));
+          const g = await getGroupById(gid);
+          if (g) {
+            const members = await getGroupMembers(gid);
+            chats.push({
+              key: row.chat_key, type: 'group', target: gid,
+              displayName: g.name, avatar: g.avatar,
+              memberCount: members.length, addedAt: row.added_at
+            });
+          }
+        }
+      }
+      cb && cb({ ok: true, chats });
+    } catch (e) { console.error('get bot chats:', e); cb && cb({ ok: false, chats: [] }); }
+  });
+
+  socket.on('load bot history', async ({ botUsername, chatKey }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      const allowed = await isBotOperator(botUsername, socket.username);
+      if (!allowed) return cb && cb({ ok: false, error: 'Нет доступа' });
+      let messages = [];
+      if (String(chatKey).startsWith('g:')) {
+        const gid = Number(String(chatKey).replace('g:', ''));
+        const rows = await getGroupHistory(gid);
+        messages = await enrichHistoryWithReplies(rows, true);
+      } else {
+        const rows = await getHistory(botUsername, chatKey);
+        messages = await enrichHistoryWithReplies(rows, false);
+      }
+      cb && cb({ ok: true, messages: messages.map(m => ({
+        id: m.id, from: m.from_user, to: m.to_user,
+        text: m.text, image: m.image, sticker: m.sticker,
+        voice: m.voice, voiceDuration: m.voice_duration,
+        videoCircle: m.video_circle, videoDuration: m.video_duration,
+        geo: (m.geo_lat != null && m.geo_lng != null) ? { lat: m.geo_lat, lng: m.geo_lng, label: m.geo_label } : null,
+        reactions: m.reactions || {}, time: m.time,
+        self: m.from_user === botUsername,
+        replyData: m.replyData,
+        edited: !!m.edited, deleted: !!m.deleted,
+        system: !!m.system, systemType: m.system_type
+      })) });
+    } catch (e) { console.error('load bot history:', e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('bot send message', async ({ botUsername, chatKey, text, replyTo }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      const allowed = await isBotOperator(botUsername, socket.username);
+      if (!allowed) return cb && cb({ ok: false, error: 'Нет доступа' });
+      text = String(text || '').trim();
+      if (!text || text.length > CONFIG.MAX_TEXT) return cb && cb({ ok: false, error: 'Пустое или длинное' });
+      const t = now();
+      if (String(chatKey).startsWith('g:')) {
+        const gid = Number(String(chatKey).replace('g:', ''));
+        const result = await db.execute({
+          sql: `INSERT INTO group_messages (group_id, from_user, text, reactions, reply_to, edited, deleted, time)
+                VALUES (?, ?, ?, '{}', ?, 0, 0, ?)`,
+          args: [gid, botUsername, text, replyTo || null, t]
+        });
+        const msgId = Number(result.lastInsertRowid);
+        const payload = { id: msgId, groupId: gid, from: botUsername, text, reactions: {}, replyData: null, time: t, self: false };
+        notifyGroupMembers(gid, 'group message', payload).catch(() => {});
+        cb && cb({ ok: true, id: msgId });
+      } else {
+        const result = await db.execute({
+          sql: `INSERT INTO messages (from_user, to_user, text, reactions, reply_to, edited, deleted, time)
+                VALUES (?, ?, ?, '{}', ?, 0, 0, ?)`,
+          args: [botUsername, chatKey, text, replyTo || null, t]
+        });
+        const msgId = Number(result.lastInsertRowid);
+        const payload = { id: msgId, from: botUsername, to: chatKey, text, reactions: {}, replyData: null, time: t };
+        findSocketsByUsername(chatKey).forEach(sid => io.to(sid).emit('private message', payload));
+        cb && cb({ ok: true, id: msgId });
+      }
+    } catch (e) { console.error('bot send message:', e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('bot send gift', async ({ botUsername, chatKey, giftKey, message }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+      const allowed = await isBotOperator(botUsername, socket.username);
+      if (!allowed) return cb && cb({ ok: false, error: 'Нет доступа' });
+      if (String(chatKey).startsWith('g:')) return cb && cb({ ok: false, error: 'Только в ЛС' });
+      const gift = GIFTS_CATALOG[giftKey];
+      if (!gift) return cb && cb({ ok: false, error: 'Нет подарка' });
+      const target = chatKey;
+      if (target === botUsername) return cb && cb({ ok: false, error: 'Боту нельзя' });
+      const targetUser = await getUser(target);
+      if (!targetUser) return cb && cb({ ok: false, error: 'Юзер не найден' });
+      const bot = await getBot(botUsername);
+      if (!bot) return cb && cb({ ok: false });
+      const ownerStars = await getStars(bot.owner);
+      if (ownerStars < gift.price) return cb && cb({ ok: false, error: 'Недостаточно ⭐ у владельца' });
+      await addStars(bot.owner, -gift.price, 'bot_gift_sent:' + target, null);
+      const giftMsg = message ? String(message).slice(0, 200).trim() : null;
+      const t = now();
+      const r = await db.execute({
+        sql: 'INSERT INTO gifts (gift_key, from_user, to_user, price, time, gift_message) VALUES (?, ?, ?, ?, ?, ?)',
+        args: [giftKey, botUsername, target, gift.price, t, giftMsg]
+      });
+      const giftId = Number(r.lastInsertRowid);
+      let msgText = '🎁 Подарок: ' + gift.emoji + ' ' + gift.name;
+      if (giftMsg) msgText += '\n💬 ' + giftMsg;
+      const msgResult = await db.execute({
+        sql: `INSERT INTO messages (from_user, to_user, text, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, '{}', NULL, 0, 0, ?)`,
+        args: [botUsername, target, msgText, t]
+      });
+      const msgId = Number(msgResult.lastInsertRowid);
+      const msgPayload = { id: msgId, from: botUsername, to: target, text: msgText, reactions: {}, replyData: null, time: t, read: false, isGift: true, giftKey };
+      findSocketsByUsername(target).forEach(sid => io.to(sid).emit('private message', msgPayload));
+      const giftPayload = { id: giftId, gift_key: giftKey, from_user: botUsername, to_user: target, price: gift.price, time: t, gift_message: giftMsg };
+      findSocketsByUsername(target).forEach(sid => io.to(sid).emit('gift received', giftPayload));
+      cb && cb({ ok: true, id: giftId });
+    } catch (e) { console.error('bot send gift:', e); cb && cb({ ok: false }); }
+  });
+
+  socket.on('bot register chat', async ({ botUsername, chatKey, chatType }, cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false });
+      const allowed = await isBotOperator(botUsername, socket.username);
+      if (!allowed) return cb && cb({ ok: false });
+      await db.execute({
+        sql: 'INSERT OR IGNORE INTO bot_chat_members (bot_username, chat_key, chat_type, added_at) VALUES (?, ?, ?, ?)',
+        args: [botUsername, chatKey, chatType || 'private', now()]
+      });
+      cb && cb({ ok: true });
+    } catch (e) { cb && cb({ ok: false }); }
+  });
+
+  socket.on('get my managed bots', async (cb) => {
+    try {
+      if (!socket.username) return cb && cb({ ok: false, bots: [], error: 'Не авторизован' });
+      const r = await db.execute({
+        sql: `SELECT b.username, b.name, b.avatar, b.emoji, b.owner,
+              CASE WHEN b.owner = ? THEN 'owner' ELSE 'operator' END AS role
+              FROM bots b
+              LEFT JOIN bot_operators bo ON bo.bot_username = b.username
+              WHERE b.owner = ? OR bo.operator = ?
+              GROUP BY b.username
+              ORDER BY b.created_at DESC`,
+        args: [socket.username, socket.username, socket.username]
+      });
+      cb && cb({ ok: true, bots: r.rows });
+    } catch (e) { console.error('get my managed bots:', e); cb && cb({ ok: false, bots: [] }); }
+  });
+
   socket.on('disconnect', async () => {
     try {
       const u = socket.username;
@@ -3587,9 +3874,10 @@ initDB()
     cleanupExpiredPunishments().catch(() => {});
     cleanupExpiredPolls().catch(() => {});
     server.listen(CONFIG.PORT, () => {
-      console.log('🌌 Azerta v14.3 запущена на порту ' + CONFIG.PORT);
+      console.log('🌌 Azerta v14.4 запущена на порту ' + CONFIG.PORT);
       console.log('🎥 Кружки: как base64 в БД');
       console.log('💬 Поддержка: @' + CONFIG.SUPPORT_USERNAME);
+      console.log('🤖 Управление ботами: активно');
     });
   })
   .catch(err => {
@@ -3601,339 +3889,3 @@ process.on('uncaughtException', (err) => { console.error('💥 uncaughtException
 process.on('unhandledRejection', (reason) => { console.error('💥 unhandledRejection:', reason); });
 process.on('SIGTERM', () => { console.log('📴 SIGTERM'); server.close(() => process.exit(0)); });
 process.on('SIGINT', () => { console.log('📴 SIGINT'); server.close(() => process.exit(0)); });
-/* ═══════════════════════════════════════════════════════════
-   🤖 AZERTA — УПРАВЛЕНИЕ БОТАМИ (единый патч)
-   Добавляется в конец server.js, всё сам прицепляет
-   ═══════════════════════════════════════════════════════════ */
-
-const botControl = (() => {
-  'use strict';
-
-  /* ─── 1. ХЕЛПЕРЫ ─── */
-  async function isBotOperator(botUsername, username) {
-    const bot = await getBot(botUsername);
-    if (!bot) return false;
-    if (bot.owner === username) return true;
-    const r = await db.execute({
-      sql: 'SELECT 1 FROM bot_operators WHERE bot_username = ? AND operator = ?',
-      args: [botUsername, username]
-    });
-    return r.rows.length > 0;
-  }
-
-  async function shouldBotAutoReply(botUsername, toUser) {
-    const t = now();
-    const r = await db.execute({
-      sql: `SELECT from_user, time FROM messages
-            WHERE ((from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?))
-            AND time > ?
-            ORDER BY time DESC LIMIT 1`,
-      args: [botUsername, toUser, toUser, botUsername, t - 60000]
-    });
-    if (r.rows.length === 0) return true;
-    return r.rows[0].from_user !== botUsername;
-  }
-
-  /* ─── 2. МИГРАЦИИ — выполняем сразу ─── */
-  async function initTables() {
-    try {
-      await db.execute(`CREATE TABLE IF NOT EXISTS bot_operators (
-        bot_username TEXT NOT NULL,
-        operator TEXT NOT NULL,
-        added_by TEXT NOT NULL,
-        added_at INTEGER NOT NULL,
-        PRIMARY KEY (bot_username, operator)
-      )`);
-      await db.execute(`CREATE TABLE IF NOT EXISTS bot_chat_members (
-        bot_username TEXT NOT NULL,
-        chat_key TEXT NOT NULL,
-        chat_type TEXT NOT NULL,
-        added_at INTEGER NOT NULL,
-        PRIMARY KEY (bot_username, chat_key)
-      )`);
-      await db.execute(`CREATE INDEX IF NOT EXISTS idx_botops_user ON bot_operators(operator)`).catch(() => {});
-      await db.execute(`CREATE INDEX IF NOT EXISTS idx_botchats_bot ON bot_chat_members(bot_username)`).catch(() => {});
-      console.log('🤖 bot_operators / bot_chat_members — OK');
-    } catch (e) {
-      console.error('❌ bot tables:', e);
-    }
-  }
-
-  /* ─── 3. SOCKET-СОБЫТИЯ — патчим io.on('connection') ─── */
-  const _origConnection = io.on.bind(io);
-  io.on = function (event, handler) {
-    if (event === 'connection') {
-      const wrapped = function (socket) {
-        // Регистрируем bot-события для каждого сокета
-        socket.on('get bot operators', async ({ botUsername }, cb) => {
-          try {
-            if (!socket.username) return cb && cb({ ok: false });
-            const bot = await getBot(botUsername);
-            if (!bot) return cb && cb({ ok: false, error: 'Бот не найден' });
-            if (bot.owner !== socket.username) return cb && cb({ ok: false, error: 'Только владелец' });
-            const r = await db.execute({
-              sql: `SELECT bo.operator, bo.added_at, u.avatar, u.first_name, u.last_name
-                    FROM bot_operators bo
-                    LEFT JOIN users u ON u.username = bo.operator
-                    WHERE bo.bot_username = ?
-                    ORDER BY bo.added_at ASC`,
-              args: [botUsername]
-            });
-            cb && cb({
-              ok: true, owner: bot.owner,
-              operators: r.rows.map(row => ({
-                username: row.operator, avatar: row.avatar,
-                firstName: row.first_name, lastName: row.last_name, addedAt: row.added_at
-              }))
-            });
-          } catch (e) { console.error(e); cb && cb({ ok: false }); }
-        });
-
-        socket.on('add bot operator', async ({ botUsername, operator }, cb) => {
-          try {
-            if (!socket.username) return cb && cb({ ok: false });
-            const bot = await getBot(botUsername);
-            if (!bot) return cb && cb({ ok: false, error: 'Бот не найден' });
-            if (bot.owner !== socket.username) return cb && cb({ ok: false, error: 'Только владелец' });
-            operator = String(operator || '').trim().toLowerCase().replace(/^@/, '');
-            if (!operator) return cb && cb({ ok: false, error: 'Введи ник' });
-            if (operator === bot.owner) return cb && cb({ ok: false, error: 'Это владелец' });
-            const target = await getUser(operator);
-            if (!target) return cb && cb({ ok: false, error: 'Юзер не найден' });
-            await db.execute({
-              sql: 'INSERT OR IGNORE INTO bot_operators (bot_username, operator, added_by, added_at) VALUES (?, ?, ?, ?)',
-              args: [botUsername, operator, socket.username, now()]
-            });
-            cb && cb({ ok: true, operator });
-          } catch (e) { console.error(e); cb && cb({ ok: false }); }
-        });
-
-        socket.on('remove bot operator', async ({ botUsername, operator }, cb) => {
-          try {
-            if (!socket.username) return cb && cb({ ok: false });
-            const bot = await getBot(botUsername);
-            if (!bot || bot.owner !== socket.username) return cb && cb({ ok: false });
-            await db.execute({
-              sql: 'DELETE FROM bot_operators WHERE bot_username = ? AND operator = ?',
-              args: [botUsername, operator]
-            });
-            cb && cb({ ok: true });
-          } catch (e) { cb && cb({ ok: false }); }
-        });
-
-        socket.on('get bot chats', async ({ botUsername }, cb) => {
-          try {
-            if (!socket.username) return cb && cb({ ok: false });
-            const allowed = await isBotOperator(botUsername, socket.username);
-            if (!allowed) return cb && cb({ ok: false, error: 'Нет доступа' });
-            const r = await db.execute({
-              sql: `SELECT chat_key, chat_type, added_at FROM bot_chat_members
-                    WHERE bot_username = ? ORDER BY added_at DESC`,
-              args: [botUsername]
-            });
-            const chats = [];
-            for (const row of r.rows) {
-              if (row.chat_type === 'private') {
-                const target = row.chat_key;
-                const contact = await db.execute({
-                  sql: `SELECT display_name FROM contacts WHERE owner = ? AND contact = ?`,
-                  args: [botUsername, target]
-                });
-                const u = await getContactInfo(target);
-                chats.push({
-                  key: row.chat_key, type: 'private', target,
-                  displayName: (contact.rows[0] && contact.rows[0].display_name) || (u && u.first_name) || target,
-                  avatar: u ? u.avatar : null, addedAt: row.added_at
-                });
-              } else if (row.chat_type === 'group') {
-                const gid = Number(String(row.chat_key).replace('g:', ''));
-                const g = await getGroupById(gid);
-                if (g) {
-                  const members = await getGroupMembers(gid);
-                  chats.push({
-                    key: row.chat_key, type: 'group', target: gid,
-                    displayName: g.name, avatar: g.avatar,
-                    memberCount: members.length, addedAt: row.added_at
-                  });
-                }
-              }
-            }
-            cb && cb({ ok: true, chats });
-          } catch (e) { console.error(e); cb && cb({ ok: false, chats: [] }); }
-        });
-
-        socket.on('load bot history', async ({ botUsername, chatKey }, cb) => {
-          try {
-            if (!socket.username) return cb && cb({ ok: false });
-            const allowed = await isBotOperator(botUsername, socket.username);
-            if (!allowed) return cb && cb({ ok: false, error: 'Нет доступа' });
-            let messages = [];
-            if (String(chatKey).startsWith('g:')) {
-              const gid = Number(String(chatKey).replace('g:', ''));
-              const rows = await getGroupHistory(gid);
-              messages = await enrichHistoryWithReplies(rows, true);
-            } else {
-              const rows = await getHistory(botUsername, chatKey);
-              messages = await enrichHistoryWithReplies(rows, false);
-            }
-            cb && cb({ ok: true, messages: messages.map(m => ({
-              id: m.id, from: m.from_user, to: m.to_user,
-              text: m.text, image: m.image, sticker: m.sticker,
-              voice: m.voice, voiceDuration: m.voice_duration,
-              videoCircle: m.video_circle, videoDuration: m.video_duration,
-              geo: (m.geo_lat != null && m.geo_lng != null) ? { lat: m.geo_lat, lng: m.geo_lng, label: m.geo_label } : null,
-              reactions: m.reactions || {}, time: m.time,
-              self: m.from_user === botUsername,
-              replyData: m.replyData,
-              edited: !!m.edited, deleted: !!m.deleted,
-              system: !!m.system, systemType: m.system_type
-            })) });
-          } catch (e) { console.error(e); cb && cb({ ok: false }); }
-        });
-
-        socket.on('bot send message', async ({ botUsername, chatKey, text, replyTo }, cb) => {
-          try {
-            if (!socket.username) return cb && cb({ ok: false });
-            const allowed = await isBotOperator(botUsername, socket.username);
-            if (!allowed) return cb && cb({ ok: false, error: 'Нет доступа' });
-            text = String(text || '').trim();
-            if (!text || text.length > CONFIG.MAX_TEXT) return cb && cb({ ok: false, error: 'Пустое или длинное' });
-            const t = now();
-            if (String(chatKey).startsWith('g:')) {
-              const gid = Number(String(chatKey).replace('g:', ''));
-              const result = await db.execute({
-                sql: `INSERT INTO group_messages (group_id, from_user, text, reactions, reply_to, edited, deleted, time)
-                      VALUES (?, ?, ?, '{}', ?, 0, 0, ?)`,
-                args: [gid, botUsername, text, replyTo || null, t]
-              });
-              const msgId = Number(result.lastInsertRowid);
-              const payload = { id: msgId, groupId: gid, from: botUsername, text, reactions: {}, replyData: null, time: t, self: false };
-              notifyGroupMembers(gid, 'group message', payload).catch(() => {});
-              cb && cb({ ok: true, id: msgId });
-            } else {
-              const result = await db.execute({
-                sql: `INSERT INTO messages (from_user, to_user, text, reactions, reply_to, edited, deleted, time)
-                      VALUES (?, ?, ?, '{}', ?, 0, 0, ?)`,
-                args: [botUsername, chatKey, text, replyTo || null, t]
-              });
-              const msgId = Number(result.lastInsertRowid);
-              const payload = { id: msgId, from: botUsername, to: chatKey, text, reactions: {}, replyData: null, time: t };
-              findSocketsByUsername(chatKey).forEach(sid => io.to(sid).emit('private message', payload));
-              cb && cb({ ok: true, id: msgId });
-            }
-          } catch (e) { console.error(e); cb && cb({ ok: false }); }
-        });
-
-        socket.on('bot send gift', async ({ botUsername, chatKey, giftKey, message }, cb) => {
-          try {
-            if (!socket.username) return cb && cb({ ok: false });
-            const allowed = await isBotOperator(botUsername, socket.username);
-            if (!allowed) return cb && cb({ ok: false, error: 'Нет доступа' });
-            if (String(chatKey).startsWith('g:')) return cb && cb({ ok: false, error: 'Только в ЛС' });
-            const gift = GIFTS_CATALOG[giftKey];
-            if (!gift) return cb && cb({ ok: false, error: 'Нет подарка' });
-            const target = chatKey;
-            if (target === botUsername) return cb && cb({ ok: false, error: 'Боту нельзя' });
-            const targetUser = await getUser(target);
-            if (!targetUser) return cb && cb({ ok: false, error: 'Юзер не найден' });
-            const bot = await getBot(botUsername);
-            if (!bot) return cb && cb({ ok: false });
-            const ownerStars = await getStars(bot.owner);
-            if (ownerStars < gift.price) return cb && cb({ ok: false, error: 'Недостаточно ⭐ у владельца' });
-            await addStars(bot.owner, -gift.price, 'bot_gift_sent:' + target, null);
-            const giftMsg = message ? String(message).slice(0, 200).trim() : null;
-            const t = now();
-            const r = await db.execute({
-              sql: 'INSERT INTO gifts (gift_key, from_user, to_user, price, time, gift_message) VALUES (?, ?, ?, ?, ?, ?)',
-              args: [giftKey, botUsername, target, gift.price, t, giftMsg]
-            });
-            const giftId = Number(r.lastInsertRowid);
-            let msgText = '🎁 Подарок: ' + gift.emoji + ' ' + gift.name;
-            if (giftMsg) msgText += '\n💬 ' + giftMsg;
-            const msgResult = await db.execute({
-              sql: `INSERT INTO messages (from_user, to_user, text, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, '{}', NULL, 0, 0, ?)`,
-              args: [botUsername, target, msgText, t]
-            });
-            const msgId = Number(msgResult.lastInsertRowid);
-            const msgPayload = { id: msgId, from: botUsername, to: target, text: msgText, reactions: {}, replyData: null, time: t, read: false, isGift: true, giftKey };
-            findSocketsByUsername(target).forEach(sid => io.to(sid).emit('private message', msgPayload));
-            const giftPayload = { id: giftId, gift_key: giftKey, from_user: botUsername, to_user: target, price: gift.price, time: t, gift_message: giftMsg };
-            findSocketsByUsername(target).forEach(sid => io.to(sid).emit('gift received', giftPayload));
-            cb && cb({ ok: true, id: giftId });
-          } catch (e) { console.error(e); cb && cb({ ok: false }); }
-        });
-
-        socket.on('bot register chat', async ({ botUsername, chatKey, chatType }, cb) => {
-          try {
-            if (!socket.username) return cb && cb({ ok: false });
-            const allowed = await isBotOperator(botUsername, socket.username);
-            if (!allowed) return cb && cb({ ok: false });
-            await db.execute({
-              sql: 'INSERT OR IGNORE INTO bot_chat_members (bot_username, chat_key, chat_type, added_at) VALUES (?, ?, ?, ?)',
-              args: [botUsername, chatKey, chatType || 'private', now()]
-            });
-            cb && cb({ ok: true });
-          } catch (e) { cb && cb({ ok: false }); }
-        });
-
-        socket.on('get my managed bots', async (cb) => {
-          try {
-            if (!socket.username) return cb && cb({ ok: false, bots: [] });
-            const r = await db.execute({
-              sql: `SELECT b.username, b.name, b.avatar, b.emoji, b.owner,
-                    CASE WHEN b.owner = ? THEN 'owner' ELSE 'operator' END AS role
-                    FROM bots b
-                    LEFT JOIN bot_operators bo ON bo.bot_username = b.username
-                    WHERE b.owner = ? OR bo.operator = ?
-                    GROUP BY b.username
-                    ORDER BY b.created_at DESC`,
-              args: [socket.username, socket.username, socket.username]
-            });
-            cb && cb({ ok: true, bots: r.rows });
-          } catch (e) { console.error(e); cb && cb({ ok: false, bots: [] }); }
-        });
-
-        // Регистрируем авто-запись чата бота при ЛС
-        socket.on('_bot_register_hook', () => {});
-
-        // Передаём управление оригинальному обработчику
-        return handler(socket);
-      };
-      return _origConnection(event, wrapped);
-    }
-    return _origConnection(event, handler);
-  };
-
-  /* ─── 4. АВТО-ЗАПИСЬ ЧАТА БОТА ─── */
-  // Патчим io.emit, чтобы ловить любые сообщения с ботом в ЛС
-  const _origEmit = io.emit.bind(io);
-  io.emit = function (event, ...args) {
-    // Ловим только 'private message' — проверяем, не бот ли получатель
-    if (event === 'private message' && args[0] && args[0].from && args[0].to) {
-      const msg = args[0];
-      isBot(msg.to).then(isBotTarget => {
-        if (isBotTarget) {
-          db.execute({
-            sql: 'INSERT OR IGNORE INTO bot_chat_members (bot_username, chat_key, chat_type, added_at) VALUES (?, ?, ?, ?)',
-            args: [msg.to, msg.from, 'private', now()]
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    }
-    return _origEmit(event, ...args);
-  };
-
-  /* ─── 5. ПАТЧ АВТООТВЕТА БОТА ─── */
-  // Заменяем io.emit('private message', ...) лог, чтобы автоответ не срабатывал,
-  // если оператор только что ответил от имени бота. Делаем через перехват
-  // socket-события 'private message' до его основной обработки.
-  // Проще: не патчим, а просто не мешаем — shouldBotAutoReply уже проверяет это
-  // в основном обработчике. Если хочешь — добавлю более глубокий патч.
-
-  /* ─── ЗАПУСК ─── */
-  initTables();
-
-  return { isBotOperator, shouldBotAutoReply, initTables };
-})();
-
-console.log('🤖 bot-control патч загружен');
