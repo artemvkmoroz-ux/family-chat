@@ -6317,3 +6317,94 @@ console.log('📍 Геолокация: send geo');
 console.log('🚨 Жалобы: report, resolve report');
 console.log('🛡️  Модерация: openModPanel, ban/mute/warn user');
 console.log('✓ ГОТОВО');
+/* ═══════════════════════════════════════════════════════════
+   👁 СПОЙЛЕР — скрытый текст
+   ═══════════════════════════════════════════════════════════ */
+
+state.spoilerMode = false;
+
+function toggleSpoilerMode() {
+  state.spoilerMode = !state.spoilerMode;
+  const btn = document.getElementById('spoilerBtn');
+  if (btn) btn.classList.toggle('active', state.spoilerMode);
+  const input = document.getElementById('msgInput');
+  if (input) input.classList.toggle('spoiler-mode', state.spoilerMode);
+  if (typeof vibrate === 'function') vibrate(15);
+  if (typeof showToast === 'function') {
+    showToast(state.spoilerMode ? '👁 Спойлер включён' : '👁 Спойлер выключен');
+  }
+}
+
+/* Переопределяем sendMsg — добавляем spoiler */
+(function patchSendMsg() {
+  const _orig = window.sendMsg || sendMsg;
+  window.sendMsg = function () {
+    const input = document.getElementById('msgInput');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    if (state.me.mute) { showToast('🔇 Ты в муте'); return; }
+
+    const spoiler = !!state.spoilerMode;
+    const replyId = state.replyToMessage ? state.replyToMessage.id : null;
+
+    if (state.isSavedChat) socket.emit('private message', { to: state.me.username, text: text, spoiler });
+    else if (state.currentChat) {
+      socket.emit('private message', { to: state.currentChat, text: text, replyTo: replyId, spoiler });
+      socket.emit('typing', { to: state.currentChat, isTyping: false });
+    } else if (state.currentGroup) {
+      socket.emit('group message', { groupId: state.currentGroup.id, text: text, replyTo: replyId, spoiler });
+      socket.emit('group typing', { groupId: state.currentGroup.id, isTyping: false });
+    } else return;
+
+    input.value = '';
+    cancelReply();
+    if (state.myTypingTimeout) { clearTimeout(state.myTypingTimeout); state.myTypingTimeout = null; }
+
+    /* Сброс режима спойлера после отправки */
+    state.spoilerMode = false;
+    const sb = document.getElementById('spoilerBtn');
+    if (sb) sb.classList.remove('active');
+    input.classList.remove('spoiler-mode');
+  };
+})();
+
+/* Патчим рендер сообщений — показываем спойлер */
+(function patchRenderMessage() {
+  const _orig = window.renderMessage || renderMessage;
+  window.renderMessage = function (msg) {
+    if (!msg || !msg.spoiler || !msg.text || msg.deleted || msg.system) {
+      return _orig(msg);
+    }
+    /* Оборачиваем как размытый блок */
+    const old = msg.text;
+    const wrapSpoiler = '__SPOILER_START__' + old + '__SPOILER_END__';
+    msg.text = wrapSpoiler;
+    _orig(msg);
+
+    /* После рендера ищем плейсхолдер и заменяем на реальный спойлер */
+    const box = document.getElementById('messages');
+    if (!box) return;
+    const last = box.lastElementChild;
+    if (!last) return;
+    const textSpan = last.querySelector('.msg-text');
+    if (!textSpan) return;
+    const html = textSpan.innerHTML;
+    const m = html.match(/__SPOILER_START__([\s\S]*?)__SPOILER_END__/);
+    if (!m) return;
+    textSpan.innerHTML = '';
+    const span = document.createElement('span');
+    span.className = 'spoiler-text';
+    span.dataset.revealed = '0';
+    span.innerHTML = m[1];
+    span.onclick = function (e) {
+      e.stopPropagation();
+      const revealed = span.dataset.revealed === '1';
+      span.dataset.revealed = revealed ? '0' : '1';
+      span.classList.toggle('revealed', !revealed);
+      vibrate(10);
+    };
+    textSpan.appendChild(span);
+    msg.text = old;
+  };
+})();
