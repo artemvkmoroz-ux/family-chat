@@ -6408,3 +6408,364 @@ function toggleSpoilerMode() {
     msg.text = old;
   };
 })();
+/* ═══════════════════════════════════════════════════════════
+   🤖 УПРАВЛЕНИЕ БОТАМИ
+   ═══════════════════════════════════════════════════════════ */
+
+state.botControlCurrent = null;
+state.botControlTab = 'chats';
+state.botChatCurrent = null;
+state.botVoiceMode = 'bot';
+state.botReplyTo = null;
+
+function openBotControl(botUsername) {
+  state.botControlCurrent = botUsername;
+  const title = $('bot-control-title');
+  if (title) title.textContent = '🤖 Управление @' + botUsername;
+  switchBotControlTab('chats');
+  loadBotChats(botUsername);
+  loadBotOperators(botUsername);
+  closeModal('my-bots-modal');
+  openModal('bot-control-modal');
+}
+
+function switchBotControlTab(tab) {
+  state.botControlTab = tab;
+  document.querySelectorAll('.bot-control-tab').forEach(function (t) {
+    t.classList.toggle('active', t.dataset.tab === tab);
+  });
+  document.querySelectorAll('.bot-control-section').forEach(function (s) {
+    s.classList.toggle('active', s.dataset.tab === tab);
+  });
+}
+
+function loadBotChats(botUsername) {
+  const box = $('bot-chats-list');
+  if (!box) return;
+  box.innerHTML = '<div class="mod-empty">Загрузка…</div>';
+  socket.emit('get bot chats', { botUsername: botUsername }, function (res) {
+    if (!res || !res.ok) {
+      box.innerHTML = '<div class="mod-empty">Ошибка</div>';
+      return;
+    }
+    if (res.chats.length === 0) {
+      box.innerHTML = '<div class="mod-empty">Бот ещё ни с кем не общался.<br>Напиши кому-нибудь от имени бота — чат появится здесь.</div>';
+      return;
+    }
+    box.innerHTML = '';
+    res.chats.forEach(function (c) {
+      const row = document.createElement('div');
+      row.className = 'bot-chat-item';
+      const av = c.avatar
+        ? '<div class="avatar" style="background-image:url(' + c.avatar + ')"></div>'
+        : '<div class="avatar ' + (c.type === 'group' ? 'group' : '') + '">' + (c.type === 'group' ? '👥' : '👤') + '</div>';
+      row.innerHTML = av +
+        '<div class="chat-info">' +
+          '<div class="chat-name">' + escapeHtml(c.displayName) + '</div>' +
+          '<div class="chat-preview">' +
+            (c.type === 'group' ? c.memberCount + ' участников' : '@' + escapeHtml(c.target)) +
+          '</div>' +
+        '</div>' +
+        '<span class="tg-row-arrow">›</span>';
+      row.onclick = function () { openBotChat(c); };
+      box.appendChild(row);
+    });
+  });
+}
+
+function loadBotOperators(botUsername) {
+  const box = $('bot-operators-list');
+  if (!box) return;
+  box.innerHTML = '<div class="mod-empty">Загрузка…</div>';
+  socket.emit('get bot operators', { botUsername: botUsername }, function (res) {
+    if (!res || !res.ok) {
+      box.innerHTML = '<div class="mod-empty">Ошибка</div>';
+      return;
+    }
+    box.innerHTML = '';
+    const owner = document.createElement('div');
+    owner.className = 'bot-operator-row owner';
+    owner.innerHTML =
+      '<div class="avatar" style="background:var(--gold); color:#0a1628; font-size:16px;">👑</div>' +
+      '<div class="chat-info">' +
+        '<div class="chat-name">@' + escapeHtml(res.owner) + '</div>' +
+        '<div class="chat-preview">Владелец</div>' +
+      '</div>';
+    box.appendChild(owner);
+    if (res.operators.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'mod-empty';
+      empty.textContent = 'Операторов пока нет';
+      box.appendChild(empty);
+    } else {
+      res.operators.forEach(function (op) {
+        const row = document.createElement('div');
+        row.className = 'bot-operator-row';
+        const av = op.avatar
+          ? '<div class="avatar" style="background-image:url(' + op.avatar + ')"></div>'
+          : '<div class="avatar">' + initials(op.firstName || op.username) + '</div>';
+        const display = ((op.firstName || '') + ' ' + (op.lastName || '')).trim() || ('@' + op.username);
+        row.innerHTML = av +
+          '<div class="chat-info">' +
+            '<div class="chat-name">' + escapeHtml(display) + '</div>' +
+            '<div class="chat-preview">@' + escapeHtml(op.username) + '</div>' +
+          '</div>' +
+          '<button class="mrc-btn ghost" onclick="removeBotOperator(\'' + op.username + '\')">Убрать</button>';
+        box.appendChild(row);
+      });
+    }
+  });
+}
+
+function addBotOperator() {
+  const inp = $('bot-operator-input');
+  if (!inp) return;
+  const op = inp.value.trim().toLowerCase().replace(/^@/, '');
+  if (!op) return;
+  socket.emit('add bot operator', { botUsername: state.botControlCurrent, operator: op }, function (res) {
+    if (!res || !res.ok) { showToast('❌ ' + ((res && res.error) || 'Ошибка')); return; }
+    inp.value = '';
+    showToast('✓ Оператор добавлен');
+    loadBotOperators(state.botControlCurrent);
+  });
+}
+
+function removeBotOperator(operator) {
+  if (!confirm('Убрать @' + operator + ' из операторов?')) return;
+  socket.emit('remove bot operator', { botUsername: state.botControlCurrent, operator: operator }, function (res) {
+    if (res && res.ok) {
+      showToast('✓ Оператор удалён');
+      loadBotOperators(state.botControlCurrent);
+    }
+  });
+}
+
+function openBotChat(chat) {
+  state.botChatCurrent = {
+    botUsername: state.botControlCurrent,
+    chatKey: chat.key,
+    chatType: chat.type,
+    target: chat.target,
+    displayName: chat.displayName
+  };
+  state.botReplyTo = null;
+
+  const av = $('bot-chat-avatar');
+  if (av) {
+    if (chat.avatar) {
+      av.style.backgroundImage = 'url(' + chat.avatar + ')';
+      av.textContent = '';
+    } else {
+      av.style.backgroundImage = '';
+      av.textContent = chat.type === 'group' ? '👥' : initials(chat.displayName);
+      av.style.background = chat.type === 'group' ? 'linear-gradient(135deg,#0f5132,#2d9e6b)' : 'var(--accent)';
+    }
+  }
+  const nameEl = $('bot-chat-name');
+  if (nameEl) nameEl.textContent = chat.displayName;
+  const botName = $('bot-chat-botname');
+  if (botName) botName.textContent = '@' + chat.botUsername;
+
+  const box = $('bot-chat-messages');
+  if (box) box.innerHTML = '<div class="mod-empty">Загрузка…</div>';
+
+  socket.emit('load bot history', {
+    botUsername: chat.botUsername,
+    chatKey: chat.chatKey
+  }, function (res) {
+    if (!res || !res.ok) {
+      if (box) box.innerHTML = '<div class="mod-empty">Ошибка</div>';
+      return;
+    }
+    if (box) box.innerHTML = '';
+    res.messages.forEach(function (m) { renderBotMessage(m); });
+    if (box) box.scrollTop = box.scrollHeight;
+  });
+
+  closeModal('bot-control-modal');
+  const screen = $('bot-chat-screen');
+  if (screen) screen.classList.add('active');
+}
+
+function closeBotChat() {
+  state.botChatCurrent = null;
+  state.botReplyTo = null;
+  const screen = $('bot-chat-screen');
+  if (screen) screen.classList.remove('active');
+  if (state.botControlCurrent) openBotControl(state.botControlCurrent);
+}
+
+function renderBotMessage(m) {
+  const box = $('bot-chat-messages');
+  if (!box) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-wrap ' + (m.self ? 'self' : 'other');
+  wrap.dataset.id = m.id;
+  const div = document.createElement('div');
+  div.className = 'msg ' + (m.self ? 'self' : 'other');
+  if (m.replyData) {
+    const rb = document.createElement('div');
+    rb.className = 'reply-block';
+    rb.innerHTML = '<div class="reply-name">' + escapeHtml(m.replyData.from) + '</div>' +
+      '<div class="reply-text">' + escapeHtml((m.replyData.text || '').slice(0, 80)) + '</div>';
+    div.appendChild(rb);
+  }
+  if (m.deleted) {
+    div.classList.add('deleted');
+    div.innerHTML += '<i>Сообщение удалено</i>';
+  } else {
+    if (m.sticker) {
+      const isVideo = /\.(mp4|webm)(\?|$)/i.test(m.sticker);
+      if (isVideo) {
+        const v = document.createElement('video');
+        v.className = 'sticker-video'; v.src = m.sticker;
+        v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
+        div.appendChild(v);
+      } else {
+        const img = document.createElement('img');
+        img.className = 'sticker-img'; img.src = m.sticker;
+        div.appendChild(img);
+      }
+    } else if (m.image) {
+      const img = document.createElement('img');
+      img.className = 'photo'; img.src = m.image;
+      div.appendChild(img);
+    }
+    if (m.text) {
+      const span = document.createElement('span');
+      span.className = 'msg-text';
+      span.innerHTML = highlightMentions(m.text);
+      div.appendChild(span);
+    }
+  }
+  const meta = document.createElement('span');
+  meta.className = 'meta';
+  meta.textContent = m.time ? formatTime(m.time) : '';
+  div.appendChild(meta);
+  wrap.appendChild(div);
+  box.appendChild(wrap);
+}
+
+function sendBotMessage() {
+  const inp = $('bot-msg-input');
+  if (!inp) return;
+  const text = inp.value.trim();
+  if (!text || !state.botChatCurrent) return;
+  socket.emit('bot send message', {
+    botUsername: state.botChatCurrent.botUsername,
+    chatKey: state.botChatCurrent.chatKey,
+    text: text,
+    replyTo: state.botReplyTo ? state.botReplyTo.id : null
+  }, function (res) {
+    if (!res || !res.ok) { showToast('❌ ' + ((res && res.error) || 'Ошибка')); return; }
+    inp.value = '';
+    cancelBotReply();
+  });
+}
+
+function cancelBotReply() {
+  state.botReplyTo = null;
+  const rp = $('bot-chat-reply-preview');
+  if (rp) rp.style.display = 'none';
+}
+
+function toggleBotVoiceMode() {
+  state.botVoiceMode = state.botVoiceMode === 'bot' ? 'self' : 'bot';
+  const btn = $('bot-voice-toggle');
+  if (btn) {
+    btn.textContent = state.botVoiceMode === 'bot' ? '🤖' : '👤';
+    btn.title = 'Режим: ' + (state.botVoiceMode === 'bot' ? 'бот' : 'я');
+  }
+  const status = $('bot-chat-status');
+  if (status && state.botChatCurrent) {
+    status.innerHTML = state.botVoiceMode === 'bot'
+      ? 'от имени <b>@' + state.botChatCurrent.botUsername + '</b>'
+      : 'пишу как <b>@' + state.me.username + '</b>';
+  }
+}
+
+function openBotGiftPicker() {
+  if (!state.botChatCurrent || state.botChatCurrent.chatType !== 'private') {
+    showToast('🎁 Подарки только в личных чатах');
+    return;
+  }
+  const grid = $('bot-gift-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const entries = Object.entries(state.giftsCatalog);
+  entries.forEach(function (entry) {
+    const key = entry[0], gift = entry[1];
+    const div = document.createElement('div');
+    div.className = 'gift-card affordable';
+    div.innerHTML = '<span class="gift-emoji">' + gift.emoji + '</span>' +
+      '<span class="gift-name">' + escapeHtml(gift.name) + '</span>' +
+      '<span class="gift-price">' + gift.price + ' ⭐</span>';
+    div.onclick = function () { sendBotGift(key, gift); };
+    grid.appendChild(div);
+  });
+  const tgt = $('bot-gift-target');
+  if (tgt) tgt.textContent = 'Кому: ' + state.botChatCurrent.displayName + ' (от @' + state.botChatCurrent.botUsername + ')';
+  openModal('bot-gift-modal');
+}
+
+function sendBotGift(giftKey, gift) {
+  if (!state.botChatCurrent) return;
+  const msg = prompt('Добавить пожелание от бота? (необязательно)') || null;
+  socket.emit('bot send gift', {
+    botUsername: state.botChatCurrent.botUsername,
+    chatKey: state.botChatCurrent.chatKey,
+    giftKey: giftKey,
+    message: msg
+  }, function (res) {
+    closeModal('bot-gift-modal');
+    if (!res || !res.ok) { showToast('❌ ' + ((res && res.error) || 'Ошибка')); return; }
+    showToast('🎁 Подарок отправлен от @' + state.botChatCurrent.botUsername);
+  });
+}
+
+/* Перезаписываем openMyBots — добавляем кнопку «Управление» и поддержку операторов */
+openMyBots = function () {
+  const box = $('my-bots-list');
+  if (!box) return;
+  box.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">Загрузка…</div>';
+  openModal('my-bots-modal');
+  socket.emit('get my managed bots', function (res) {
+    if (!res || !res.ok) {
+      box.innerHTML = '<div style="text-align:center;padding:20px;color:#f87171;">Ошибка</div>';
+      return;
+    }
+    if (res.bots.length === 0) {
+      box.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Пока нет ботов 🤖<br><br>Нажми «Создать бота»</div>';
+      return;
+    }
+    box.innerHTML = '';
+    res.bots.forEach(function (b) {
+      const card = document.createElement('div');
+      card.className = 'my-bot-card';
+      const avStyle = b.avatar ? 'background-image:url(' + b.avatar + ')' : '';
+      const avContent = b.avatar ? '' : (b.emoji || '🤖');
+      const roleLabel = b.role === 'owner' ? '👑 Владелец' : '👥 Оператор';
+      card.innerHTML = '<div class="bot-avatar" style="' + avStyle + '">' + avContent + '</div>' +
+        '<div class="bot-info">' +
+          '<div class="bot-name">' + escapeHtml(b.name) + ' <span class="bot-mark">бот</span></div>' +
+          '<div class="bot-desc">@' + escapeHtml(b.username) + ' · ' + roleLabel + '</div>' +
+        '</div>' +
+        '<button class="mrc-btn" onclick="event.stopPropagation(); openBotControl(\'' + b.username + '\')">Управление</button>';
+      card.onclick = function () { openEditBot(b.username); };
+      box.appendChild(card);
+    });
+  });
+};
+
+/* Enter для отправки */
+document.addEventListener('DOMContentLoaded', function () {
+  const botInput = $('bot-msg-input');
+  if (botInput) {
+    botInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendBotMessage();
+      }
+    });
+  }
+});
