@@ -673,7 +673,7 @@
 
 <div class="modal" id="my-bots-modal"><div class="modal-box">
   <h3>🤖 Мои боты</h3>
-  <div class="modal-desc">Твои боты (максимум 3)</div>
+  <div class="modal-desc">Твои боты и боты, где ты оператор</div>
   <div id="my-bots-list" style="max-height:60vh;overflow-y:auto;"></div>
   <button class="modal-primary" onclick="closeModal('my-bots-modal'); openCreateBotModal();">➕ Создать бота</button>
   <button class="modal-secondary" onclick="closeModal('my-bots-modal')">Закрыть</button>
@@ -710,6 +710,67 @@
   <div id="bot-info-content"></div>
   <button class="modal-primary" onclick="addFoundBot()">➕ Добавить и написать</button>
   <button class="modal-secondary" onclick="closeModal('bot-info-modal')">Закрыть</button>
+</div></div>
+
+<!-- BOT CONTROL PANEL -->
+<div class="modal" id="bot-control-modal"><div class="modal-box" style="max-width:520px;">
+  <h3 id="bot-control-title">🤖 Управление ботом</h3>
+
+  <div class="bot-control-tabs">
+    <button class="bot-control-tab active" data-tab="chats" onclick="switchBotControlTab('chats')">💬 Чаты</button>
+    <button class="bot-control-tab" data-tab="operators" onclick="switchBotControlTab('operators')">👥 Операторы</button>
+  </div>
+
+  <div class="bot-control-section active" data-tab="chats">
+    <div id="bot-chats-list" class="mod-list"></div>
+  </div>
+
+  <div class="bot-control-section" data-tab="operators">
+    <div class="modal-desc">Кто может писать от имени бота</div>
+    <div class="auth-input-group" style="margin-bottom:12px;">
+      <span class="auth-input-prefix">@</span>
+      <input id="bot-operator-input" class="auth-input" placeholder="username" autocapitalize="none" style="padding-left:34px;" />
+    </div>
+    <button class="modal-primary" onclick="addBotOperator()">➕ Добавить оператора</button>
+    <div id="bot-operators-list" style="margin-top:12px;"></div>
+  </div>
+
+  <button class="modal-secondary" onclick="closeModal('bot-control-modal')">Закрыть</button>
+</div></div>
+
+<!-- BOT CHAT VIEW -->
+<div id="bot-chat-screen">
+  <div id="bot-chat-top">
+    <button class="back-btn" onclick="closeBotChat()">‹</button>
+    <div class="avatar" id="bot-chat-avatar"></div>
+    <div id="bot-chat-info">
+      <div id="bot-chat-name">—</div>
+      <div id="bot-chat-status">от имени <b id="bot-chat-botname">—</b></div>
+    </div>
+    <button class="icon-btn" onclick="toggleBotVoiceMode()" id="bot-voice-toggle" title="Режим: бот">🤖</button>
+    <button class="icon-btn" onclick="openBotGiftPicker()" title="Подарок от бота">🎁</button>
+  </div>
+  <div id="bot-chat-messages"></div>
+  <div id="bot-chat-reply-preview" style="display:none;">
+    <div class="rp-text">
+      <div class="rp-name" id="bot-rp-name">—</div>
+      <div class="rp-msg" id="bot-rp-msg">—</div>
+    </div>
+    <button class="rp-close" onclick="cancelBotReply()">✕</button>
+  </div>
+  <div id="bot-chat-input-area">
+    <input id="bot-msg-input" placeholder="Сообщение от имени бота..." />
+    <button id="bot-send-btn" onclick="sendBotMessage()">➤</button>
+  </div>
+</div>
+
+<!-- BOT GIFT PICKER -->
+<div class="modal" id="bot-gift-modal"><div class="modal-box">
+  <h3>🎁 Подарок от имени бота</h3>
+  <div class="modal-desc" id="bot-gift-target">Кому: —</div>
+  <div class="gifts-grid" id="bot-gift-grid"></div>
+  <div class="modal-error" id="bot-gift-error"></div>
+  <button class="modal-secondary" onclick="closeModal('bot-gift-modal')">Отмена</button>
 </div></div>
 
 <!-- STORIES -->
