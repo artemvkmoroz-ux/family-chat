@@ -1,11 +1,13 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v14.5 — Server
+   🌌 AZERTA v14.6 — Server
    ✓ Кружки как base64
    ✓ Автоудаление старых таблиц каналов
    ✓ 🤖 Управление ботами (операторы + чаты от имени бота)
    ✓ 🏅 Бейджи ботов (галочка, молоток, скам, премиум)
+   ✓ ❌ Поддержка bogdan_fazilov удалена
+   ✓ ❌ Опросы удалены
    ═══════════════════════════════════════════════════════════ */
 
 const express = require('express');
@@ -20,9 +22,6 @@ const { createClient } = require('@libsql/client');
 const CONFIG = {
   PORT: process.env.PORT || 3000,
   ADMIN_USERNAME: 'moroz',
-  SUPPORT_USERNAME: 'bogdan_fazilov',
-  SUPPORT_DISPLAY_NAME: 'Поддержка Azerta',
-  SUPPORT_WELCOME: 'Привет! 👋 Я поддержка Azerta. Пиши сюда, если есть вопросы.',
   SESSION_TTL: 30 * 24 * 60 * 60 * 1000,
   CACHE_TTL: 30_000,
   RATE_WINDOW: 60_000,
@@ -50,11 +49,6 @@ const CONFIG = {
   REPORT_COMMENT_MAX: 500,
   MAX_CHANNELS_PER_USER: 1,
   MAX_GROUPS_PER_USER: 1,
-  MAX_POLL_OPTIONS: 10,
-  MIN_POLL_OPTIONS: 2,
-  MAX_POLL_QUESTION: 200,
-  MAX_POLL_OPTION: 100,
-  POLL_TTL: 7 * 24 * 60 * 60 * 1000,
   CALL_TIMEOUT_MS: 45_000,
 };
 
@@ -137,11 +131,6 @@ const ACHIEVEMENTS_CATALOG = {
   first_group: { emoji: '👨‍👩‍👧', name: 'Организатор', desc: 'Первая группа', target: 1, stat: 'groups_created' },
   first_channel: { emoji: '📢', name: 'Вещатель', desc: 'Первый канал', target: 1, stat: 'channels_created' },
   first_bot: { emoji: '🤖', name: 'Робототехник', desc: 'Первый бот', target: 1, stat: 'bots_created' },
-  first_poll: { emoji: '🗳', name: 'Демократ', desc: 'Первый опрос', target: 1, stat: 'polls_created' },
-  polls_10: { emoji: '📊', name: 'Социолог', desc: '10 опросов', target: 10, stat: 'polls_created' },
-  votes_50: { emoji: '✅', name: 'Активист', desc: '50 голосов', target: 50, stat: 'polls_voted' },
-  first_spoiler: { emoji: '👁', name: 'Секрет', desc: 'Первый спойлер', target: 1, stat: 'spoilers_sent' },
-  spoilers_50: { emoji: '🕵️', name: 'Шпион', desc: '50 спойлеров', target: 50, stat: 'spoilers_sent' },
   days_7: { emoji: '🔥', name: 'Неделя подряд', desc: '7 дней', target: 7, stat: 'days_active' },
   days_30: { emoji: '💫', name: 'Месяц с Azerta', desc: '30 дней', target: 30, stat: 'days_active' },
   days_365: { emoji: '🏆', name: 'Год верности', desc: '365 дней', target: 365, stat: 'days_active' },
@@ -165,13 +154,11 @@ const SYSTEM_BOTS = {
     description: 'Официальный помощник.',
     avatar: null, emoji: '🌌', owner: 'system', is_public: 1,
     commands: [
-      { trigger: '/start', response: 'Привет! Я Azerta Assistant 🌌\n\n/help, /info, /support, /gifts, /premium, /polls, /moder, /fun' },
-      { trigger: '/help', response: '📋 Команды: /start, /info, /support, /gifts, /premium, /polls, /moder, /fun' },
+      { trigger: '/start', response: 'Привет! Я Azerta Assistant 🌌\n\n/help, /info, /gifts, /premium, /moder, /fun' },
+      { trigger: '/help', response: '📋 Команды: /start, /info, /gifts, /premium, /moder, /fun' },
       { trigger: '/info', response: '🌌 Azerta — семейный мессенджер' },
-      { trigger: '/support', response: '💬 Поддержка: @bogdan_fazilov' },
       { trigger: '/gifts', response: '🎁 Подарки — продать за 50%' },
       { trigger: '/premium', response: '⭐ Premium — золото, рамка, градиент' },
-      { trigger: '/polls', response: '🗳 Опросы — кнопка «📊 Опрос»' },
       { trigger: '/moder', response: '🛡️ Пожаловаться — долгий тап на сообщение' },
       { trigger: '/fun', response: '😂 OCT 31 == DEC 25' },
     ]
@@ -216,7 +203,7 @@ for (const dir of [STORIES_DIR, STICKERS_DIR]) {
 app.use('/stories', express.static(STORIES_DIR));
 app.use('/stickers', express.static(STICKERS_DIR));
 
-console.log('🚀 Azerta v14.5: старт...');
+console.log('🚀 Azerta v14.6: старт...');
 console.log('🔌 TURSO_DATABASE_URL:', process.env.TURSO_DATABASE_URL ? '✓' : '✗');
 console.log('🔑 TURSO_AUTH_TOKEN:', process.env.TURSO_AUTH_TOKEN ? '✓' : '✗');
 
@@ -310,7 +297,7 @@ async function initDB() {
     edited INTEGER DEFAULT 0, deleted INTEGER DEFAULT 0,
     read_at INTEGER, sticker TEXT, time INTEGER NOT NULL,
     system INTEGER DEFAULT 0, system_type TEXT,
-    geo_lat REAL, geo_lng REAL, geo_label TEXT, poll_id INTEGER,
+    geo_lat REAL, geo_lng REAL, geo_label TEXT,
     spoiler INTEGER DEFAULT 0
   )`);
   await migrate('messages', [
@@ -319,7 +306,7 @@ async function initDB() {
     'reply_to INTEGER', 'edited INTEGER DEFAULT 0', 'deleted INTEGER DEFAULT 0',
     'read_at INTEGER', 'sticker TEXT', 'time INTEGER', 'system INTEGER DEFAULT 0',
     'system_type TEXT', 'geo_lat REAL', 'geo_lng REAL', 'geo_label TEXT',
-    'poll_id INTEGER', 'spoiler INTEGER DEFAULT 0'
+    'spoiler INTEGER DEFAULT 0'
   ]);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(from_user, to_user, time)`).catch(() => {});
 
@@ -343,14 +330,14 @@ async function initDB() {
     edited INTEGER DEFAULT 0, deleted INTEGER DEFAULT 0,
     sticker TEXT, time INTEGER NOT NULL, system INTEGER DEFAULT 0,
     system_type TEXT, geo_lat REAL, geo_lng REAL, geo_label TEXT,
-    poll_id INTEGER, spoiler INTEGER DEFAULT 0
+    spoiler INTEGER DEFAULT 0
   )`);
   await migrate('group_messages', [
     'text TEXT', 'image TEXT', 'voice TEXT', 'voice_duration INTEGER',
     'video_circle TEXT', 'video_duration INTEGER', `reactions TEXT DEFAULT '{}'`,
     'reply_to INTEGER', 'edited INTEGER DEFAULT 0', 'deleted INTEGER DEFAULT 0',
     'sticker TEXT', 'time INTEGER', 'system INTEGER DEFAULT 0', 'system_type TEXT',
-    'geo_lat REAL', 'geo_lng REAL', 'geo_label TEXT', 'poll_id INTEGER', 'spoiler INTEGER DEFAULT 0'
+    'geo_lat REAL', 'geo_lng REAL', 'geo_label TEXT', 'spoiler INTEGER DEFAULT 0'
   ]);
 
   await db.execute(`CREATE TABLE IF NOT EXISTS chat_settings (
@@ -457,8 +444,7 @@ async function initDB() {
     voice_sent INTEGER DEFAULT 0, circles_sent INTEGER DEFAULT 0,
     photos_sent INTEGER DEFAULT 0, reactions_given INTEGER DEFAULT 0,
     edited_messages INTEGER DEFAULT 0, deleted_messages INTEGER DEFAULT 0,
-    geo_sent INTEGER DEFAULT 0, polls_created INTEGER DEFAULT 0,
-    polls_voted INTEGER DEFAULT 0, spoilers_sent INTEGER DEFAULT 0
+    geo_sent INTEGER DEFAULT 0, spoilers_sent INTEGER DEFAULT 0
   )`);
   await migrate('user_stats', [
     'messages_sent INTEGER DEFAULT 0', 'calls_made INTEGER DEFAULT 0', 'calls_received INTEGER DEFAULT 0',
@@ -468,8 +454,7 @@ async function initDB() {
     'days_active INTEGER DEFAULT 0', 'last_active_day TEXT', 'stickers_sent INTEGER DEFAULT 0',
     'voice_sent INTEGER DEFAULT 0', 'circles_sent INTEGER DEFAULT 0', 'photos_sent INTEGER DEFAULT 0',
     'reactions_given INTEGER DEFAULT 0', 'edited_messages INTEGER DEFAULT 0', 'deleted_messages INTEGER DEFAULT 0',
-    'geo_sent INTEGER DEFAULT 0', 'polls_created INTEGER DEFAULT 0', 'polls_voted INTEGER DEFAULT 0',
-    'spoilers_sent INTEGER DEFAULT 0'
+    'geo_sent INTEGER DEFAULT 0', 'spoilers_sent INTEGER DEFAULT 0'
   ]);
 
   await db.execute(`CREATE TABLE IF NOT EXISTS bots (
@@ -533,20 +518,6 @@ async function initDB() {
   await migrate('mod_logs', ['action TEXT', 'target_user TEXT', 'target_report_id INTEGER', 'details TEXT', 'time INTEGER']);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_modlogs_time ON mod_logs(time DESC)`).catch(() => {});
 
-  await db.execute(`CREATE TABLE IF NOT EXISTS polls (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, creator TEXT NOT NULL, question TEXT NOT NULL,
-    options TEXT NOT NULL, multiple INTEGER DEFAULT 0, anonymous INTEGER DEFAULT 0,
-    closed INTEGER DEFAULT 0, created_at INTEGER NOT NULL, expires_at INTEGER
-  )`);
-  await migrate('polls', ['creator TEXT', 'question TEXT', 'options TEXT', 'multiple INTEGER DEFAULT 0', 'anonymous INTEGER DEFAULT 0', 'closed INTEGER DEFAULT 0', 'created_at INTEGER', 'expires_at INTEGER']);
-
-  await db.execute(`CREATE TABLE IF NOT EXISTS poll_votes (
-    poll_id INTEGER NOT NULL, username TEXT NOT NULL, option_index INTEGER NOT NULL,
-    time INTEGER NOT NULL, PRIMARY KEY (poll_id, username, option_index)
-  )`);
-  await migrate('poll_votes', ['option_index INTEGER', 'time INTEGER']);
-  await db.execute(`CREATE INDEX IF NOT EXISTS idx_poll_votes_poll ON poll_votes(poll_id)`).catch(() => {});
-
   for (const [uname, bot] of Object.entries(SYSTEM_BOTS)) {
     const existing = await db.execute({ sql: 'SELECT 1 FROM bots WHERE username = ?', args: [uname] }).catch(() => ({ rows: [] }));
     if (existing.rows.length === 0) {
@@ -558,62 +529,16 @@ async function initDB() {
     }
   }
 
-  /* 🏅 COALESCE для старых ботов без бейджей */
   await db.execute(`UPDATE bots SET verified = COALESCE(verified, 0)`).catch(() => {});
   await db.execute(`UPDATE bots SET premium = COALESCE(premium, 0)`).catch(() => {});
   await db.execute(`UPDATE bots SET badge_hammer = COALESCE(badge_hammer, 0)`).catch(() => {});
   await db.execute(`UPDATE bots SET badge_scam = COALESCE(badge_scam, 0)`).catch(() => {});
 
-  const supportUser = await db.execute({
-    sql: 'SELECT 1 FROM users WHERE username = ?',
-    args: [CONFIG.SUPPORT_USERNAME]
-  }).catch(() => ({ rows: [] }));
-  if (supportUser.rows.length === 0) {
-    const supportPassword = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
-    await db.execute({
-      sql: `INSERT INTO users 
-            (username, password, avatar, banner, premium, verified, badge_hammer, badge_scam, bio, first_name, last_name, birthday, emoji_status, last_seen_visibility, phone, is_support, registered_at) 
-            VALUES (?, ?, NULL, NULL, 1, 1, 1, 0, ?, ?, NULL, NULL, '💬', 'everyone', NULL, 1, ?)`,
-      args: [CONFIG.SUPPORT_USERNAME, supportPassword, 'Официальная поддержка Azerta.', CONFIG.SUPPORT_DISPLAY_NAME, now()]
-    });
-    await db.execute({ sql: 'INSERT OR IGNORE INTO user_settings (username) VALUES (?)', args: [CONFIG.SUPPORT_USERNAME] });
-    console.log('💬 Аккаунт поддержки создан:', CONFIG.SUPPORT_USERNAME);
-  } else {
-    await db.execute({
-      sql: `UPDATE users SET is_support = 1, verified = 1, premium = 1, badge_hammer = 1, first_name = ?, emoji_status = ? WHERE username = ?`,
-      args: [CONFIG.SUPPORT_DISPLAY_NAME, '💬', CONFIG.SUPPORT_USERNAME]
-    }).catch(() => {});
-  }
-
   console.log(`✅ Схема БД готова за ${Date.now() - start}мс`);
 }
-/* ─── Вспомогательные ─── */
+/* ─── Поддержка отключена ─── */
 async function ensureSupportContact(username) {
-  try {
-    if (!username || username === CONFIG.SUPPORT_USERNAME) return false;
-    const existing = await db.execute({ sql: 'SELECT 1 FROM contacts WHERE owner = ? AND contact = ?', args: [username, CONFIG.SUPPORT_USERNAME] });
-    if (existing.rows.length > 0) return false;
-    const supportExists = await db.execute({ sql: 'SELECT 1 FROM users WHERE username = ?', args: [CONFIG.SUPPORT_USERNAME] }).catch(() => ({ rows: [] }));
-    if (supportExists.rows.length === 0) return false;
-    const t = now();
-    await db.execute({
-      sql: 'INSERT OR REPLACE INTO contacts (owner, contact, display_name, added_at) VALUES (?, ?, ?, ?)',
-      args: [username, CONFIG.SUPPORT_USERNAME, CONFIG.SUPPORT_DISPLAY_NAME, t]
-    });
-    const msgResult = await db.execute({
-      sql: `INSERT INTO messages (from_user, to_user, text, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, '{}', NULL, 0, 0, ?)`,
-      args: [CONFIG.SUPPORT_USERNAME, username, CONFIG.SUPPORT_WELCOME, t]
-    });
-    const msgId = Number(msgResult.lastInsertRowid);
-    sendContactsTo(username).catch(() => {});
-    findSocketsByUsername(username).forEach(sid => {
-      io.to(sid).emit('private message', {
-        id: msgId, from: CONFIG.SUPPORT_USERNAME, to: username,
-        text: CONFIG.SUPPORT_WELCOME, reactions: {}, replyData: null, time: t, read: false
-      });
-    });
-    return true;
-  } catch (e) { console.error('ensureSupportContact:', e); return false; }
+  return false;
 }
 
 async function getUser(username) {
@@ -904,7 +829,7 @@ async function incrementStat(username, statName, amount) {
     'gifts_sent', 'gifts_received', 'stories_posted', 'groups_created',
     'channels_created', 'bots_created', 'friends_added', 'stickers_sent', 'voice_sent',
     'circles_sent', 'photos_sent', 'reactions_given', 'edited_messages', 'deleted_messages',
-    'geo_sent', 'polls_created', 'polls_voted', 'spoilers_sent'
+    'geo_sent', 'spoilers_sent'
   ];
   if (allowed.indexOf(statName) === -1) return;
   try {
@@ -1224,41 +1149,6 @@ async function deleteSticker(id, username) {
   await db.execute({ sql: 'DELETE FROM stickers WHERE id = ? AND username = ?', args: [id, username] });
 }
 
-async function getPollById(id) {
-  const r = await db.execute({ sql: 'SELECT * FROM polls WHERE id = ?', args: [id] });
-  return r.rows[0] || null;
-}
-async function getPollVotes(pollId) {
-  const r = await db.execute({ sql: 'SELECT username, option_index, time FROM poll_votes WHERE poll_id = ?', args: [pollId] });
-  return r.rows;
-}
-async function buildPollPayload(poll, viewer) {
-  if (!poll) return null;
-  const options = safeParseJson(poll.options, []);
-  const votes = await getPollVotes(poll.id);
-  const counts = new Array(options.length).fill(0);
-  let myVotes = [];
-  let totalVotes = 0;
-  for (const v of votes) {
-    if (v.option_index >= 0 && v.option_index < counts.length) { counts[v.option_index]++; totalVotes++; }
-    if (viewer && v.username === viewer) myVotes.push(v.option_index);
-  }
-  const voters = {};
-  if (!poll.anonymous) {
-    for (const v of votes) {
-      if (!voters[v.option_index]) voters[v.option_index] = [];
-      voters[v.option_index].push(v.username);
-    }
-  }
-  return {
-    id: poll.id, creator: poll.creator, question: poll.question, options,
-    counts, myVotes, totalVotes,
-    multiple: !!poll.multiple, anonymous: !!poll.anonymous,
-    closed: !!poll.closed, created_at: poll.created_at, expires_at: poll.expires_at,
-    voters: poll.anonymous ? {} : voters
-  };
-}
-
 async function cleanupExpiredStories() {
   try {
     const t = now();
@@ -1278,9 +1168,6 @@ async function cleanupExpiredInvites() {
 }
 async function cleanupExpiredPunishments() {
   try { await db.execute({ sql: `UPDATE punishments SET active = 0 WHERE active = 1 AND expires_at IS NOT NULL AND expires_at < ?`, args: [now()] }); } catch (e) {}
-}
-async function cleanupExpiredPolls() {
-  try { await db.execute({ sql: `UPDATE polls SET closed = 1 WHERE closed = 0 AND expires_at IS NOT NULL AND expires_at < ?`, args: [now()] }); } catch (e) {}
 }
 
 async function sendContactsTo(username) {
@@ -1329,7 +1216,7 @@ async function sendContactsTo(username) {
         hammer: info ? !!info.badge_hammer : false, scam: info ? !!info.badge_scam : false,
         firstName: info ? info.first_name : null, lastName: info ? info.last_name : null,
         emojiStatus: info ? info.emoji_status : null,
-        online: row.contact === CONFIG.SUPPORT_USERNAME ? true : (lastSeenVisible ? isOnline(row.contact) : false),
+        online: lastSeenVisible ? isOnline(row.contact) : false,
         archived: !!settings.archived, muted: !!settings.muted,
         pinned: !!settings.pinned, pinOrder: Number(settings.pin_order) || 0,
         blocked: blockedSet.has(row.contact), isBot: false,
@@ -1472,10 +1359,6 @@ async function removeBadge(username, badgeType) {
   return { ok: true };
 }
 
-/* ═══════════════════════════════════════════════════════════
-   🏅 УНИВЕРСАЛЬНЫЙ БЕЙДЖ — работает и для юзеров, и для ботов
-   ═══════════════════════════════════════════════════════════ */
-
 async function findUserOrBot(username) {
   const user = await getUser(username);
   if (user) return { kind: 'user', row: user };
@@ -1510,10 +1393,6 @@ async function removeBadgeUniversal(username, badgeType) {
   return { ok: true, kind: found.kind };
 }
 
-/* ═══════════════════════════════════════════════════════════
-   🤖 УПРАВЛЕНИЕ БОТАМИ — ХЕЛПЕРЫ
-   ═══════════════════════════════════════════════════════════ */
-
 async function isBotOperator(botUsername, username) {
   const bot = await getBot(botUsername);
   if (!bot) return false;
@@ -1545,7 +1424,6 @@ io.on('connection', (socket) => {
       if (!rateLimit('check:' + socket.handshake.address, 60, CONFIG.RATE_WINDOW)) return cb && cb({ ok: false, available: false, error: 'Слишком часто' });
       username = String(username || '').trim().toLowerCase();
       if (!username) return cb && cb({ ok: true, available: false, reason: 'empty' });
-      if (username === CONFIG.SUPPORT_USERNAME) return cb && cb({ ok: true, available: false, reason: 'taken' });
       if (username.length < CONFIG.MIN_USERNAME_LEN) return cb && cb({ ok: true, available: false, reason: 'short' });
       if (username.length > CONFIG.MAX_USERNAME_LEN) return cb && cb({ ok: true, available: false, reason: 'long' });
       if (!/^[a-z0-9_]+$/.test(username)) return cb && cb({ ok: true, available: false, reason: 'chars' });
@@ -1562,7 +1440,6 @@ io.on('connection', (socket) => {
       password = String(password || '');
       displayName = String(displayName || '').trim().slice(0, CONFIG.MAX_DISPLAY_NAME);
       if (!username || !password) return cb && cb({ ok: false, error: 'Заполни все поля' });
-      if (username === CONFIG.SUPPORT_USERNAME) return cb && cb({ ok: false, error: 'Ник зарезервирован' });
       if (username.length < CONFIG.MIN_USERNAME_LEN) return cb && cb({ ok: false, error: 'Ник минимум ' + CONFIG.MIN_USERNAME_LEN });
       if (username.length > CONFIG.MAX_USERNAME_LEN) return cb && cb({ ok: false, error: 'Ник максимум ' + CONFIG.MAX_USERNAME_LEN });
       if (!/^[a-z0-9_]+$/.test(username)) return cb && cb({ ok: false, error: 'Только латиница, цифры и _' });
@@ -1584,7 +1461,6 @@ io.on('connection', (socket) => {
       socket.sessionId = sessionId;
       const user = await getUser(username);
       const stars = await getStars(username);
-      await ensureSupportContact(username);
       cb && cb({
         ok: true, bonus: 10, sessionId, username,
         avatar: user.avatar, banner: user.banner, premium: false,
@@ -1616,7 +1492,6 @@ io.on('connection', (socket) => {
       await updateSession(sessionId);
       await updateDayStreak(session.username);
       const stars = await getStars(session.username);
-      await ensureSupportContact(session.username);
       const mute = activePunishments.find(p => p.type === 'mute');
       cb && cb({
         ok: true, avatar: user.avatar, banner: user.banner,
@@ -1657,7 +1532,6 @@ io.on('connection', (socket) => {
       socket.sessionId = sessId;
       await updateDayStreak(username);
       const stars = await getStars(username);
-      await ensureSupportContact(username);
       const mute = activePunishments.find(p => p.type === 'mute');
       cb && cb({
         ok: true, avatar: user.avatar, banner: user.banner,
@@ -1811,7 +1685,7 @@ io.on('connection', (socket) => {
           hammer: info ? !!info.badge_hammer : false, scam: info ? !!info.badge_scam : false,
           firstName: info ? info.first_name : null, lastName: info ? info.last_name : null,
           emojiStatus: info ? info.emoji_status : null,
-          online: row.contact === CONFIG.SUPPORT_USERNAME ? true : isOnline(row.contact),
+          online: isOnline(row.contact),
           blocked: false, isBot: false,
           isSupport: info ? !!info.is_support : false
         };
@@ -1878,7 +1752,7 @@ io.on('connection', (socket) => {
         hammer: !!info.badge_hammer, scam: !!info.badge_scam,
         bio: info.bio, firstName: info.first_name, lastName: info.last_name,
         emojiStatus: info.emoji_status,
-        online: info.is_support ? true : (lastSeenVisible && isOnline(username)),
+        online: lastSeenVisible && isOnline(username),
         blockedByMe, blockedMe, gifts, isBot: false,
         isSupport: !!info.is_support,
         punishments: isModerator(socket.username) ? punishments.map(p => ({
@@ -2041,7 +1915,6 @@ io.on('connection', (socket) => {
       if (!rateLimit('botcreate:' + socket.username, 5, 60_000)) return cb && cb({ ok: false, error: 'Слишком часто.' });
       username = String(username || '').trim().toLowerCase();
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
-      if (username === CONFIG.SUPPORT_USERNAME) return cb && cb({ ok: false, error: 'Ник зарезервирован' });
       if (username.length < 3) return cb && cb({ ok: false, error: 'Ник минимум 3' });
       if (username.length > 20) return cb && cb({ ok: false, error: 'Ник максимум 20' });
       if (!/^[a-z0-9_]+$/.test(username)) return cb && cb({ ok: false, error: 'Только латиница, цифры и _' });
@@ -2165,10 +2038,6 @@ io.on('connection', (socket) => {
     if (!socket.username || socket.username !== CONFIG.ADMIN_USERNAME) { cb && cb({ ok: false, error: 'Только ' + CONFIG.ADMIN_USERNAME }); return false; }
     return true;
   }
-
-  /* ═══════════════════════════════════════════════════════════
-     🏅 БЕЙДЖИ — работают и для юзеров, и для ботов
-     ═══════════════════════════════════════════════════════════ */
 
   socket.on('verify', async ({ username }, cb) => {
     try {
@@ -2398,116 +2267,6 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('send geo:', e); cb && cb({ ok: false }); }
   });
 
-  socket.on('create poll', async ({ to, groupId, question, options, multiple, anonymous }, cb) => {
-    try {
-      if (!socket.username) return cb && cb({ ok: false });
-      if (await isMuted(socket.username)) return cb && cb({ ok: false, error: 'Ты в муте' });
-      question = String(question || '').trim().slice(0, CONFIG.MAX_POLL_QUESTION);
-      if (!question) return cb && cb({ ok: false, error: 'Введи вопрос' });
-      if (!Array.isArray(options)) return cb && cb({ ok: false, error: 'Опции массивом' });
-      const cleanOptions = options.map(o => String(o || '').trim().slice(0, CONFIG.MAX_POLL_OPTION)).filter(o => o.length > 0);
-      if (cleanOptions.length < CONFIG.MIN_POLL_OPTIONS) return cb && cb({ ok: false, error: 'Минимум ' + CONFIG.MIN_POLL_OPTIONS });
-      if (cleanOptions.length > CONFIG.MAX_POLL_OPTIONS) return cb && cb({ ok: false, error: 'Максимум ' + CONFIG.MAX_POLL_OPTIONS });
-      const from = socket.username;
-      const t = now();
-      const expires = t + CONFIG.POLL_TTL;
-      const r = await db.execute({
-        sql: `INSERT INTO polls (creator, question, options, multiple, anonymous, closed, created_at, expires_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
-        args: [from, question, JSON.stringify(cleanOptions), multiple ? 1 : 0, anonymous ? 1 : 0, t, expires]
-      });
-      const pollId = Number(r.lastInsertRowid);
-      const poll = await getPollById(pollId);
-      const pollPayload = await buildPollPayload(poll, from);
-      if (groupId) {
-        if (!await isGroupMember(groupId, from)) return cb && cb({ ok: false });
-        const msgRes = await db.execute({
-          sql: `INSERT INTO group_messages (group_id, from_user, poll_id, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, '{}', NULL, 0, 0, ?)`,
-          args: [groupId, from, pollId, t]
-        });
-        const msgId = Number(msgRes.lastInsertRowid);
-        const payload = { id: msgId, groupId, from, poll: pollPayload, reactions: {}, replyData: null, time: t, self: false };
-        notifyGroupMembers(groupId, 'group message', payload).catch(() => {});
-        socket.emit('group message', { ...payload, self: true });
-        await incrementStat(from, 'polls_created');
-        cb && cb({ ok: true, pollId, messageId: msgId });
-      } else if (to) {
-        if (await isBlockedEither(from, to)) return cb && cb({ ok: false });
-        const msgRes = await db.execute({
-          sql: `INSERT INTO messages (from_user, to_user, poll_id, reactions, reply_to, edited, deleted, time) VALUES (?, ?, ?, '{}', NULL, 0, 0, ?)`,
-          args: [from, to, pollId, t]
-        });
-        const msgId = Number(msgRes.lastInsertRowid);
-        const payload = { id: msgId, from, to, poll: pollPayload, reactions: {}, replyData: null, time: t };
-        findSocketsByUsername(to).forEach(sid => io.to(sid).emit('private message', payload));
-        socket.emit('private message', { ...payload, self: true });
-        await incrementStat(from, 'polls_created');
-        cb && cb({ ok: true, pollId, messageId: msgId });
-      } else {
-        cb && cb({ ok: false, error: 'Не указан получатель' });
-      }
-    } catch (e) { console.error('create poll:', e); cb && cb({ ok: false, error: 'Ошибка: ' + e.message }); }
-  });
-
-  socket.on('vote poll', async ({ pollId, optionIndexes }, cb) => {
-    try {
-      if (!socket.username) return cb && cb({ ok: false });
-      if (await isMuted(socket.username)) return cb && cb({ ok: false, error: 'Ты в муте' });
-      const poll = await getPollById(pollId);
-      if (!poll) return cb && cb({ ok: false, error: 'Опрос не найден' });
-      if (poll.closed) return cb && cb({ ok: false, error: 'Опрос закрыт' });
-      if (poll.expires_at && now() > poll.expires_at) return cb && cb({ ok: false, error: 'Опрос истёк' });
-      const options = safeParseJson(poll.options, []);
-      if (!Array.isArray(optionIndexes)) optionIndexes = [optionIndexes];
-      const clean = optionIndexes.map(i => Number(i)).filter(i => Number.isInteger(i) && i >= 0 && i < options.length);
-      if (clean.length === 0) return cb && cb({ ok: false, error: 'Выбери вариант' });
-      if (!poll.multiple && clean.length > 1) return cb && cb({ ok: false, error: 'Только один' });
-      const me = socket.username;
-      const isMineFirstVote = (await db.execute({ sql: 'SELECT 1 FROM poll_votes WHERE poll_id = ? AND username = ? LIMIT 1', args: [pollId, me] })).rows.length === 0;
-      if (!poll.multiple) {
-        await db.execute({ sql: 'DELETE FROM poll_votes WHERE poll_id = ? AND username = ?', args: [pollId, me] });
-      } else {
-        for (const idx of clean) {
-          const already = await db.execute({ sql: 'SELECT 1 FROM poll_votes WHERE poll_id = ? AND username = ? AND option_index = ?', args: [pollId, me, idx] });
-          if (already.rows.length > 0) {
-            await db.execute({ sql: 'DELETE FROM poll_votes WHERE poll_id = ? AND username = ? AND option_index = ?', args: [pollId, me, idx] });
-          }
-        }
-      }
-      for (const idx of clean) {
-        await db.execute({ sql: 'INSERT OR IGNORE INTO poll_votes (poll_id, username, option_index, time) VALUES (?, ?, ?, ?)', args: [pollId, me, idx, now()] });
-      }
-      if (isMineFirstVote) await incrementStat(me, 'polls_voted');
-      const updatedPoll = await getPollById(pollId);
-      const privMsgs = await db.execute({ sql: 'SELECT id, from_user, to_user FROM messages WHERE poll_id = ?', args: [pollId] });
-      for (const m of privMsgs.rows) {
-        const forFrom = await buildPollPayload(updatedPoll, m.from_user);
-        const forTo = await buildPollPayload(updatedPoll, m.to_user);
-        findSocketsByUsername(m.from_user).forEach(sid => io.to(sid).emit('poll updated', { messageId: m.id, poll: forFrom, isGroup: false }));
-        findSocketsByUsername(m.to_user).forEach(sid => io.to(sid).emit('poll updated', { messageId: m.id, poll: forTo, isGroup: false }));
-      }
-      const grpMsgs = await db.execute({ sql: 'SELECT id, group_id FROM group_messages WHERE poll_id = ?', args: [pollId] });
-      for (const m of grpMsgs.rows) {
-        const members = await getGroupMembers(m.group_id);
-        for (const u of members) {
-          const forU = await buildPollPayload(updatedPoll, u);
-          findSocketsByUsername(u).forEach(sid => io.to(sid).emit('poll updated', { messageId: m.id, poll: forU, isGroup: true }));
-        }
-      }
-      cb && cb({ ok: true });
-    } catch (e) { console.error('vote poll:', e); cb && cb({ ok: false, error: 'Ошибка: ' + e.message }); }
-  });
-
-  socket.on('close poll', async ({ pollId }, cb) => {
-    try {
-      if (!socket.username) return cb && cb({ ok: false });
-      const poll = await getPollById(pollId);
-      if (!poll) return cb && cb({ ok: false, error: 'Не найден' });
-      if (poll.creator !== socket.username && socket.username !== CONFIG.ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Только автор' });
-      await db.execute({ sql: 'UPDATE polls SET closed = 1 WHERE id = ?', args: [pollId] });
-      cb && cb({ ok: true });
-    } catch (e) { cb && cb({ ok: false }); }
-  });
-
   socket.on('report', async ({ targetUser, targetMessageId, targetIsGroup, reason, comment }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false });
@@ -2618,7 +2377,6 @@ io.on('connection', (socket) => {
       username = String(username || '').trim().toLowerCase();
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
       if (username === CONFIG.ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Нельзя админа' });
-      if (username === CONFIG.SUPPORT_USERNAME) return cb && cb({ ok: false, error: 'Нельзя поддержку' });
       const target = await getUser(username);
       if (!target) return cb && cb({ ok: false, error: 'Не найден' });
       const validDurations = Object.keys(PUNISHMENT_DURATIONS.ban);
@@ -2635,7 +2393,6 @@ io.on('connection', (socket) => {
       username = String(username || '').trim().toLowerCase();
       if (!username) return cb && cb({ ok: false, error: 'Введи ник' });
       if (username === CONFIG.ADMIN_USERNAME) return cb && cb({ ok: false, error: 'Нельзя админа' });
-      if (username === CONFIG.SUPPORT_USERNAME) return cb && cb({ ok: false, error: 'Нельзя поддержку' });
       const target = await getUser(username);
       if (!target) return cb && cb({ ok: false, error: 'Не найден' });
       const validDurations = Object.keys(PUNISHMENT_DURATIONS.mute);
@@ -2810,7 +2567,6 @@ io.on('connection', (socket) => {
       if (sticker) await incrementStat(from, 'stickers_sent');
       if (spoilerFlag) await incrementStat(from, 'spoilers_sent');
 
-      /* 🤖 Если получатель — бот, регистрируем чат и (опционально) автоответ */
       if (await isBot(to)) {
         db.execute({
           sql: 'INSERT OR IGNORE INTO bot_chat_members (bot_username, chat_key, chat_type, added_at) VALUES (?, ?, ?, ?)',
@@ -3112,7 +2868,6 @@ io.on('connection', (socket) => {
     } catch (e) { cb && cb({ ok: false, results: [] }); }
   });
 
-  /* КАНАЛЫ */
   socket.on('create channel', async ({ slug, name, description }, cb) => {
     try {
       if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
@@ -3677,7 +3432,7 @@ io.on('connection', (socket) => {
   });
 
   /* ═══════════════════════════════════════════════════════════
-     🤖 УПРАВЛЕНИЕ БОТАМИ — SOCKET-СОБЫТИЯ
+     🤖 УПРАВЛЕНИЕ БОТАМИ
      ═══════════════════════════════════════════════════════════ */
 
   socket.on('get bot operators', async ({ botUsername }, cb) => {
@@ -3938,18 +3693,17 @@ initDB()
     setInterval(cleanupExpiredInvites, 30 * 60 * 1000);
     setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);
     setInterval(cleanupExpiredPunishments, 5 * 60 * 1000);
-    setInterval(cleanupExpiredPolls, 5 * 60 * 1000);
     cleanupExpiredStories().catch(() => {});
     cleanupExpiredInvites().catch(() => {});
     cleanupExpiredSessions().catch(() => {});
     cleanupExpiredPunishments().catch(() => {});
-    cleanupExpiredPolls().catch(() => {});
     server.listen(CONFIG.PORT, () => {
-      console.log('🌌 Azerta v14.5 запущена на порту ' + CONFIG.PORT);
+      console.log('🌌 Azerta v14.6 запущена на порту ' + CONFIG.PORT);
       console.log('🎥 Кружки: как base64 в БД');
-      console.log('💬 Поддержка: @' + CONFIG.SUPPORT_USERNAME);
       console.log('🤖 Управление ботами: активно');
       console.log('🏅 Бейджи ботов: активно');
+      console.log('❌ Поддержка: отключена');
+      console.log('❌ Опросы: отключены');
     });
   })
   .catch(err => {
