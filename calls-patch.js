@@ -1,9 +1,11 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   📞 AZERTA — патч звонков (STUN-only, без TURN)
-   Подключать ПОСЛЕ app.js.
-   Перезаписывает: startCall, acceptIncoming, handlers, cleanup.
+   📞 AZERTA — PATCH ЗВОНКОВ v2
+   ✓ STUN-only
+   ✓ Очередь ICE-кандидатов (до setRemoteDescription)
+   ✓ Правильный cleanup
+   ✓ Логирование ICE-состояний
    ═══════════════════════════════════════════════════════════ */
 
 (function () {
@@ -12,7 +14,6 @@
     return;
   }
 
-  // Только STUN
   window.RTC_CONFIG = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -20,10 +21,82 @@
       { urls: 'stun:stun.cloudflare.com:3478' },
       { urls: 'stun:stun.relay.metered.ca:80' }
     ],
-    iceCandidatePoolSize: 4
+    iceCandidatePoolSize: 4,
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require'
   };
 
-  // ─── Запуск исходящего звонка ───
+  // Очередь ICE-кандидатов (пока не установлен remoteDescription)
+  let pendingCandidates = [];
+  let remoteDescSet = false;
+
+  function flushPendingCandidates() {
+    if (!state.peerConnection) return;
+    pendingCandidates.forEach(function (c) {
+      state.peerConnection.addIceCandidate(c).catch(function () {});
+    });
+    pendingCandidates = [];
+  }
+
+  function bindPeerEvents(pc, isCaller) {
+    pc.onicecandidate = function (e) {
+      if (e.candidate) {
+        socket.emit('ice-candidate', {
+          to: isCaller ? state.currentChat : state.incomingFrom,
+          candidate: e.candidate
+        });
+      }
+    };
+
+    pc.oniceconnectionstatechange = function () {
+      const st = pc.iceConnectionState;
+      console.log('🔌 ICE:', st);
+      const stEl = $('call-status');
+      if (st === 'failed') {
+        if (stEl) stEl.textContent = '❌ Соединение не установлено';
+        if (typeof showToast === 'function') showToast('❌ P2P заблокирован. Нужен TURN или VPN.');
+      } else if (st === 'disconnected') {
+        if (stEl) stEl.textContent = '⚠️ Связь прервалась';
+      } else if (st === 'connected' || st === 'completed') {
+        if (stEl) stEl.textContent = 'В разговоре';
+      }
+    };
+
+    pc.ontrack = function (e) {
+      console.log('📹 track:', e.track.kind);
+      const rv = $('remoteVideo');
+      if (rv) {
+        rv.srcObject = e.streams[0];
+        const rw = $('remote-video-wrap');
+        if (rw) rw.classList.remove('audio-only');
+        const ab = $('call-avatar-big');
+        if (ab) ab.style.display = 'none';
+      }
+      if (typeof startCallTimer === 'function' && !state.callTimerInterval) {
+        startCallTimer();
+      }
+    };
+  }
+
+  async function askMedia(video) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: video ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false
+      });
+    } catch (err) {
+      console.error('❌ getUserMedia:', err);
+      let msg = 'Не удалось получить доступ';
+      if (err.name === 'NotAllowedError') msg = '🚫 Доступ запрещён. Разреши камеру/микрофон в браузере.';
+      else if (err.name === 'NotFoundError') msg = '🎤 Устройство не найдено';
+      else if (err.name === 'NotReadableError') msg = '⚠️ Устройство занято другим приложением';
+      else if (err.name === 'SecurityError') msg = '🔒 Нужен HTTPS';
+      alert(msg);
+      return null;
+    }
+  }
+
+  // ─── Исходящий звонок ───
   window.startCall = async function (video) {
     if (!state.currentChat || state.callActive) return;
     if (state.isBotChat) { showToast('🤖 Ботам нельзя звонить'); return; }
@@ -35,86 +108,40 @@
       return;
     }
 
-    try {
-      console.log('🎤 getUserMedia...');
-      state.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: video ? { facingMode: 'user' } : false
-      });
-      console.log('✅ Треки:', state.localStream.getTracks().map(t => t.kind));
-    } catch (err) {
-      console.error('❌ getUserMedia:', err);
-      let msg = 'Не удалось получить доступ';
-      if (err.name === 'NotAllowedError') msg = '🚫 Доступ запрещён. Разреши микрофон/камеру в браузере.';
-      else if (err.name === 'NotFoundError') msg = '🎤 Устройство не найдено';
-      else if (err.name === 'NotReadableError') msg = '⚠️ Устройство занято другим приложением';
-      else if (err.name === 'SecurityError') msg = '🔒 Нужен HTTPS (Render даёт его автоматически)';
-      alert(msg);
-      return;
-    }
+    const stream = await askMedia(video);
+    if (!stream) return;
 
+    state.localStream = stream;
     state.callActive = true;
     state.micOn = true;
     state.camOn = !!video;
+    pendingCandidates = [];
+    remoteDescSet = false;
+
     showCallScreen(state.currentChat, contact, video, 'Вызов...');
 
-    state.peerConnection = new RTCPeerConnection(window.RTC_CONFIG);
+    const pc = new RTCPeerConnection(window.RTC_CONFIG);
+    state.peerConnection = pc;
 
-    state.localStream.getTracks().forEach(function (t) {
-      state.peerConnection.addTrack(t, state.localStream);
-    });
-
-    state.peerConnection.onicecandidate = function (e) {
-      if (e.candidate) {
-        socket.emit('ice-candidate', { to: state.currentChat, candidate: e.candidate });
-      }
-    };
-
-    state.peerConnection.oniceconnectionstatechange = function () {
-      const st = state.peerConnection.iceConnectionState;
-      console.log('🔌 ICE:', st);
-      const stEl = $('call-status');
-      if (st === 'failed') {
-        if (stEl) stEl.textContent = '❌ Не удалось соединиться';
-        showToast('❌ Сеть блокирует P2P. Нужен TURN или VPN.');
-      } else if (st === 'disconnected') {
-        if (stEl) stEl.textContent = '⚠️ Связь прервалась';
-      } else if (st === 'connected' || st === 'completed') {
-        if (stEl) stEl.textContent = 'В разговоре';
-      }
-    };
-
-    state.peerConnection.ontrack = function (e) {
-      console.log('📹 ontrack:', e.track.kind);
-      const rv = $('remoteVideo');
-      if (rv) {
-        rv.srcObject = e.streams[0];
-        const rw = $('remote-video-wrap');
-        if (rw) rw.classList.remove('audio-only');
-        const ab = $('call-avatar-big');
-        if (ab) ab.style.display = 'none';
-      }
-      const st = $('call-status');
-      if (st) st.textContent = 'В разговоре';
-      if (!state.callTimerInterval) startCallTimer();
-    };
+    stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
+    bindPeerEvents(pc, true);
 
     try {
-      const offer = await state.peerConnection.createOffer({
+      const offer = await pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: video
       });
-      await state.peerConnection.setLocalDescription(offer);
+      await pc.setLocalDescription(offer);
       socket.emit('call-user', { to: state.currentChat, offer: offer, video: video });
-      console.log('📤 Offer отправлен');
+      console.log('📤 offer sent');
     } catch (err) {
-      console.error('❌ Offer:', err);
-      alert('Ошибка звонка: ' + err.message);
+      console.error('❌ offer:', err);
+      alert('Ошибка: ' + err.message);
       window.cleanupCall();
     }
   };
 
-  // ─── Принятие входящего ───
+  // ─── Входящий звонок ───
   window.acceptIncoming = async function () {
     const is = $('incoming-screen');
     if (is) is.classList.remove('active');
@@ -127,71 +154,39 @@
     state.incomingFrom = null;
     state.currentChat = from;
 
-    try {
-      console.log('🎤 getUserMedia (accept)...');
-      state.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: video ? { facingMode: 'user' } : false
-      });
-      console.log('✅ Треки:', state.localStream.getTracks().map(t => t.kind));
-    } catch (err) {
-      console.error('❌ getUserMedia:', err);
-      alert('Не удалось: ' + err.message);
+    const stream = await askMedia(video);
+    if (!stream) {
       socket.emit('end-call', { to: from });
       return;
     }
 
+    state.localStream = stream;
     state.callActive = true;
     state.micOn = true;
     state.camOn = !!video;
+    pendingCandidates = [];
+    remoteDescSet = false;
+
     const contact = state.contacts.find(function (c) { return c.name === from; });
     showCallScreen(from, contact, video, 'Соединение...');
 
-    state.peerConnection = new RTCPeerConnection(window.RTC_CONFIG);
+    const pc = new RTCPeerConnection(window.RTC_CONFIG);
+    state.peerConnection = pc;
 
-    state.localStream.getTracks().forEach(function (t) {
-      state.peerConnection.addTrack(t, state.localStream);
-    });
-
-    state.peerConnection.onicecandidate = function (e) {
-      if (e.candidate) {
-        socket.emit('ice-candidate', { to: from, candidate: e.candidate });
-      }
-    };
-
-    state.peerConnection.oniceconnectionstatechange = function () {
-      const st = state.peerConnection.iceConnectionState;
-      console.log('🔌 ICE (accept):', st);
-      const stEl = $('call-status');
-      if (st === 'failed' && stEl) stEl.textContent = '❌ Не удалось соединиться';
-      else if (st === 'connected' || st === 'completed') {
-        if (stEl) stEl.textContent = 'В разговоре';
-      }
-    };
-
-    state.peerConnection.ontrack = function (e) {
-      console.log('📹 ontrack (accept):', e.track.kind);
-      const rv = $('remoteVideo');
-      if (rv) {
-        rv.srcObject = e.streams[0];
-        const rw = $('remote-video-wrap');
-        if (rw) rw.classList.remove('audio-only');
-        const ab = $('call-avatar-big');
-        if (ab) ab.style.display = 'none';
-      }
-      const st = $('call-status');
-      if (st) st.textContent = 'В разговоре';
-      if (!state.callTimerInterval) startCallTimer();
-    };
+    stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
+    bindPeerEvents(pc, false);
 
     try {
-      await state.peerConnection.setRemoteDescription(offer);
-      const answer = await state.peerConnection.createAnswer();
-      await state.peerConnection.setLocalDescription(answer);
+      await pc.setRemoteDescription(offer);
+      remoteDescSet = true;
+      flushPendingCandidates();
+
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
       socket.emit('answer-call', { to: from, answer: answer });
-      console.log('📤 Answer отправлен');
+      console.log('📤 answer sent');
     } catch (err) {
-      console.error('❌ Answer:', err);
+      console.error('❌ answer:', err);
       alert('Ошибка: ' + err.message);
       window.cleanupCall();
     }
@@ -202,119 +197,32 @@
     state.callActive = false;
     if (typeof stopCallTimer === 'function') stopCallTimer();
 
-    if (typeof state.isScreenSharing !== 'undefined' && state.isScreenSharing && typeof stopScreenShare === 'function') {
-      try { stopScreenShare(); } catch (e) {}
-    }
-
     if (state.peerConnection) {
       try { state.peerConnection.close(); } catch (e) {}
       state.peerConnection = null;
     }
 
     if (state.localStream) {
-      try { state.localStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+      try { state.localStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
       state.localStream = null;
     }
 
-    const cs = $('call-screen');
-    if (cs) cs.classList.remove('active');
-    const is = $('incoming-screen');
-    if (is) is.classList.remove('active');
+    const cs = $('call-screen'); if (cs) cs.classList.remove('active');
+    const is = $('incoming-screen'); if (is) is.classList.remove('active');
+    const lv = $('localVideo'); if (lv) lv.srcObject = null;
+    const rv = $('remoteVideo'); if (rv) rv.srcObject = null;
+    const lw = $('local-video-wrap'); if (lw) lw.classList.remove('active');
 
-    const lv = $('localVideo');
-    if (lv) lv.srcObject = null;
-    const rv = $('remoteVideo');
-    if (rv) rv.srcObject = null;
-    const lw = $('local-video-wrap');
-    if (lw) lw.classList.remove('active');
-
-    console.log('📞 Звонок очищен');
+    pendingCandidates = [];
+    remoteDescSet = false;
+    console.log('📞 cleanup');
   };
 
-  // ─── Перезаписываем обработчики socket ───
-  socket.off('call-answered');
-  socket.off('ice-candidate');
-  socket.off('call-ended');
-  socket.off('call-failed');
-  socket.off('incoming-call');
-
-  socket.on('call-answered', async function (data) {
-    try {
-      if (state.peerConnection) {
-        await state.peerConnection.setRemoteDescription(data.answer);
-        const st = $('call-status');
-        if (st) st.textContent = 'В разговоре';
-        if (!state.callTimerInterval && typeof startCallTimer === 'function') startCallTimer();
-        console.log('✅ Answer применён');
-      }
-    } catch (err) {
-      console.error('❌ setRemoteDescription(answer):', err);
-    }
-  });
-
-  socket.on('ice-candidate', async function (data) {
-    if (state.peerConnection && data.candidate) {
-      try {
-        await state.peerConnection.addIceCandidate(data.candidate);
-      } catch (e) {
-        if (e.name !== 'InvalidStateError') console.warn('⚠️ addIceCandidate:', e);
-      }
-    }
-  });
-
-  socket.on('call-ended', function () {
-    console.log('📞 call-ended');
-    window.cleanupCall();
-  });
-
-  socket.on('call-failed', function (data) {
-    console.error('❌ call-failed:', data && data.reason);
-    alert('Не удалось: ' + ((data && data.reason) || 'неизвестно'));
-    window.cleanupCall();
-  });
-
-  socket.on('incoming-call', function (data) {
-    console.log('📞 incoming-call:', data.from);
-    state.incomingFrom = data.from;
-    state.incomingVideo = data.video;
-    state.pendingOffer = data.offer;
-
-    const contact = state.contacts.find(function (c) { return c.name === data.from; });
-    const displayName = (contact && contact.displayName) || data.from;
-    const badges = typeof renderBadgesBig === 'function' ? renderBadgesBig(contact || {}) : '';
-
-    const iname = $('incoming-name');
-    if (iname) iname.innerHTML = escapeHtml(displayName) + ' ' + badges;
-    const itype = $('incoming-type');
-    if (itype) itype.textContent = data.video ? 'Видеозвонок' : 'Аудиозвонок';
-
-    const av = $('incoming-avatar');
-    if (av) {
-      av.classList.toggle('premium', !!(contact && contact.premium));
-      if (contact && contact.avatar) {
-        av.style.backgroundImage = 'url(' + contact.avatar + ')';
-        av.textContent = '';
-      } else {
-        av.style.backgroundImage = '';
-        av.textContent = typeof initials === 'function' ? initials(displayName) : displayName.slice(0, 2).toUpperCase();
-        av.style.background = 'linear-gradient(135deg,#6d5eff,#8b7fff)';
-      }
-    }
-
-    const is = $('incoming-screen');
-    if (is) is.classList.add('active');
-
-    if (typeof playPing === 'function') playPing();
-    if (typeof vibrate === 'function') vibrate();
-  });
-
-  // ─── Переопределяем hangUp на всякий случай ───
   window.hangUp = function () {
     if (state.currentChat) socket.emit('end-call', { to: state.currentChat });
     window.cleanupCall();
   };
 
-  // ─── Тумблеры (микрофон/камера) ───
   window.toggleMic = function () {
     if (!state.localStream) return;
     const t = state.localStream.getAudioTracks()[0];
@@ -333,5 +241,85 @@
     if (typeof updateCallButtons === 'function') updateCallButtons();
   };
 
-  console.log('📞 calls-patch загружен (STUN-only)');
+  // ─── Переопределяем socket-обработчики ───
+  ['call-answered', 'ice-candidate', 'call-ended', 'call-failed', 'incoming-call'].forEach(function (ev) {
+    socket.off(ev);
+  });
+
+  socket.on('call-answered', async function (data) {
+    try {
+      if (state.peerConnection) {
+        await state.peerConnection.setRemoteDescription(data.answer);
+        remoteDescSet = true;
+        flushPendingCandidates();
+        const st = $('call-status');
+        if (st) st.textContent = 'В разговоре';
+        if (typeof startCallTimer === 'function' && !state.callTimerInterval) startCallTimer();
+      }
+    } catch (err) {
+      console.error('❌ answer apply:', err);
+    }
+  });
+
+  socket.on('ice-candidate', async function (data) {
+    if (!state.peerConnection || !data.candidate) return;
+    if (!remoteDescSet) {
+      pendingCandidates.push(data.candidate);
+      return;
+    }
+    try {
+      await state.peerConnection.addIceCandidate(data.candidate);
+    } catch (e) {
+      if (e.name !== 'InvalidStateError') console.warn('addIce:', e);
+    }
+  });
+
+  socket.on('call-ended', function () {
+    window.cleanupCall();
+  });
+
+  socket.on('call-failed', function (data) {
+    alert('Не удалось: ' + ((data && data.reason) || 'неизвестно'));
+    window.cleanupCall();
+  });
+
+  socket.on('incoming-call', function (data) {
+    state.incomingFrom = data.from;
+    state.incomingVideo = data.video;
+    state.pendingOffer = data.offer;
+
+    const contact = state.contacts.find(function (c) { return c.name === data.from; });
+    const displayName = (contact && contact.displayName) || data.from;
+    const badges = typeof renderBadgesBig === 'function' ? renderBadgesBig(contact || {}) : '';
+
+    const iname = $('incoming-name');
+    if (iname) iname.innerHTML = escapeHtml(displayName) + ' ' + badges;
+    const itype = $('incoming-type');
+    if (itype) itype.textContent = data.video ? 'Видеозвонок' : 'Аудиозвонок';
+
+    const av = $('incoming-avatar');
+    if (av) {
+      av.classList.toggle('premium', !!(contact && contact.premium));
+      const v = contact && (contact.avatar_video || contact.avatar);
+      if (v && contact.avatar_video) {
+        // Видео-аватар в incoming
+        av.innerHTML = '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:50%"><source src="' + v + '"></video>';
+        av.style.backgroundImage = '';
+      } else if (contact && contact.avatar) {
+        av.style.backgroundImage = 'url(' + contact.avatar + ')';
+        av.textContent = '';
+      } else {
+        av.style.backgroundImage = '';
+        av.textContent = typeof initials === 'function' ? initials(displayName) : displayName.slice(0, 2).toUpperCase();
+      }
+    }
+
+    const is = $('incoming-screen');
+    if (is) is.classList.add('active');
+
+    if (typeof playPing === 'function') playPing();
+    if (typeof vibrate === 'function') vibrate();
+  });
+
+  console.log('📞 calls-patch v2 loaded');
 })();
