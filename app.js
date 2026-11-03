@@ -6769,3 +6769,147 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 });
+/* ═══════════════════════════════════════════════════════════
+   📎 МЕНЮ ВЛОЖЕНИЙ (＋) — ПАТЧ В КОНЕЦ app.js
+   Не переписывает существующие функции, только дополняет.
+   ═══════════════════════════════════════════════════════════ */
+
+(function attachMenuPatch() {
+  'use strict';
+
+  // ─── Открытие/закрытие меню ───
+  window.toggleAttachMenu = function () {
+    const menu = document.getElementById('attach-menu');
+    if (!menu) return;
+    if (menu.classList.contains('active')) window.closeAttachMenu();
+    else window.openAttachMenu();
+  };
+
+  window.openAttachMenu = function () {
+    const menu = document.getElementById('attach-menu');
+    if (!menu) return;
+    menu.classList.add('active');
+    if (typeof vibrate === 'function') vibrate(10);
+  };
+
+  window.closeAttachMenu = function () {
+    const menu = document.getElementById('attach-menu');
+    if (!menu) return;
+    menu.classList.remove('active');
+  };
+
+  // Закрытие по Escape
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') window.closeAttachMenu();
+  });
+
+  // ─── Обёртки над существующими функциями ───
+  // При смене чата — закрываем меню
+  if (typeof window.openChat === 'function' && !window.openChat.__patched) {
+    const _openChat = window.openChat;
+    window.openChat = function (name) {
+      window.closeAttachMenu();
+      return _openChat.apply(this, arguments);
+    };
+    window.openChat.__patched = true;
+  }
+
+  if (typeof window.closeChat === 'function' && !window.closeChat.__patched) {
+    const _closeChat = window.closeChat;
+    window.closeChat = function () {
+      window.closeAttachMenu();
+      return _closeChat.apply(this, arguments);
+    };
+    window.closeChat.__patched = true;
+  }
+
+  if (typeof window.openGroupChat === 'function' && !window.openGroupChat.__patched) {
+    const _openGroupChat = window.openGroupChat;
+    window.openGroupChat = function (g) {
+      window.closeAttachMenu();
+      return _openGroupChat.apply(this, arguments);
+    };
+    window.openGroupChat.__patched = true;
+  }
+
+  if (typeof window.openSavedChat === 'function' && !window.openSavedChat.__patched) {
+    const _openSavedChat = window.openSavedChat;
+    window.openSavedChat = function () {
+      window.closeAttachMenu();
+      return _openSavedChat.apply(this, arguments);
+    };
+    window.openSavedChat.__patched = true;
+  }
+
+  // ─── Обёртки для безопасного вызова из меню ───
+  // toggleSpoilerMode из патча (может быть не объявлена, если spoiler-patch не подключён)
+  if (typeof window.toggleSpoilerMode !== 'function') {
+    window.toggleSpoilerMode = function () {
+      if (typeof state !== 'undefined') state.spoilerMode = !state.spoilerMode;
+      const btn = document.getElementById('spoilerBtn');
+      if (btn) btn.classList.toggle('active', !!(state && state.spoilerMode));
+      const input = document.getElementById('msgInput');
+      if (input) input.classList.toggle('spoiler-mode', !!(state && state.spoilerMode));
+      if (typeof showToast === 'function') {
+        showToast(state && state.spoilerMode ? '👁 Спойлер включён' : '👁 Спойлер выключен');
+      }
+      if (typeof vibrate === 'function') vibrate(15);
+    };
+  }
+
+  // ─── Исправление applyMuteLock под новую разметку ───
+  // Старая версия искала micBtnInput / circleBtn / .attach — их больше нет
+  if (typeof window.applyMuteLock === 'function' && !window.applyMuteLock.__patched) {
+    window.applyMuteLock = function () {
+      if (typeof state === 'undefined' || !state.isLoggedIn) return;
+
+      const mute = state.me.mute;
+      const input = document.getElementById('msgInput');
+      const sendBtn = document.getElementById('send-btn');
+      const attachBtn = document.getElementById('attachBtn');
+
+      if (!mute) {
+        if (input) {
+          input.disabled = false;
+          input.placeholder = 'Сообщение...';
+        }
+        if (sendBtn) sendBtn.disabled = false;
+        if (attachBtn) attachBtn.disabled = false;
+        const existing = document.getElementById('mute-banner');
+        if (existing) existing.remove();
+        return;
+      }
+
+      const until = mute.expires_at
+        ? new Date(mute.expires_at).toLocaleString('ru-RU')
+        : '';
+
+      if (input) {
+        input.disabled = true;
+        input.placeholder = '🔇 Ты в муте';
+      }
+      if (sendBtn) sendBtn.disabled = true;
+      if (attachBtn) attachBtn.disabled = true;
+
+      let banner = document.getElementById('mute-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'mute-banner';
+        const inputArea = document.getElementById('input-area');
+        if (inputArea && inputArea.parentNode) {
+          inputArea.parentNode.insertBefore(banner, inputArea);
+        }
+      }
+      banner.innerHTML =
+        '🔇 Ты в муте' +
+        (mute.reason ? ' · ' + escapeHtml(mute.reason) : '') +
+        (until ? ' · до ' + escapeHtml(until) : '');
+    };
+    window.applyMuteLock.__patched = true;
+  }
+
+  // ─── Убираем старый обработчик touchstart scale (он искал .mic/.camera) ───
+  // Не критично — .mic/.camera больше нет в DOM, так что селектор просто ничего не найдёт.
+
+  console.log('📎 attach-menu patch applied');
+})();
