@@ -7263,3 +7263,35 @@ document.addEventListener('DOMContentLoaded', function () {
         if (data.banner_video !== undefined) c.bannerVideo = data.banner_video;
       }
     });
+/* ═══════════════════════════════════════════════════════════
+   🚫 УБИРАЕМ SPLASH SCREEN
+   ═══════════════════════════════════════════════════════════ */
+
+(function removeSplashForever() {
+  'use strict';
+
+  // 1. Сразу удаляем заставку из DOM, как только выполнится этот код
+  function killSplash() {
+    const sp = document.getElementById('splash-screen');
+    if (sp) sp.remove();
+  }
+
+  // Убираем сразу
+  killSplash();
+
+  // 2. На всякий случай — если DOM ещё не готов, ждём
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', killSplash);
+  }
+
+  // 3. Перекрываем функцию hideSplash — чтобы она тоже удаляла заставку
+  window.hideSplash = function () {
+    killSplash();
+  };
+
+  // 4. Если через 3 секунды заставка всё ещё есть (вдруг появилась снова) — удаляем
+  setTimeout(killSplash, 3000);
+  setTimeout(killSplash, 5000);
+
+  console.log('🚫 splash screen killer active');
+})();
