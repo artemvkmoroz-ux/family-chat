@@ -7295,3 +7295,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
   console.log('🚫 splash screen killer active');
 })();
+/* ═══════════════════════════════════════════════════════════
+   🚫 ЖЁСТКОЕ УДАЛЕНИЕ ЗАСТАВКИ (SPLASH SCREEN)
+   ═══════════════════════════════════════════════════════════ */
+
+(function killSplashScreenForever() {
+  'use strict';
+
+  // Функция, которая физически удаляет элемент из HTML
+  function destroySplash() {
+    const splash = document.getElementById('splash-screen');
+    if (splash && splash.parentNode) {
+      splash.parentNode.removeChild(splash);
+    }
+  }
+
+  // 1. Пытаемся удалить сразу
+  destroySplash();
+
+  // 2. Если страница ещё грузится, удаляем как только DOM будет готов
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', destroySplash);
+  }
+
+  // 3. Переопределяем стандартную функцию, чтобы она тоже удаляла
+  window.hideSplash = destroySplash;
+
+  // 4. САМОЕ ГЛАВНОЕ: запускаем цикл, который проверяет наличие заставки каждые 100 мс
+  // Это убьёт её, даже если другой код попытается её вернуть или показать
+  const splashKillerInterval = setInterval(function() {
+    destroySplash();
+  }, 100);
+
+  // 5. Останавливаем цикл через 10 секунд, чтобы не грузить телефон впустую
+  setTimeout(function() {
+    clearInterval(splashKillerInterval);
+  }, 10000);
+
+  console.log('🔪 Splash screen killer activated');
+})();
