@@ -6913,3 +6913,353 @@ document.addEventListener('DOMContentLoaded', function () {
 
   console.log('📎 attach-menu patch applied');
 })();
+/* ═══════════════════════════════════════════════════════════
+   🎬 ВИДЕО-АВАТАР И ВИДЕО-БАННЕР — ПАТЧ В КОНЕЦ app.js
+   ═══════════════════════════════════════════════════════════ */
+
+(function videoMediaPatch() {
+  'use strict';
+
+  // ─── Расширяем состояние ───
+  if (typeof state !== 'undefined') {
+    if (!state.me) state.me = {};
+    if (state.me.avatarVideo === undefined) state.me.avatarVideo = null;
+    if (state.me.bannerVideo === undefined) state.me.bannerVideo = null;
+  }
+
+  // ─── Обработка выбора файла (фото ИЛИ видео) ───
+  window.pickAvatarMedia = function () {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,video/*';
+    input.style.display = 'none';
+    input.onchange = function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.type.startsWith('video/')) {
+        window.uploadAvatarVideo(file);
+      } else if (file.type.startsWith('image/')) {
+        window.uploadAvatarPhoto(file);
+      } else {
+        showToast('⚠️ Только фото или видео');
+      }
+    };
+    document.body.appendChild(input);
+    input.click();
+    setTimeout(function () { input.remove(); }, 1000);
+  };
+
+  window.pickBannerMedia = function () {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,video/*';
+    input.style.display = 'none';
+    input.onchange = function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.type.startsWith('video/')) {
+        window.uploadBannerVideo(file);
+      } else if (file.type.startsWith('image/')) {
+        window.uploadBannerPhoto(file);
+      } else {
+        showToast('⚠️ Только фото или видео');
+      }
+    };
+    document.body.appendChild(input);
+    input.click();
+    setTimeout(function () { input.remove(); }, 1000);
+  };
+
+  // ─── Фото-аватар (используем старый uploadAvatar через canvas) ───
+  window.uploadAvatarPhoto = function (file) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200; canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        const min = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - min) / 2, (img.height - min) / 2, min, min, 0, 0, 200, 200);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+        // Сначала удаляем видео-аватар (если был)
+        socket.emit('remove avatar video', function () {
+          state.me.avatarVideo = null;
+          state.me.avatar = dataUrl;
+          socket.emit('set avatar', { avatar: dataUrl });
+          if (typeof updateMyAvatarBtn === 'function') updateMyAvatarBtn();
+          if (typeof renderStoriesBar === 'function') renderStoriesBar();
+          showToast('✓ Фото-аватар установлен');
+          closeModal('profile-modal');
+        });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // ─── Видео-аватар ───
+  window.uploadAvatarVideo = function (file) {
+    // Лимит 6 МБ
+    if (file.size > 6 * 1024 * 1024) {
+      showToast('⚠️ Видео больше 6 МБ');
+      return;
+    }
+    // Проверка длительности
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = function () {
+      if (video.duration > 8) {
+        showToast('⚠️ Видео не длиннее 8 секунд');
+        URL.revokeObjectURL(video.src);
+        return;
+      }
+      URL.revokeObjectURL(video.src);
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const dataUrl = e.target.result;
+        if (dataUrl.length > 8_000_000) {
+          showToast('⚠️ Видео слишком большое после кодирования');
+          return;
+        }
+        socket.emit('set avatar video', { video: dataUrl }, function (res) {
+          if (!res || !res.ok) {
+            showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+            return;
+          }
+          state.me.avatarVideo = dataUrl;
+          // Убираем фото-аватар
+          state.me.avatar = null;
+          if (typeof updateMyAvatarBtn === 'function') updateMyAvatarBtn();
+          if (typeof renderStoriesBar === 'function') renderStoriesBar();
+          showToast('🎬 Видео-аватар установлен');
+          closeModal('profile-modal');
+        });
+      };
+      reader.readAsDataURL(file);
+    };
+    video.src = URL.createObjectURL(file);
+  };
+
+  // ─── Фото-баннер ───
+  window.uploadBannerPhoto = function (file) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const targetW = 1200;
+        const targetH = 400;
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW; canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(targetW / img.width, targetH / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (targetW - w) / 2, (targetH - h) / 2, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+
+        // Убираем видео-баннер
+        socket.emit('remove banner video', function () {
+          state.me.bannerVideo = null;
+          socket.emit('set banner', { banner: dataUrl }, function (res) {
+            if (res && res.ok) {
+              state.me.banner = dataUrl;
+              const preview = $('profile-banner-preview');
+              const imgEl = $('profile-banner-img');
+              if (imgEl) imgEl.src = dataUrl;
+              if (preview) preview.style.display = 'block';
+              showToast('🎨 Баннер установлен');
+              vibrate(15);
+            } else {
+              showToast('❌ Ошибка');
+            }
+          });
+        });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // ─── Видео-баннер ───
+  window.uploadBannerVideo = function (file) {
+    if (file.size > 15 * 1024 * 1024) {
+      showToast('⚠️ Видео больше 15 МБ');
+      return;
+    }
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = function () {
+      if (video.duration > 20) {
+        showToast('⚠️ Видео не длиннее 20 секунд');
+        URL.revokeObjectURL(video.src);
+        return;
+      }
+      URL.revokeObjectURL(video.src);
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const dataUrl = e.target.result;
+        if (dataUrl.length > 15_000_000) {
+          showToast('⚠️ Видео слишком большое');
+          return;
+        }
+        socket.emit('set banner video', { video: dataUrl }, function (res) {
+          if (!res || !res.ok) {
+            showToast('❌ ' + ((res && res.error) || 'Ошибка'));
+            return;
+          }
+          state.me.bannerVideo = dataUrl;
+          state.me.banner = null;
+          showToast('🎬 Видео-баннер установлен');
+          vibrate(15);
+        });
+      };
+      reader.readAsDataURL(file);
+    };
+    video.src = URL.createObjectURL(file);
+  };
+
+  // ─── Рендер видео-аватара в кнопке "Мой профиль" ───
+  const _origUpdateMyAvatarBtn = window.updateMyAvatarBtn;
+  if (typeof _origUpdateMyAvatarBtn === 'function') {
+    window.updateMyAvatarBtn = function () {
+      const btn = $('my-avatar-btn');
+      if (!btn) return;
+
+      if (state.me.avatarVideo) {
+        // Видео-аватар
+        btn.innerHTML = '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:50%"><source src="' + state.me.avatarVideo + '"></video>';
+      } else if (state.me.avatar) {
+        btn.innerHTML = '<img src="' + state.me.avatar + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+      } else {
+        btn.textContent = '👤';
+      }
+
+      if (state.me.premium) {
+        btn.style.boxShadow = '0 0 0 2px var(--gold), 0 0 12px rgba(251, 191, 36, 0.5)';
+      } else {
+        btn.style.boxShadow = '';
+      }
+    };
+  }
+
+  // ─── Рендер видео-аватара в списке чатов ───
+  // Патчим renderContactItem и renderGroupItem (только аватар)
+  function wrapAvatarRenderer(origName, isGroup) {
+    const orig = window[origName];
+    if (typeof orig !== 'function') return;
+    window[origName] = function () {
+      const el = orig.apply(this, arguments);
+      // Найти .avatar внутри
+      const av = el && el.querySelector && el.querySelector('.avatar');
+      const user = arguments[0];
+      if (av && user && user.avatarVideo) {
+        av.innerHTML = '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:50%"><source src="' + user.avatarVideo + '"></video>';
+      } else if (av && user && user.avatar_video) {
+        av.innerHTML = '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:50%"><source src="' + user.avatar_video + '"></video>';
+      }
+      return el;
+    };
+  }
+  wrapAvatarRenderer('renderContactItem', false);
+  wrapAvatarRenderer('renderGroupItem', true);
+
+  // ─── Рендер видео-баннера в профиле ───
+  const _origOpenContactProfile = window.openContactProfile;
+  if (typeof _origOpenContactProfile === 'function') {
+    window.openContactProfile = function (username) {
+      return _origOpenContactProfile.call(this, username).then ? _origOpenContactProfile.call(this, username) : (function () {
+        // Перехватываем socket-ответ и дорисовываем видео
+        const _origCb = socket.listeners('get profile');
+        return _origOpenContactProfile.call(this, username);
+      }).call(this);
+    };
+  }
+
+  // Более чистый способ — переопределить socket.on('get profile') не получится,
+  // поэтому патчим финальный рендер после openContactProfile
+  const _origOpenContactProfile2 = window.openContactProfile;
+  if (typeof _origOpenContactProfile2 === 'function' && !window.openContactProfile.__patched) {
+    window.openContactProfile = function (username) {
+      const result = _origOpenContactProfile2.call(this, username);
+      // Через 100мс после запроса — дорисуем видео-аватар и видео-баннер
+      setTimeout(function () {
+        const data = state.contactProfileCurrent;
+        if (!data) return;
+
+        // Видео-баннер
+        if (data.banner_video) {
+          const bannerWrap = document.querySelector('.contact-banner');
+          if (bannerWrap) {
+            bannerWrap.innerHTML = '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover"><source src="' + data.banner_video + '"></video>';
+          }
+        }
+
+        // Видео-аватар
+        if (data.avatar_video) {
+          const avBig = document.querySelector('#contact-profile-content .profile-avatar-big');
+          if (avBig) {
+            avBig.innerHTML = '<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:50%"><source src="' + data.avatar_video + '"></video>';
+            avBig.style.backgroundImage = '';
+          }
+        }
+      }, 200);
+      return result;
+    };
+    window.openContactProfile.__patched = true;
+  }
+
+  // ─── Заменяем кнопки в profile-modal ───
+  // Ищем кнопки "Сменить фото" / "Сменить баннер" и меняем onclick
+  function patchProfileButtons() {
+    const btns = document.querySelectorAll('#profile-modal .modal-primary');
+    btns.forEach(function (btn) {
+      const txt = btn.textContent || '';
+      if (txt.includes('Сменить фото')) {
+        btn.onclick = function () { window.pickAvatarMedia(); };
+      } else if (txt.includes('Сменить баннер')) {
+        btn.onclick = function () { window.pickBannerMedia(); };
+      }
+    });
+  }
+
+  // Патчим openProfile
+  const _origOpenProfile = window.openProfile;
+  if (typeof _origOpenProfile === 'function' && !window.openProfile.__patched) {
+    window.openProfile = function () {
+      const result = _origOpenProfile.apply(this, arguments);
+      setTimeout(patchProfileButtons, 50);
+      return result;
+    };
+    window.openProfile.__patched = true;
+  }
+
+  // ─── Применяем патч при загрузке ───
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(patchProfileButtons, 500);
+  });
+
+  // ─── Обновление профиля: сохраняем видео-аватар ───
+  if (typeof socket !== 'undefined') {
+    socket.on('me updated', function (data) {
+      if (data.avatar_video !== undefined) {
+        state.me.avatarVideo = data.avatar_video;
+        if (typeof updateMyAvatarBtn === 'function') updateMyAvatarBtn();
+      }
+      if (data.banner_video !== undefined) {
+        state.me.bannerVideo = data.banner_video;
+      }
+    });
+
+    socket.on('friend updated', function (data) {
+      if (!data || !data.username) return;
+      // Обновляем контакт
+      const c = state.contacts.find(function (x) { return x.name === data.username; });
+      if (c) {
+        if (data.avatar_video !== undefined) c.avatarVideo = data.avatar_video;
+        if (data.banner_video !== undefined) c.bannerVideo = data.banner_video;
+      }
+    });
