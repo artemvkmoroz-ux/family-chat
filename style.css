@@ -3416,3 +3416,22 @@ body.light .settings-tg-row .tg-row-switch .slider {
   }
   #snow-layer { animation: none; }
 }
+/* ═══════════════════════════════════════════════════════════
+   🚫 ПРИНУДИТЕЛЬНОЕ СКРЫТИЕ ЗАСТАВКИ ЧЕРЕЗ 1 СЕКУНДУ
+   ═══════════════════════════════════════════════════════════ */
+#splash-screen {
+  animation: forceHideSplash 1s forwards !important;
+  pointer-events: none;
+}
+
+@keyframes forceHideSplash {
+  0%, 99% {
+    opacity: 1;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+    display: none;
+  }
+}
