@@ -3559,34 +3559,174 @@ io.on('connection', (socket) => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════
-// ЗАПУСК
-// ═══════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
+   📞 ПАТЧ ЗВОНКОВ + 🎬 ВИДЕО-АВАТАР/БАННЕР + 🚀 ЗАПУСК
+   ═══════════════════════════════════════════════════════════ */
 
-initDB()
-  .then(() => {
-    console.log('✅ initDB завершён успешно');
-    setInterval(cleanupExpiredStories, 60 * 60 * 1000);
-    setInterval(cleanupExpiredInvites, 30 * 60 * 1000);
-    setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);
-    setInterval(cleanupExpiredPunishments, 5 * 60 * 1000);
-    cleanupExpiredStories().catch(() => {});
-    cleanupExpiredInvites().catch(() => {});
-    cleanupExpiredSessions().catch(() => {});
-    cleanupExpiredPunishments().catch(() => {});
+(function callsAndMediaPatch() {
+  'use strict';
 
-    server.listen(CONFIG.PORT, () => {
-      console.log('🌌 Azerta v15.1 запущена на порту ' + CONFIG.PORT);
-      console.log('📞 STUN-only сигналинг: включён');
-      console.log('⚠️ Без TURN звонки могут не работать через строгий NAT');
+  // ─── Дополняем схему БД для видео-аватара и видео-баннера ───
+  setTimeout(async () => {
+    try {
+      await db.execute('ALTER TABLE users ADD COLUMN avatar_video TEXT').catch(() => {});
+      await db.execute('ALTER TABLE users ADD COLUMN banner_video TEXT').catch(() => {});
+      console.log('🎬 video-avatar/banner columns ready');
+    } catch (e) {}
+  }, 3000);
+
+  // ─── Валидаторы видео ───
+  function validAvatarVideo(s) {
+    if (typeof s !== 'string') return false;
+    if (s.length > 8_000_000) return false;
+    return /^data:video\/(mp4|webm|quicktime|ogg);base64,/i.test(s);
+  }
+  function validBannerVideo(s) {
+    if (typeof s !== 'string') return false;
+    if (s.length > 15_000_000) return false;
+    return /^data:video\/(mp4|webm|quicktime|ogg);base64,/i.test(s);
+  }
+
+  // ─── Расширяем публичный профиль: отдаём видео ───
+  // eslint-disable-next-line no-func-assign
+  getContactInfo = async function (username) {
+    const r = await db.execute({
+      sql: `SELECT username, avatar, avatar_video, banner, banner_video, premium, verified,
+                   badge_hammer, badge_scam, bio, first_name, last_name, emoji_status,
+                   last_seen_visibility, is_support
+            FROM users WHERE username = ?`,
+      args: [username]
     });
-  })
-  .catch(err => {
-    console.error('❌ ОШИБКА при инициализации:', err);
-    process.exit(1);
+    return r.rows[0] || null;
+  };
+
+  // ─── Сокет: загрузка/удаление видео-аватара и баннера ───
+  io.on('connection', (socket) => {
+    socket.on('set avatar video', async ({ video }, cb) => {
+      try {
+        if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+        if (!video) return cb && cb({ ok: false, error: 'Пустое видео' });
+        if (!validAvatarVideo(video)) return cb && cb({ ok: false, error: 'Видео слишком большое или неверный формат' });
+
+        await db.execute({ sql: 'UPDATE users SET avatar_video = ? WHERE username = ?', args: [video, socket.username] });
+
+        notifyAllFriends(socket.username, 'friend updated', {
+          username: socket.username,
+          avatar_video: video
+        }).catch(() => {});
+
+        socket.emit('me updated', { avatar_video: video });
+        refreshForFriends(socket.username).catch(() => {});
+        cb && cb({ ok: true });
+      } catch (e) { console.error('set avatar video:', e); cb && cb({ ok: false }); }
+    });
+
+    socket.on('remove avatar video', async (cb) => {
+      try {
+        if (!socket.username) return cb && cb({ ok: false });
+        await db.execute({ sql: 'UPDATE users SET avatar_video = NULL WHERE username = ?', args: [socket.username] });
+        notifyAllFriends(socket.username, 'friend updated', { username: socket.username, avatar_video: null }).catch(() => {});
+        socket.emit('me updated', { avatar_video: null });
+        refreshForFriends(socket.username).catch(() => {});
+        cb && cb({ ok: true });
+      } catch (e) { cb && cb({ ok: false }); }
+    });
+
+    socket.on('set banner video', async ({ video }, cb) => {
+      try {
+        if (!socket.username) return cb && cb({ ok: false, error: 'Не авторизован' });
+        if (!video) return cb && cb({ ok: false, error: 'Пустое видео' });
+        if (!validBannerVideo(video)) return cb && cb({ ok: false, error: 'Видео слишком большое или неверный формат' });
+
+        await db.execute({ sql: 'UPDATE users SET banner_video = ? WHERE username = ?', args: [video, socket.username] });
+        notifyAllFriends(socket.username, 'friend updated', { username: socket.username, banner_video: video }).catch(() => {});
+        socket.emit('me updated', { banner_video: video });
+        refreshForFriends(socket.username).catch(() => {});
+        cb && cb({ ok: true });
+      } catch (e) { console.error('set banner video:', e); cb && cb({ ok: false }); }
+    });
+
+    socket.on('remove banner video', async (cb) => {
+      try {
+        if (!socket.username) return cb && cb({ ok: false });
+        await db.execute({ sql: 'UPDATE users SET banner_video = NULL WHERE username = ?', args: [socket.username] });
+        notifyAllFriends(socket.username, 'friend updated', { username: socket.username, banner_video: null }).catch(() => {});
+        socket.emit('me updated', { banner_video: null });
+        refreshForFriends(socket.username).catch(() => {});
+        cb && cb({ ok: true });
+      } catch (e) { cb && cb({ ok: false }); }
+    });
   });
 
-process.on('uncaughtException', (err) => { console.error('💥 uncaughtException:', err); });
-process.on('unhandledRejection', (reason) => { console.error('💥 unhandledRejection:', reason); });
-process.on('SIGTERM', () => { console.log('📴 SIGTERM'); server.close(() => process.exit(0)); });
-process.on('SIGINT', () => { console.log('📴 SIGINT'); server.close(() => process.exit(0)); });
+  console.log('📞 calls + 🎬 media patch loaded');
+})();
+
+// ═══════════════════════════════════════════════════════════
+// 🚀 ЗАПУСК (Render-safe)
+// ═══════════════════════════════════════════════════════════
+
+let _started = false;
+
+async function startServer() {
+  if (_started) return;
+  _started = true;
+
+  try {
+    console.log('⏳ initDB...');
+    await initDB();
+    console.log('✅ initDB завершён');
+  } catch (err) {
+    console.error('❌ ОШИБКА initDB:', err);
+    console.error('⚠️ Сервер продолжит работу, но БД может быть не готова');
+  }
+
+  // Интервалы очистки
+  setInterval(cleanupExpiredStories, 60 * 60 * 1000);
+  setInterval(cleanupExpiredInvites, 30 * 60 * 1000);
+  setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);
+  setInterval(cleanupExpiredPunishments, 5 * 60 * 1000);
+
+  // Разовая очистка при старте
+  cleanupExpiredStories().catch(() => {});
+  cleanupExpiredInvites().catch(() => {});
+  cleanupExpiredSessions().catch(() => {});
+  cleanupExpiredPunishments().catch(() => {});
+
+  // Запуск HTTP
+  server.listen(CONFIG.PORT, () => {
+    console.log('🌌 Azerta v15.1 запущена на порту ' + CONFIG.PORT);
+    console.log('📞 STUN-only сигналинг: включён');
+    console.log('⚠️ Без TURN звонки могут не работать через строгий NAT');
+    console.log('🔗 Health: http://localhost:' + CONFIG.PORT + '/health');
+  });
+
+  server.on('error', (err) => {
+    console.error('❌ HTTP server error:', err);
+  });
+}
+
+startServer();
+
+// ─── Graceful shutdown ───
+process.on('uncaughtException', (err) => {
+  console.error('💥 uncaughtException:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('💥 unhandledRejection:', reason);
+});
+
+process.on('SIGTERM', () => {
+  console.log('📴 SIGTERM — завершаюсь');
+  server.close(() => {
+    console.log('✅ HTTP закрыт');
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10_000);
+});
+
+process.on('SIGINT', () => {
+  console.log('📴 SIGINT — завершаюсь');
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10_000);
+});
