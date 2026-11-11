@@ -968,3 +968,37 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 console.log('%c✅ Azerta v20.0 — Запущена!', 'color:#4ade80;font-weight:bold;font-size:14px');
+/* ─── ЗАГЛУШКИ ДЛЯ НОВЫХ КНОПОК ─── */
+window.openProfile = function() {
+  document.getElementById('modal-title').textContent = 'Мой профиль';
+  document.getElementById('modal-content').innerHTML = '<div style="text-align:center;"><div class="avatar" style="margin:0 auto 15px; width:80px; height:80px; font-size:30px;">👤</div><p>@' + (localStorage.getItem('aurora-session') ? JSON.parse(localStorage.getItem('aurora-session')).username : 'guest') + '</p></div>';
+  document.getElementById('modal-container').style.display = 'flex';
+};
+
+window.changeTheme = function() {
+  document.body.classList.toggle('light');
+};
+
+window.uploadAvatar = function(event) {
+  // Заглушка для загрузки аватарки
+  alert('Загрузка аватарки');
+};
+
+window.toggleStickersPanel = function() {
+  alert('Панель стикеров');
+};
+
+window.closeAllModals = function() {
+  document.getElementById('modal-container').style.display = 'none';
+};
+
+// Обработчик кнопки «Создать»
+window.openCreateMenu = function() {
+  document.getElementById('modal-title').textContent = 'Что создать?';
+  document.getElementById('modal-content').innerHTML = `
+    <div class="chat-item" onclick="alert('Добавление контакта')"><div class="avatar">👤</div><div><div class="chat-name">Контакт</div></div></div>
+    <div class="chat-item" onclick="alert('Создание группы')"><div class="avatar">👥</div><div><div class="chat-name">Группу</div></div></div>
+    <div class="chat-item" onclick="alert('Создание канала')"><div class="avatar">📢</div><div><div class="chat-name">Канал</div></div></div>
+  `;
+  document.getElementById('modal-container').style.display = 'flex';
+};
