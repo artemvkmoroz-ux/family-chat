@@ -1,17 +1,32 @@
 'use strict';
 
-/* ═══════════════════════════════════════════════════════════
-   AZERTA v13.9 — Client (Оригинал + Фиксы)
-   ═══════════════════════════════════════════════════════════ */
-
+/* ─── 1. УТИЛИТЫ ─── */
 const $ = id => document.getElementById(id);
-const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const el = (tag, cls, html) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html != null) e.innerHTML = html;
+  return e;
+};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[c]));
 const now = () => Date.now();
 const fmtT = ms => new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 const fmtD = ms => new Date(ms).toLocaleString('ru-RU');
-const initials = n => { const p = String(n || '').trim().split(/\s+/); return p.length > 1 && p[0] && p[1] ? (p[0][0] + p[1][0]).toUpperCase() : String(n || '?').slice(0, 2).toUpperCase(); };
-const ago = ms => { const m = Math.floor((now() - ms) / 6e4); return m < 1 ? 'только что' : m < 60 ? m + ' мин назад' : m < 1440 ? Math.floor(m / 60) + ' ч назад' : Math.floor(m / 1440) + ' дн назад'; };
+const initials = n => {
+  const p = String(n || '').trim().split(/\s+/);
+  return p.length > 1 && p[0] && p[1]
+    ? (p[0][0] + p[1][0]).toUpperCase()
+    : String(n || '?').slice(0, 2).toUpperCase();
+};
+const ago = ms => {
+  const m = Math.floor((now() - ms) / 6e4);
+  return m < 1 ? 'только что'
+    : m < 60 ? m + ' мин назад'
+    : m < 1440 ? Math.floor(m / 60) + ' ч назад'
+    : Math.floor(m / 1440) + ' дн назад';
+};
 const jset = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const jget = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } };
 const vib = ms => { if (state.settings.vibration == 0) return; try { navigator.vibrate?.(ms || [10, 20, 10]); } catch {} };
@@ -34,20 +49,28 @@ function closeModal(id) { $(id)?.classList.remove('active'); }
 function renderBadges(u) {
   if (!u) return '';
   let h = '';
-  if (u.premium) h += '<span class="premium-badge" title="Premium">⭐</span>';
-  if (u.verified) h += '<span class="verified-badge" title="Verified">✓</span>';
-  if (u.hammer) h += '<span class="hammer-badge" title="Mod">🔨</span>';
-  if (u.scam) h += '<span class="scam-badge" title="Scam">SCAM</span>';
+  if (u.premium) h += '<span class="premium-badge">⭐</span>';
+  if (u.verified) h += '<span class="verified-badge">✓</span>';
+  if (u.hammer) h += '<span class="hammer-badge">🔨</span>';
+  if (u.scam) h += '<span class="scam-badge">SCAM</span>';
   return h;
 }
 function renderBadgesBig(u) { return renderBadges(u).replace(/class="(\w+-badge)"/g, 'class="$1 big"'); }
-function displayName(u) { if (u === state.me.username) return 'Я'; const c = state.contacts.find(x => x.name === u); return c?.displayName || u; }
+function displayName(u) {
+  if (u === state.me.username) return 'Я';
+  const c = state.contacts.find(x => x.name === u);
+  return c?.displayName || u;
+}
 
+/* ─── 2. СОСТОЯНИЕ ─── */
 const state = {
   me: { username: null, avatar: null, banner: null, avatarVideo: null, bannerVideo: null, premium: false, verified: false, hammer: false, scam: false, bio: '', firstName: '', lastName: '', birthday: '', emoji: '', stars: 0, sessionId: null, isModerator: false, mute: null },
-  contacts: [], groups: [], channels: [], unread: {}, typingUsers: {}, typingTimeouts: {}, blockedList: [],
-  giftsCatalog: {}, myBots: [], currentChat: null, currentGroup: null, currentChannel: null,
-  isSavedChat: false, isBotChat: false, currentBot: null, activeTab: 'chats', showArchived: false, settings: {},
+  contacts: [], groups: [], channels: [],
+  unread: {}, typingUsers: {}, typingTimeouts: {}, blockedList: [],
+  giftsCatalog: {}, myBots: [],
+  currentChat: null, currentGroup: null, currentChannel: null,
+  isSavedChat: false, isBotChat: false, currentBot: null,
+  activeTab: 'chats', showArchived: false, settings: {},
   regStep: 1, regUsernameAvailable: false, regUsernameCheckTimer: null,
   replyToMessage: null, editingMessageId: null, pinnedMessageId: null,
   activeReactionMsgId: null, activeReactionGroupId: null, activeMessage: null,
@@ -58,10 +81,12 @@ const state = {
   peerConnection: null, localStream: null, callActive: false, micOn: true, camOn: true,
   pendingOffer: null, incomingFrom: null, incomingVideo: false,
   callTimerInterval: null, callStartTime: 0,
+  screenStream: null, screenTrack: null, isScreenSharing: false,
   mediaRecorder: null, audioChunks: [], isRecording: false, cancelledRecording: false,
   recordingStartTime: 0, recordingTimer: null, currentAudioMime: '',
   circleStream: null, circleRecorder: null, circleChunks: [], circleTimer: null,
-  circleStartTime: 0, circleMime: '', lastDateShown: '', canCreateGroup: true, canCreateChannel: true,
+  circleStartTime: 0, circleMime: '',
+  lastDateShown: '', canCreateGroup: true, canCreateChannel: true,
   galleryWaiting: false, notificationsAllowed: false, reconnectAttempts: 0,
   titleFlashInterval: null, myTypingTimeout: null,
   createSelected: new Set(), addMembersSelected: new Set(),
@@ -70,53 +95,96 @@ const state = {
   modPanelOpen: false, modTab: 'reports', modReportsFilter: 'new',
   modReports: [], modPunishments: [], modLogs: [], modStats: {},
   reportTarget: null, reportTargetMessageId: null, reportIsGroup: false,
-  spoilerMode: false, botControlCurrent: null, botControlTab: 'chats', botChatCurrent: null,
-  botVoiceMode: 'bot', botReplyTo: null, currentColorTarget: null
+  spoilerMode: false,
+  botControlCurrent: null, botControlTab: 'chats', botChatCurrent: null,
+  botVoiceMode: 'bot', botReplyTo: null,
+  currentColorTarget: null
 };
 
-const STORAGE = { SESSION: 'aurora-session', UNREAD: 'aurora-unread', CONTACTS: 'aurora-contacts-cache', GROUPS: 'aurora-groups-cache', STICKERS: 'aurora-recent-stickers', SETTINGS: 'aurora-settings-cache', WALLPAPERS: 'aurora-wallpapers' };
+const STORAGE = {
+  SESSION: 'aurora-session', UNREAD: 'aurora-unread', CONTACTS: 'aurora-contacts-cache',
+  GROUPS: 'aurora-groups-cache', STICKERS: 'aurora-recent-stickers',
+  SETTINGS: 'aurora-settings-cache', WALLPAPERS: 'aurora-wallpapers'
+};
 const STORY_DURATION = 5000, SWIPE_THRESHOLD = 60, MAX_RECORDING_SEC = 60, MAX_CIRCLE_SEC = 30;
+
+const BUILTIN_GIFS = [
+  ['😀', 'https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif'],
+  ['😍', 'https://media.giphy.com/media/3o6Zt6ML6BklcajjsA/giphy.gif'],
+  ['😂', 'https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif']
+].map(([emoji, url]) => ({ emoji, url }));
 
 const REPORT_REASONS = { spam: '🚫 Спам', abuse: '🤬 Оскорбления', nsfw: '🔞 18+', scam: '💀 Мошенничество', ads: '📢 Реклама', other: '❓ Другое' };
 const PUNISH_LABELS = { ban: '🚫 Бан', mute: '🔇 Мут', warn: '⚠️ Предупреждение' };
 
-const socket = io({ reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 5000, reconnectionAttempts: Infinity });
+/* ─── 3. SOCKET ─── */
+const socket = io({
+  reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 5000,
+  reconnectionAttempts: Infinity
+});
 
+/* ─── 4. RIPPLE ─── */
 function attachRipple(e) {
   if (!e || e.dataset.ripple) return;
-  e.dataset.ripple = '1'; e.classList.add('ripple-container');
+  e.dataset.ripple = '1';
+  e.classList.add('ripple-container');
   e.addEventListener('pointerdown', ev => {
-    const r = e.getBoundingClientRect(), s = Math.max(r.width, r.height);
+    const r = e.getBoundingClientRect();
+    const s = Math.max(r.width, r.height);
     const x = ev.clientX - r.left - s / 2, y = ev.clientY - r.top - s / 2;
     const d = el('span', 'ripple');
     Object.assign(d.style, { width: s + 'px', height: s + 'px', left: x + 'px', top: y + 'px' });
-    e.appendChild(d); setTimeout(() => d.remove(), 700);
+    e.appendChild(d);
+    setTimeout(() => d.remove(), 700);
   });
 }
 function bindRipples(root) {
-  const sel = '.auth-btn-primary,.modal-primary,.modal-secondary,.modal-danger,.create-menu-btn,.nav-btn,.settings-tg-row,.chat-item,.back-btn,.icon-btn,#burger,#send-btn,.attach,.reaction-chip,.action-item,.my-bot-card,.bch-chip,.mod-tab,.report-reason-btn,.punish-duration-btn';
+  const sel = '.auth-btn-primary,.modal-primary,.modal-secondary,.modal-danger,.create-menu-btn,.nav-btn,.settings-item,.settings-tg-row,.chat-item,.back-btn,.icon-btn,#burger,#send-btn,.attach,.mic,.camera,.reaction-chip,.action-item,.my-bot-card,.bch-chip,.mod-tab,.report-reason-btn,.punish-duration-btn';
   (root || document).querySelectorAll(sel).forEach(attachRipple);
 }
 
-document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+/* ─── 5. МОДАЛКИ ─── */
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => {
+  if (e.target === m) m.classList.remove('active');
+}));
 
+/* ─── 6. АВТОРИЗАЦИЯ ─── */
 let autoLoginDone = false, isLoggedInOnServer = false;
 
 function showBanScreen(ban) {
-  let s = $('ban-screen') || (() => { const d = el('div'); d.id = 'ban-screen'; document.body.appendChild(d); return d; })();
+  let s = $('ban-screen') || (() => {
+    const d = el('div'); d.id = 'ban-screen'; document.body.appendChild(d); return d;
+  })();
   const until = ban.expires_at ? new Date(ban.expires_at).toLocaleString('ru-RU') : 'никогда';
-  s.innerHTML = `<div class="ban-screen-inner"><div class="ban-emoji">🚫</div><h2>Ты забанен</h2><div class="ban-reason"><div class="ban-label">Причина:</div><div class="ban-value">${esc(ban.reason || 'Не указана')}</div></div><div class="ban-until"><div class="ban-label">До:</div><div class="ban-value">${esc(until)}</div><div class="ban-sub">(${esc(ban.duration_text || 'навсегда')})</div></div><button class="modal-secondary" onclick="location.reload()">🔄 Проверить снова</button></div>`;
+  s.innerHTML = `<div class="ban-screen-inner">
+    <div class="ban-emoji">🚫</div><h2>Ты забанен</h2>
+    <div class="ban-reason"><div class="ban-label">Причина:</div><div class="ban-value">${esc(ban.reason || 'Не указана')}</div></div>
+    <div class="ban-until"><div class="ban-label">До:</div><div class="ban-value">${esc(until)}</div>
+      <div class="ban-sub">(${esc(ban.duration_text || 'навсегда')})</div></div>
+    <button class="modal-secondary" onclick="location.reload()">🔄 Проверить снова</button></div>`;
   s.classList.add('active');
 }
 
 function applyMuteLock() {
   if (!state.isLoggedIn) return;
-  const mute = state.me.mute, input = $('msgInput'), send = $('send-btn'), attach = $('attachBtn');
-  if (!mute) { if (input) { input.disabled = false; input.placeholder = 'Сообщение...'; } if (send) send.disabled = false; if (attach) attach.disabled = false; $('mute-banner')?.remove(); return; }
+  const mute = state.me.mute;
+  const input = $('msgInput'), send = $('send-btn'), attach = $('attachBtn');
+  if (!mute) {
+    if (input) { input.disabled = false; input.placeholder = 'Сообщение...'; }
+    if (send) send.disabled = false;
+    if (attach) attach.disabled = false;
+    $('mute-banner')?.remove();
+    return;
+  }
   const until = mute.expires_at ? new Date(mute.expires_at).toLocaleString('ru-RU') : '';
   if (input) { input.disabled = true; input.placeholder = '🔇 Ты в муте'; }
-  if (send) send.disabled = true; if (attach) attach.disabled = true;
-  let b = $('mute-banner'); if (!b) { b = el('div'); b.id = 'mute-banner'; $('input-area')?.parentNode?.insertBefore(b, $('input-area')); }
+  if (send) send.disabled = true;
+  if (attach) attach.disabled = true;
+  let b = $('mute-banner');
+  if (!b) {
+    b = el('div'); b.id = 'mute-banner';
+    $('input-area')?.parentNode?.insertBefore(b, $('input-area'));
+  }
   b.innerHTML = '🔇 Ты в муте' + (mute.reason ? ' · ' + esc(mute.reason) : '') + (until ? ' · до ' + esc(until) : '');
 }
 
@@ -124,54 +192,68 @@ function hideSplash() {
   const sp = $('splash-screen');
   if (sp && !sp.classList.contains('hide')) { sp.classList.add('hide'); setTimeout(() => sp.remove(), 500); }
 }
-// ФИКС ЧЕРНОГО ЭКРАНА
-setTimeout(hideSplash, 1500);
-setTimeout(hideSplash, 2500);
+setTimeout(hideSplash, 2000);
+setTimeout(hideSplash, 3000);
 
 function playLoginTransition(username, firstName, auto) {
   state.isLoggedIn = true; isLoggedInOnServer = true;
   const auth = $('auth'), app = $('app'), flash = $('welcome-flash'), wt = $('welcome-toast');
-  hideSplash(); $('passcode-screen')?.classList.remove('active');
-  if (auth?.classList.contains('active')) { auth.classList.add('auth-exit'); setTimeout(() => { auth.classList.remove('active', 'auth-exit'); }, 450); }
-  else auth?.classList.remove('active');
-  if (app) { app.classList.add('active', 'app-enter'); void app.offsetWidth; setTimeout(() => app.classList.remove('app-enter'), 700); }
+  hideSplash();
+  $('passcode-screen')?.classList.remove('active');
+  if (auth?.classList.contains('active')) {
+    auth.classList.add('auth-exit');
+    setTimeout(() => { auth.classList.remove('active', 'auth-exit'); }, 450);
+  } else auth?.classList.remove('active');
+  if (app) {
+    app.classList.add('active', 'app-enter');
+    void app.offsetWidth;
+    setTimeout(() => app.classList.remove('app-enter'), 700);
+  }
   if (flash) { flash.classList.add('active'); setTimeout(() => flash.classList.remove('active'), 1000); }
   if (!auto && wt) {
-    wt.querySelector('.wt-emoji').textContent = ['👋', '🌌', '✨', '🚀', '💫'][Math.floor(Math.random() * 5)];
+    const emoji = ['👋', '🌌', '✨', '🚀', '💫'][Math.floor(Math.random() * 5)];
+    wt.querySelector('.wt-emoji').textContent = emoji;
     wt.querySelector('.wt-name').textContent = 'Привет, ' + ((firstName && firstName.trim()) || username || 'друг') + '!';
     wt.querySelector('.wt-sub').textContent = 'С возвращением в Azerta';
-    wt.classList.add('active'); setTimeout(() => wt.classList.remove('active'), 2200);
+    wt.classList.add('active');
+    setTimeout(() => wt.classList.remove('active'), 2200);
   }
   setTimeout(() => {
     updateMyAvatarBtn(); updateVerifyButton(); updateVerifyChannelButton();
-    loadStories(); renderChatList(); renderStoriesBar(); applyChatWallpaper(); bindRipples(); applyMuteLock();
+    loadStories(); renderChatList(); renderStoriesBar();
+    applyChatWallpaper(); bindRipples(); applyMuteLock();
   }, 200);
 }
 
 function forceShowAuth(msg) {
-  isLoggedInOnServer = false; state.isLoggedIn = false; state.me.username = null; state.me.sessionId = null;
-  $('app')?.classList.remove('active'); $('chat-screen')?.classList.remove('active');
+  isLoggedInOnServer = false; state.isLoggedIn = false;
+  state.me.username = null; state.me.sessionId = null;
+  $('app')?.classList.remove('active');
+  $('chat-screen')?.classList.remove('active');
   const a = $('auth'); if (a) { a.classList.remove('auth-exit'); a.classList.add('active'); }
-  $('passcode-screen')?.classList.remove('active'); hideSplash();
+  $('passcode-screen')?.classList.remove('active');
+  hideSplash();
   toast('⚠️ ' + (msg || 'Войди заново'));
 }
 
 function applyMe(res) {
   Object.assign(state.me, {
     username: res.username, avatar: res.avatar || null, banner: res.banner || null,
-    avatarVideo: res.avatarVideo || res.avatar_video || null,
-    bannerVideo: res.bannerVideo || res.banner_video || null,
+    avatarVideo: res.avatarVideo || res.avatar_video || null, // ФИКС
+    bannerVideo: res.bannerVideo || res.banner_video || null, // ФИКС
     premium: !!res.premium, verified: !!res.verified, hammer: !!res.hammer, scam: !!res.scam,
     bio: res.bio || '', firstName: res.firstName || '', lastName: res.lastName || '',
     birthday: res.birthday || '', emoji: res.emojiStatus || '',
-    sessionId: res.sessionId, stars: Number(res.stars || 0),
+    sessionId: res.sessionId,
+    stars: Number(res.stars || 0),
     isModerator: !!res.is_moderator, mute: res.mute || null
   });
   state.chatWallpapers = jget(STORAGE.WALLPAPERS, {});
 }
 
 function onLoggedIn(res, auto) {
-  applyMe(res); playLoginTransition(res.username, res.firstName, !!auto);
+  applyMe(res);
+  playLoginTransition(res.username, res.firstName, !!auto);
   api('get gifts catalog', r => { if (r?.ok) state.giftsCatalog = r.catalog || {}; });
 }
 
@@ -183,7 +265,7 @@ function doRegister() {
   showBtnSpinner('reg-submit', 'Создаю…');
   api('register', { username: username.trim().toLowerCase(), password, displayName: displayName.trim() }, res => {
     hideBtnSpinner('reg-submit', 'Создать аккаунт');
-    if (!res?.ok) { if (err) err.textContent = res?.error || 'Ошибка'; vib([30, 20, 30]); return; }
+    if (!res?.ok) { if (err) err.textContent = res?.error || 'Ошибка регистрации'; vib([30, 20, 30]); return; }
     jset(STORAGE.SESSION, { username: res.username, sessionId: res.sessionId });
     onLoggedIn(res, false);
     toast('🎉 Добро пожаловать! +' + res.bonus + ' ⭐'); vib([50, 30, 50]);
@@ -197,9 +279,16 @@ function doLogin() {
   if (!username || !password) { if (err) err.textContent = 'Заполни все поля'; vib([30, 20, 30]); return; }
   showBtnSpinner('login-btn', 'Вхожу…');
   const existing = jget(STORAGE.SESSION);
-  api('login', { username: username.trim().toLowerCase(), password, device: (navigator.userAgent || '').slice(0, 40), sessionId: existing?.sessionId || null }, res => {
+  api('login', {
+    username: username.trim().toLowerCase(), password,
+    device: (navigator.userAgent || '').slice(0, 40),
+    sessionId: existing?.sessionId || null
+  }, res => {
     hideBtnSpinner('login-btn', 'Войти');
-    if (!res?.ok) { if (res?.banned) { showBanScreen(res.ban); return; } if (err) err.textContent = res?.error || 'Ошибка'; vib([30, 20, 30]); return; }
+    if (!res?.ok) {
+      if (res?.banned) { showBanScreen(res.ban); return; }
+      if (err) err.textContent = res?.error || 'Ошибка входа'; vib([30, 20, 30]); return;
+    }
     jset(STORAGE.SESSION, { username: res.username, sessionId: res.sessionId });
     onLoggedIn(res, false);
   });
@@ -210,12 +299,14 @@ async function tryAutoLogin() {
   if (!creds?.sessionId) return false;
   return new Promise(resolve => {
     let done = false;
-    const t = setTimeout(() => { if (!done) { done = true; resolve(false); } }, 6000);
+    const t = setTimeout(() => { if (!done) { done = true; resolve(false); } }, 8000);
     api('login with session', { sessionId: creds.sessionId }, res => {
       if (done) return; done = true; clearTimeout(t);
       if (!res?.ok) {
         if (res?.banned) { showBanScreen(res.ban); resolve(true); return; }
-        localStorage.removeItem(STORAGE.SESSION); forceShowAuth('Сессия истекла'); resolve(false); return;
+        localStorage.removeItem(STORAGE.SESSION);
+        forceShowAuth('Сессия истекла — войди заново');
+        resolve(false); return;
       }
       jset(STORAGE.SESSION, { username: res.username, sessionId: res.sessionId });
       applyMe(res);
@@ -229,17 +320,22 @@ async function tryAutoLogin() {
   });
 }
 
+/* ─── 7. SPINNER ─── */
 function showBtnSpinner(id, text) {
   const b = $(id); if (!b) return;
   const t = b.querySelector('.btn-text'), s = b.querySelector('.btn-spinner');
-  if (t && text) t.textContent = text; if (s) s.style.display = 'inline-flex'; b.disabled = true;
+  if (t && text) t.textContent = text;
+  if (s) s.style.display = 'inline-flex';
+  b.disabled = true;
 }
 function hideBtnSpinner(id, text) {
   const b = $(id); if (!b) return;
   const t = b.querySelector('.btn-text'), s = b.querySelector('.btn-spinner');
-  if (t && text) t.textContent = text; if (s) s.style.display = 'none'; b.disabled = false;
+  if (t && text) t.textContent = text;
+  if (s) s.style.display = 'none';
+  b.disabled = false;
 }
-
+/* ─── 8. РЕГИСТРАЦИЯ UI ─── */
 function switchAuthScreen(s) {
   document.querySelectorAll('.auth-screen').forEach(x => x.classList.remove('active'));
   $(s === 'login' ? 'auth-login-screen' : 'auth-register-screen')?.classList.add('active');
@@ -248,10 +344,15 @@ function switchAuthScreen(s) {
 }
 function regShowStep(step) {
   state.regStep = step;
-  document.querySelectorAll('.reg-progress-seg').forEach(seg => { const s = +seg.dataset.step; seg.classList.toggle('active', s === step); seg.classList.toggle('done', s < step); });
+  document.querySelectorAll('.reg-progress-seg').forEach(seg => {
+    const s = +seg.dataset.step;
+    seg.classList.toggle('active', s === step);
+    seg.classList.toggle('done', s < step);
+  });
   $('reg-back-btn')?.classList.toggle('show', step > 1);
   document.querySelectorAll('.reg-step-card').forEach(c => c.classList.toggle('active', +c.dataset.step === step));
-  setTimeout(() => $('reg-username')?.focus(), 200); vib(10);
+  setTimeout(() => $('reg-username')?.focus(), 200);
+  vib(10);
 }
 function regNext(step) {
   if (step === 1) { if (state.regUsernameAvailable) regShowStep(2); }
@@ -263,21 +364,35 @@ function regNext(step) {
 function regBack() { if (state.regStep > 1) regShowStep(state.regStep - 1); vib(10); }
 
 function onRegUsernameInput() {
-  const input = $('reg-username'), wrap = $('reg-username-wrap'), status = $('reg-username-status'), hint = $('reg-username-hint'), next = $('reg-next-1');
+  const input = $('reg-username'), wrap = $('reg-username-wrap'), status = $('reg-username-status'),
+    hint = $('reg-username-hint'), next = $('reg-next-1');
   if (!input) return;
   const v = input.value.trim().toLowerCase(); input.value = v;
   wrap.classList.remove('error', 'success'); status.textContent = ''; hint.classList.remove('error', 'success');
   next.disabled = true; state.regUsernameAvailable = false;
   if (v.length < 3) { hint.textContent = 'Минимум 3 символа'; hint.classList.add('error'); return; }
   if (v.length > 20) { hint.textContent = 'Максимум 20 символов'; hint.classList.add('error'); return; }
-  if (!/^[a-z0-9_]+$/.test(v)) { hint.textContent = 'Только латиница, цифры и _'; hint.classList.add('error'); wrap.classList.add('error'); return; }
+  if (!/^[a-z0-9_]+$/.test(v)) {
+    hint.textContent = 'Только латиница, цифры и _';
+    hint.classList.add('error'); wrap.classList.add('error'); return;
+  }
   hint.textContent = 'Проверяю...'; status.textContent = '⏳';
   clearTimeout(state.regUsernameCheckTimer);
   state.regUsernameCheckTimer = setTimeout(() => {
     api('check username', { username: v }, res => {
       if (!res?.ok) { hint.textContent = 'Ошибка проверки'; hint.classList.add('error'); return; }
-      if (res.available) { wrap.classList.add('success'); status.textContent = '✅'; hint.textContent = 'Свободен!'; hint.classList.add('success'); next.disabled = false; state.regUsernameAvailable = true; vib(15); }
-      else { wrap.classList.add('error'); status.textContent = '❌'; hint.textContent = { taken: 'Этот ник занят', short: 'Слишком короткий', long: 'Слишком длинный', chars: 'Только латиница, цифры и _', empty: 'Введи ник' }[res.reason] || 'Недоступен'; hint.classList.add('error'); next.disabled = true; vib([30, 20, 30]); }
+      if (res.available) {
+        wrap.classList.add('success'); status.textContent = '✅';
+        hint.textContent = 'Свободен!'; hint.classList.add('success');
+        next.disabled = false; state.regUsernameAvailable = true; vib(15);
+      } else {
+        wrap.classList.add('error'); status.textContent = '❌';
+        hint.textContent = {
+          taken: 'Этот ник занят', short: 'Слишком короткий', long: 'Слишком длинный',
+          chars: 'Только латиница, цифры и _', empty: 'Введи ник'
+        }[res.reason] || 'Недоступен';
+        hint.classList.add('error'); next.disabled = true; vib([30, 20, 30]);
+      }
     });
   }, 350);
 }
@@ -308,25 +423,28 @@ function onRegPassword2Input() {
 }
 function updateRegSubmit() {
   const btn = $('reg-submit'); if (!btn) return;
-  const p = $('reg-password')?.value || '', p2 = $('reg-password2')?.value || '', dn = ($('reg-displayname')?.value || '').trim();
+  const p = $('reg-password')?.value || '', p2 = $('reg-password2')?.value || '',
+    dn = ($('reg-displayname')?.value || '').trim();
   btn.disabled = !(p.length >= 8 && /[a-zA-Z]/.test(p) && /[0-9]/.test(p) && p === p2 && dn && state.regUsernameAvailable);
 }
 function togglePassword(id) {
   const input = $(id); if (!input) return;
   const btn = input.parentElement.querySelector('.auth-toggle-password');
-  if (input.type === 'password') { input.type = 'text'; if (btn) btn.textContent = '🙈'; } else { input.type = 'password'; if (btn) btn.textContent = '👁'; }
+  if (input.type === 'password') { input.type = 'text'; if (btn) btn.textContent = '🙈'; }
+  else { input.type = 'password'; if (btn) btn.textContent = '👁'; }
   vib(10);
 }
 function tryPasscode() {
-  const v = $('passcode-input')?.value || '', err = $('passcode-error'); if (err) err.textContent = '';
+  const v = $('passcode-input')?.value || '', err = $('passcode-error');
+  if (err) err.textContent = '';
   api('check passcode', { passcode: v }, res => {
     if (!res?.ok) { if (err) err.textContent = 'Неверный код'; vib([30, 20, 30]); return; }
     $('passcode-screen')?.classList.remove('active');
     playLoginTransition(state.me.username, state.me.firstName, true);
   });
 }
-/* === ПРОДОЛЖЕНИЕ (Настройки, Чаты, Сообщения, Звонки) === */
 
+/* ─── 9. НАСТРОЙКИ / ТЕМА ─── */
 function initNotifications() {
   if (!('Notification' in window)) return;
   if (Notification.permission === 'granted') state.notificationsAllowed = true;
@@ -335,16 +453,24 @@ function initNotifications() {
 async function enableNotifications() {
   $('notif-banner')?.classList.remove('active');
   if (!('Notification' in window)) return;
-  try { if (await Notification.requestPermission() === 'granted') { state.notificationsAllowed = true; new Notification('Azerta', { body: 'Уведомления включены! 🎉' }); } } catch {}
+  try {
+    if (await Notification.requestPermission() === 'granted') {
+      state.notificationsAllowed = true;
+      new Notification('Azerta', { body: 'Уведомления включены! 🎉' });
+    }
+  } catch {}
 }
 function playPing() {
   if (state.settings.sound == 0) return;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator(), g = ctx.createGain();
-    osc.connect(g); g.connect(ctx.destination); osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.08);
-    g.gain.setValueAtTime(0.15, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.08);
+    g.gain.setValueAtTime(0.15, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
     osc.start(); osc.stop(ctx.currentTime + 0.3);
   } catch {}
 }
@@ -355,23 +481,30 @@ function browserNotif(from, text) {
 function updateTitle() {
   const total = Object.values(state.unread).reduce((a, b) => a + b, 0);
   clearInterval(state.titleFlashInterval);
-  if (total > 0) { let on = true; state.titleFlashInterval = setInterval(() => { document.title = on ? `(${total}) Azerta` : 'Azerta'; on = !on; }, 1000); }
-  else document.title = 'Azerta';
+  if (total > 0) {
+    let on = true;
+    state.titleFlashInterval = setInterval(() => {
+      document.title = on ? `(${total}) Azerta` : 'Azerta'; on = !on;
+    }, 1000);
+  } else document.title = 'Azerta';
   const nb = $('nav-badge-chats');
-  if (nb) { if (total > 0 && state.activeTab !== 'chats') { nb.textContent = total > 99 ? '99+' : total; nb.style.display = 'block'; } else nb.style.display = 'none'; }
+  if (nb) {
+    if (total > 0 && state.activeTab !== 'chats') {
+      nb.textContent = total > 99 ? '99+' : total; nb.style.display = 'block';
+    } else nb.style.display = 'none';
+  }
 }
 function applyLocalSettings() {
   const s = state.settings;
   document.body.classList.toggle('light', s.theme === 'light');
   document.body.classList.toggle('no-anim', s.animations == 0);
-  document.documentElement.style.setProperty('--font-size', { small: '13px', medium: '15px', large: '17px' }[s.font_size] || '15px');
-  if (s.accent_color) {
-    document.documentElement.style.setProperty('--accent', s.accent_color);
-    const hex = s.accent_color.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16) || 230, g = parseInt(hex.substr(2, 2), 16) || 57, b = parseInt(hex.substr(4, 2), 16) || 70;
-    document.documentElement.style.setProperty('--accent-soft', `rgba(${r},${g},${b},0.15)`);
-  }
+  document.documentElement.style.setProperty('--font-size', {
+    small: '13px', medium: '15px', large: '17px'
+  }[s.font_size] || '15px');
+  if (s.accent_color) document.documentElement.style.setProperty('--accent', s.accent_color);
 }
+
+/* ─── 10. ВКЛАДКИ ─── */
 const TAB_TITLES = { chats: 'Azerta', calls: 'Звонки', contacts: 'Контакты', settings: 'Настройки' };
 function switchTab(tab) {
   state.activeTab = tab;
@@ -381,21 +514,29 @@ function switchTab(tab) {
   const h = document.querySelector('#main-header h2'); if (h) h.textContent = TAB_TITLES[tab] || 'Azerta';
   document.querySelectorAll('.app-tab').forEach(t => t.classList.remove('active'));
   if (tab === 'chats') { $('search-wrap').style.display = ''; renderChatList(); renderStoriesBar(); }
-  else { $('tab-' + tab)?.classList.add('active'); $('search-wrap').style.display = 'none'; if (tab === 'contacts') renderContactsTab(); else if (tab === 'settings') renderSettingsTab(); }
+  else {
+    $('tab-' + tab)?.classList.add('active');
+    $('search-wrap').style.display = 'none';
+    if (tab === 'contacts') renderContactsTab();
+    else if (tab === 'settings') renderSettingsTab();
+  }
   if (tab === 'chats') $('nav-badge-chats').style.display = 'none';
 }
-
+/* ─── 11. НАСТРОЙКИ UI ─── */
 function renderTgRow(o) {
   const type = o.type || 'arrow';
   const cls = 'settings-tg-row' + (type === 'danger' ? ' danger' : '') + (type === 'disabled' ? ' disabled' : '');
   const onClick = o.onClick ? ` onclick="${o.onClick}"` : '';
   let right = '';
   if (type === 'switch') right = `<label class="tg-row-switch" onclick="event.stopPropagation()"><input type="checkbox" ${o.checked ? 'checked' : ''} onchange="${o.onToggle || ''}" /><span class="slider"></span></label>`;
-  else if (type === 'color') right = `<span class="tg-row-color-dot" style="background:${o.color || '#8b7fff'};"></span><span class="tg-row-arrow">›</span>`;
-  else if (type === 'arrow') { if (o.value != null && o.value !== '') right += `<span class="tg-row-value">${esc(o.value)}</span>`; right += '<span class="tg-row-arrow">›</span>'; }
-  else if (type === 'value') right = `<span class="tg-row-value">${esc(o.value || '')}</span>`;
+  else if (type === 'color') right = `<span class="tg-row-color-dot" style="background:${o.color || '#e63946'};"></span><span class="tg-row-arrow">›</span>`;
+  else if (type === 'arrow') {
+    if (o.value != null && o.value !== '') right += `<span class="tg-row-value">${esc(o.value)}</span>`;
+    right += '<span class="tg-row-arrow">›</span>';
+  } else if (type === 'value') right = `<span class="tg-row-value">${esc(o.value || '')}</span>`;
   return `<div class="${cls}"${onClick}><span class="tg-row-icon">${o.icon || ''}</span><span class="tg-row-text">${esc(o.text || '')}</span>${right}</div>`;
 }
+
 const visibilityLabel = v => ({ everyone: 'Все', contacts: 'Контакты', nobody: 'Никто' }[v] || 'Все');
 
 function renderSettings() {
@@ -407,6 +548,7 @@ function renderSettings() {
   const bannerMedia = me.bannerVideo ? `<video class="tg-banner" autoplay loop muted playsinline style="object-fit:cover;width:100%;height:100%"><source src="${me.bannerVideo}"></video>` : `<div class="tg-banner" style="${bannerStyle}"></div>`;
   const avStyle = me.avatarVideo ? '' : me.avatar ? `background-image:url(${me.avatar})` : '';
   const avContent = me.avatarVideo ? `<video autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:50%"><source src="${me.avatarVideo}"></video>` : me.avatar ? '' : initials(me.username);
+
   const pending = state.modStats.new_reports || 0;
   const modSection = me.isModerator ? `<div class="settings-tg-section"><div class="settings-tg-section-title">🛡️ Модерация</div><div class="settings-tg-group">${renderTgRow({ icon: '🚨', text: 'Панель модератора', value: pending > 0 ? pending + ' новых' : '', onClick: 'openModPanel()' })}</div></div>` : '';
 
@@ -466,7 +608,7 @@ function updateMyAvatarBtn() {
 function updateVerifyButton() { const b = $('verify-btn'); if (!b) return; b.style.display = state.me.username === 'moroz' ? 'block' : 'none'; if (state.me.username === 'moroz') b.onclick = openBadgeModal; }
 function updateVerifyChannelButton() { const b = $('verify-channel-btn'); if (!b) return; b.style.display = state.me.username === 'moroz' ? 'block' : 'none'; if (state.me.username === 'moroz') b.onclick = () => { $('verify-channel-slug').value = ''; $('verify-channel-error').textContent = ''; openModal('verify-channel-modal'); }; }
 
-/* ─── СПИСОК ЧАТОВ ─── */
+/* ─── 12. СПИСОК ЧАТОВ ─── */
 function renderChatList() {
   const box = $('chat-list'); if (!box) return;
   box.innerHTML = '';
@@ -526,6 +668,7 @@ function renderContactItem(u) {
   return div;
 }
 
+/* ─── 13. ОТКРЫТИЕ ЧАТОВ ─── */
 function openChat(name) {
   state.currentChat = name; state.currentGroup = null; state.currentChannel = null; state.isSavedChat = false;
   const contact = state.contacts.find(c => c.name === name);
@@ -575,6 +718,7 @@ function closeChat() {
 
 function clearUnread(key) { if (state.unread[key]) { delete state.unread[key]; jset(STORAGE.UNREAD, state.unread); updateTitle(); renderChatList(); } }
 
+/* ─── 14. СООБЩЕНИЯ ─── */
 function renderMessage(msg) {
   const box = $('messages'); if (!box) return;
   if (msg.time) {
@@ -604,13 +748,18 @@ function sendMsg() {
   else if (state.currentGroup) api('group message', { groupId: state.currentGroup.id, text });
   input.value = ''; cancelReply();
 }
-
-/* ─── ЗВОНКИ ─── */
-const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }] };
+/* ─── 15. ЗВОНКИ (WebRTC) ─── */
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
+  ]
+};
 let iceCandidatesQueue = [], isRemoteDescSet = false;
 
 async function startCall(video) {
   if (!state.currentChat || state.callActive) return;
+  if (state.isBotChat) return toast('🤖 Ботам нельзя звонить');
   try { state.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video }); } catch (err) { return alert('Нет доступа'); }
   state.callActive = true;
   $('call-peer-name').textContent = displayName(state.currentChat);
@@ -663,11 +812,17 @@ function startCallTimer() {
   state.callStartTime = Date.now(); clearInterval(state.callTimerInterval);
   state.callTimerInterval = setInterval(() => { const s = Math.floor((Date.now() - state.callStartTime) / 1000); $('call-timer').textContent = `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`; }, 1000);
 }
+function toggleMic() { if (state.localStream) { const t = state.localStream.getAudioTracks()[0]; t.enabled = !t.enabled; $('micBtn').classList.toggle('off', !t.enabled); } }
+function toggleCamera() { if (state.localStream) { const t = state.localStream.getVideoTracks()[0]; t.enabled = !t.enabled; $('camBtn').classList.toggle('off', !t.enabled); } }
 
-/* ─── СОКЕТЫ ─── */
+/* ─── 16. СОКЕТЫ ─── */
 socket.on('connect', async () => {
   const ok = await tryAutoLogin();
-  if (!ok) { $('app').classList.remove('active'); $('auth').classList.add('active'); state.isLoggedIn = false; }
+  if (!ok) {
+    $('app').classList.remove('active');
+    $('auth').classList.add('active');
+    state.isLoggedIn = false; isLoggedInOnServer = false;
+  }
   autoLoginDone = true;
 });
 
@@ -683,7 +838,8 @@ socket.on('private message', data => {
     renderMessage({ id: data.id, from: data.from, text: data.text, time: data.time, self: data.self });
   } else {
     state.unread[data.from] = (state.unread[data.from] || 0) + 1;
-    jset(STORAGE.UNREAD, state.unread); updateTitle(); renderChatList(); playPing();
+    jset(STORAGE.UNREAD, state.unread); updateTitle(); renderChatList();
+    playPing();
   }
 });
 
@@ -711,8 +867,9 @@ socket.on('ice-candidate', async data => {
 });
 
 socket.on('call-ended', () => cleanupCall());
+socket.on('message blocked', d => toast(d.reason));
 
-/* ─── ИНИЦИАЛИЗАЦИЯ ─── */
+/* ─── 17. ИНИЦИАЛИЗАЦИЯ ─── */
 window.addEventListener('load', () => {
   try {
     state.unread = jget(STORAGE.UNREAD, {}) || {};
@@ -722,38 +879,22 @@ window.addEventListener('load', () => {
     bindRipples();
     const creds = jget(STORAGE.SESSION);
     if (!creds?.sessionId) { hideSplash(); $('auth')?.classList.add('active'); }
-  } catch (e) { console.error('Init error:', e); hideSplash(); $('auth')?.classList.add('active'); }
+  } catch (e) {
+    console.error('Init error:', e); hideSplash(); $('auth')?.classList.add('active');
+  }
 });
-/* ─── ДОБАВЛЯЕМ НЕДОСТАЮЩИЕ ФУНКЦИИ ─── */
-window.openSettings = function() {
-  const s = document.getElementById('settings-screen');
-  if (s) s.classList.add('active');
-  if (typeof renderSettings === 'function') renderSettings();
-};
 
-window.openProfile = function() {
-  const usernameEl = document.getElementById('profile-username');
-  if (usernameEl) usernameEl.textContent = '@' + (state.me.username || '');
-  const fn = document.getElementById('my-first-name'); if (fn) fn.value = state.me.firstName || '';
-  const ln = document.getElementById('my-last-name'); if (ln) ln.value = state.me.lastName || '';
-  const bio = document.getElementById('my-bio'); if (bio) bio.value = state.me.bio || '';
-  openModal('profile-modal');
-};
-
-window.openBadgeModal = function() {
-  const u = document.getElementById('badge-username'); if (u) u.value = '';
-  const e = document.getElementById('badge-error'); if (e) e.textContent = '';
-  openModal('badge-modal');
-};
-
-window.renderStoriesBar = function() {
-  const row = document.getElementById('stories-row');
-  if (!row) return;
-  row.innerHTML = '';
-  const bubble = el('div', 'story-bubble');
-  bubble.innerHTML = `<div class="story-ring mine"><div class="story-ring-inner">${initials(state.me.username || '?')}</div><div class="story-add-badge">+</div></div><div class="story-name">Моя</div>`;
-  bubble.onclick = () => openModal('story-add-modal');
-  row.appendChild(bubble);
-};
-
+// ФУНКЦИИ, КОТОРЫХ НЕ ХВАТАЛО
+window.openSettings = function() { $('settings-screen').classList.add('active'); renderSettings(); };
+window.closeSettings = function() { $('settings-screen').classList.remove('active'); };
+window.openProfile = function() { $('profile-username').textContent = '@' + (state.me.username || ''); $('my-first-name').value = state.me.firstName || ''; $('my-last-name').value = state.me.lastName || ''; $('my-bio').value = state.me.bio || ''; openModal('profile-modal'); };
+window.openBadgeModal = function() { openModal('badge-modal'); };
+window.renderStoriesBar = function() { const row = $('stories-row'); if (!row) return; row.innerHTML = ''; const bubble = el('div', 'story-bubble'); bubble.innerHTML = `<div class="story-ring mine"><div class="story-ring-inner">${initials(state.me.username || '?')}</div><div class="story-add-badge">+</div></div><div class="story-name">Моя</div>`; row.appendChild(bubble); };
 window.openStarsHistory = function() { alert('История звёзд'); };
+window.openModPanel = function() { alert('Панель модератора'); };
+
+// 🚑 ФИКС ЧЕРНОГО ЭКРАНА (Принудительно убираем заставку)
+setTimeout(() => {
+  const sp = document.getElementById('splash-screen');
+  if (sp) { sp.style.opacity = '0'; setTimeout(() => sp.remove(), 300); }
+}, 1500);
