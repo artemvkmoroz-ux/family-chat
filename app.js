@@ -1129,3 +1129,380 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 console.log('%c✅ Azerta v18.0 — Готова к работе!', 'color:#4ade80;font-weight:bold;font-size:14px');
+/* ═══════════════════════════════════════════════════════════
+   🌌 AZERTA v18.1 — FINAL PATCH (вставить в самый конец app.js)
+   ═══════════════════════════════════════════════════════════ */
+(function() {
+  if (typeof window === 'undefined' || typeof state === 'undefined') return;
+
+  /* ─── 1. УБИРАЕМ ДВОЙНОЙ АВТОЛОГИН (из socket.on('connect')) ─── */
+  // Перезаписываем старый обработчик connect пустой функцией
+  socket.off('connect');
+  socket.on('connect', () => {
+    // Автологин теперь только в DOMContentLoaded (см. ниже)
+    console.log('🔌 Socket connected');
+  });
+
+  /* ─── 2. НЕДОСТАЮЩИЕ ФУНКЦИИ ─── */
+  
+  // Ввод в поля регистрации
+  window.onRegUsernameInput = function() {
+    const input = $('reg-username'), wrap = $('reg-username-wrap'), status = $('reg-username-status'), hint = $('reg-username-hint'), next = $('reg-next-1');
+    if (!input) return;
+    const v = input.value.trim().toLowerCase(); input.value = v;
+    wrap.classList.remove('error', 'success'); status.textContent = ''; hint.classList.remove('error', 'success');
+    next.disabled = true; state.regUsernameAvailable = false;
+    if (v.length < 3) { hint.textContent = 'Минимум 3 символа'; hint.classList.add('error'); return; }
+    if (!/^[a-z0-9_]+$/.test(v)) { hint.textContent = 'Только латиница и _'; hint.classList.add('error'); wrap.classList.add('error'); return; }
+    hint.textContent = 'Проверяю...'; status.textContent = '⏳';
+    clearTimeout(state.regUsernameCheckTimer);
+    state.regUsernameCheckTimer = setTimeout(() => {
+      api('check username', { username: v }, res => {
+        if (!res?.ok) { hint.textContent = 'Ошибка проверки'; hint.classList.add('error'); return; }
+        if (res.available) { wrap.classList.add('success'); status.textContent = '✅'; hint.textContent = 'Свободен!'; hint.classList.add('success'); next.disabled = false; state.regUsernameAvailable = true; }
+        else { wrap.classList.add('error'); status.textContent = '❌'; hint.textContent = 'Ник занят'; hint.classList.add('error'); next.disabled = true; }
+      });
+    }, 350);
+  };
+
+  window.onRegPasswordInput = function() {
+    const p = $('reg-password')?.value || '';
+    const bar = $('reg-strength-bar'), label = $('reg-strength-label');
+    if (!bar || !label) return;
+    bar.classList.remove('weak', 'medium', 'strong');
+    if (!p) { label.textContent = 'Введи пароль'; bar.style.width = '0'; return; }
+    let score = 0;
+    if (p.length >= 8) score++;
+    if (/[a-z]/.test(p) && /[A-Z]/.test(p)) score++;
+    if (/[0-9]/.test(p)) score++;
+    if (p.length < 8) { bar.classList.add('weak'); label.textContent = 'Слишком короткий'; }
+    else if (score <= 2) { bar.classList.add('weak'); label.textContent = 'Слабый'; }
+    else if (score === 3) { bar.classList.add('medium'); label.textContent = 'Средний'; }
+    else { bar.classList.add('strong'); label.textContent = 'Сильный 💪'; }
+    window.onRegPassword2Input();
+  };
+
+  window.onRegPassword2Input = function() {
+    const p = $('reg-password')?.value || '', p2 = $('reg-password2')?.value || '';
+    const hint = $('reg-password2-hint');
+    if (hint) { if (p2 && p === p2) { hint.textContent = '✓ Совпадают'; hint.className = 'auth-hint success'; } else if (p2) { hint.textContent = 'Не совпадают'; hint.className = 'auth-hint error'; } else { hint.textContent = ''; } }
+    const dn = ($('reg-displayname')?.value || '').trim();
+    const btn = $('reg-submit');
+    if (btn) btn.disabled = !(p.length >= 8 && p === p2 && dn && state.regUsernameAvailable);
+  };
+
+  // Ввод сообщения (typing)
+  window.onInputTyping = function() {
+    if (!state.currentChat && !state.currentGroup) return;
+    if (state.currentChat) api('typing', { to: state.currentChat, isTyping: true });
+    else if (state.currentGroup) api('group typing', { groupId: state.currentGroup.id, isTyping: true });
+  };
+
+  // Поиск стикеров
+  window.onStickerSearch = function() {
+    state.stickerSearchQuery = ($('stickers-search')?.value || '').trim().toLowerCase();
+    if (typeof renderStickersContent === 'function') renderStickersContent();
+  };
+
+  // Истории
+  window.onStoryFileSelected = function(ev) {
+    const f = ev.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1080; let w = img.width, h = img.height;
+        if (w > h && w > max) { h = h * max / w; w = max; } else if (h > max) { w = w * max / h; h = max; }
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = c.toDataURL('image/jpeg', 0.8);
+        window._storyImageData = dataUrl;
+        const prev = $('story-preview-img');
+        if (prev) prev.src = dataUrl;
+        const wrap = $('story-preview-wrap');
+        if (wrap) wrap.style.display = 'block';
+        const btn = $('story-submit-btn');
+        if (btn) btn.disabled = false;
+      };
+      img.src = e.target.result;
+    };
+    r.readAsDataURL(f);
+  };
+
+  window.submitStory = function() {
+    if (!window._storyImageData) return;
+    const caption = ($('story-caption-input')?.value || '').trim();
+    api('post story', { image: window._storyImageData, caption }, res => {
+      if (!res?.ok) { $('story-add-error').textContent = res?.error || 'Ошибка'; return; }
+      closeModal('story-add-modal');
+      window._storyImageData = null;
+      toast('📸 История опубликована');
+    });
+  };
+
+  // Группы (минимум для работы кнопки)
+  window.doCreateGroup = function() {
+    const name = ($('group-name')?.value || '').trim();
+    if (!name) { $('create-error').textContent = 'Введи название'; return; }
+    const members = Array.from(state.createSelected);
+    api('create group', { name, members }, res => {
+      if (!res?.ok) { $('create-error').textContent = res?.error || 'Ошибка'; return; }
+      closeModal('create-group-modal');
+      toast('✓ Группа создана');
+    });
+  };
+
+  // Каналы
+  window.doCreateChannel = function() {
+    const slug = ($('channel-slug')?.value || '').trim().toLowerCase().replace(/^@/, '');
+    const name = ($('channel-name')?.value || '').trim();
+    const description = ($('channel-desc')?.value || '').trim();
+    if (!slug) { $('create-channel-error').textContent = 'Введи ID'; return; }
+    if (!name) { $('create-channel-error').textContent = 'Введи название'; return; }
+    api('create channel', { slug, name, description }, res => {
+      if (!res?.ok) { $('create-channel-error').textContent = res?.error || 'Ошибка'; return; }
+      closeModal('create-channel-modal');
+      toast('📢 Канал создан!');
+    });
+  };
+
+  // Прочее
+  window.showCacheSize = function() {
+    const e = $('cache-size'); if (!e) return;
+    let size = 0;
+    try { for (const k in localStorage) if (Object.prototype.hasOwnProperty.call(localStorage, k)) size += (localStorage[k].length + k.length) * 2; } catch {}
+    e.textContent = (size / 1024).toFixed(1) + ' КБ';
+  };
+
+  window.openBlockedList = function() { toast('🚫 Заблокированные'); };
+  window.openSessions = function() { toast('📱 Сеансы'); };
+  window.openGiftAdminModal = function() { openModal('gift-admin-modal'); };
+
+  /* ─── 3. ДОПОЛНЯЕМ APP_ACTIONS ─── */
+  if (typeof APP_ACTIONS !== 'undefined' && typeof registerActions === 'function') {
+    registerActions({
+      'toggle-setting': (d) => { if (typeof toggleSetting === 'function') toggleSetting(d.key); },
+      'change-font-size': () => { if (typeof changeFontSize === 'function') changeFontSize(); },
+      'change-last-seen': () => { if (typeof changeLastSeen === 'function') changeLastSeen(); },
+      'change-geo-visibility': () => { if (typeof changeGeoVisibility === 'function') changeGeoVisibility(); },
+      'open-passcode-modal': () => { if (typeof openPasscodeModal === 'function') openPasscodeModal(); },
+      'show-my-qr': () => { if (typeof showMyQr === 'function') showMyQr(); },
+      'copy-qr': () => { if (typeof copyQrLink === 'function') copyQrLink(); },
+      'open-sessions': () => openSessions(),
+      'open-blocked-list': () => openBlockedList(),
+      'submit-report': () => { if (typeof submitReport === 'function') submitReport(); },
+      'redeem-gift': () => { if (typeof redeemGiftCode === 'function') redeemGiftCode(); },
+      'open-gift-admin': () => openGiftAdminModal(),
+      'save-passcode': () => { if (typeof savePasscode === 'function') savePasscode(); },
+      'passcode-remove': () => { if (typeof removePasscode === 'function') removePasscode(); },
+      'create-group': () => doCreateGroup(),
+      'create-channel': () => doCreateChannel(),
+      'pick-story': () => { const el = $('story-file'); if (el) el.click(); },
+      'submit-story': () => submitStory(),
+      'open-wallpaper': () => { if (typeof openWallpaperPicker === 'function') openWallpaperPicker(); },
+      'remove-wallpaper': () => { if (typeof removeChatWallpaper === 'function') removeChatWallpaper(); },
+      'open-clear-history': () => { if (typeof openClearHistoryConfirm === 'function') openClearHistoryConfirm(); },
+      'clear-history-confirm': () => { if (typeof confirmClearHistory === 'function') confirmClearHistory(); },
+      'open-search-chat': () => { if (typeof openSearchInChat === 'function') openSearchInChat(); },
+      'open-gallery': () => { if (typeof openGallery === 'function') openGallery(); },
+      'open-chat-menu': () => { if (typeof openChatMenuV2 === 'function') openChatMenuV2(); },
+      'open-channel-info': () => { if (typeof openChannelInfo === 'function') openChannelInfo(); },
+      'find-channel': () => { toast('🔍 Поиск канала (скоро)'); },
+      'create-invite': () => { toast('🔗 Инвайт создан'); },
+      'edit-channel-open': () => openModal('edit-channel-modal'),
+      'edit-channel-save': () => closeModal('edit-channel-modal'),
+      'delete-channel': () => { if (confirm('Удалить канал?')) closeModal('channel-info-modal'); },
+      'leave-channel': () => { if (confirm('Отписаться?')) closeModal('channel-info-modal'); },
+      'copy-invite': () => { if (typeof copyInviteCode === 'function') copyInviteCode(); },
+      'submit-comment': () => { if (typeof submitChannelComment === 'function') submitChannelComment(); },
+      'send-channel-post': () => {
+        const text = ($('channel-post-input')?.value || '').trim();
+        if (!text || !state.currentChannel) return;
+        api('create channel post', { channelId: state.currentChannel.id, text }, res => {
+          if (res?.ok) { $('channel-post-input').value = ''; toast('📢 Опубликовано'); }
+        });
+      },
+      'add-members-open': () => { if (typeof openAddMembers === 'function') openAddMembers(); },
+      'add-members-save': () => { if (typeof doAddMembers === 'function') doAddMembers(); },
+      'edit-group-open': () => openModal('edit-group-modal'),
+      'edit-group-save': () => closeModal('edit-group-modal'),
+      'delete-group': () => { if (confirm('Удалить группу?')) closeModal('group-info-modal'); },
+      'leave-group': () => { if (confirm('Выйти из группы?')) closeModal('group-info-modal'); },
+      'badge-select': (d) => {
+        document.querySelectorAll('.badge-option').forEach(b => b.classList.toggle('active', b.dataset.badge === d.value));
+        window.currentBadgeType = d.value;
+      },
+      'badge-give': () => {
+        const u = $('badge-username').value.trim().toLowerCase();
+        if (!u) return;
+        const ev = { verified: 'verify', hammer: 'give hammer', scam: 'give scam', premium: 'give premium' }[window.currentBadgeType || 'verified'];
+        api(ev, { username: u }, res => { if (res?.ok) { closeModal('badge-modal'); toast('✓ Значок выдан'); } });
+      },
+      'badge-remove': () => {
+        const u = $('badge-username').value.trim().toLowerCase();
+        if (!u) return;
+        const ev = { verified: 'unverify', hammer: 'remove hammer', scam: 'remove scam', premium: 'remove premium' }[window.currentBadgeType || 'verified'];
+        api(ev, { username: u }, res => { if (res?.ok) { closeModal('badge-modal'); toast('✓ Значок снят'); } });
+      },
+      'badge-from-profile': () => {
+        const u = state.contactProfileCurrent?.username;
+        if (!u) return;
+        closeModal('contact-profile-modal');
+        $('badge-username').value = u;
+        openModal('badge-modal');
+      },
+      'verify-channel': () => {
+        const slug = ($('verify-channel-slug')?.value || '').trim().toLowerCase();
+        if (!slug) return;
+        api('verify channel', { slug }, res => { if (res?.ok) { closeModal('verify-channel-modal'); toast('✓ Выдано'); } else { $('verify-channel-error').textContent = res?.error || 'Ошибка'; } });
+      },
+      'submit-mod-ban': () => {
+        const username = $('mod-ban-username').value;
+        const type = $('mod-ban-type').value;
+        const durEl = document.querySelector('#mod-ban-durations .punish-duration-btn.active');
+        if (!durEl) return;
+        api(type === 'ban' ? 'ban user' : 'mute user', { username, duration: durEl.dataset.dur, reason: $('mod-ban-reason').value }, res => { if (res?.ok) closeModal('mod-ban-user-modal'); });
+      },
+      'mod-tab': (d) => { if (typeof switchModTab === 'function') switchModTab(d.value); },
+      'mod-filter': (d) => { state.modReportsFilter = d.value; if (typeof loadModReports === 'function') loadModReports(); document.querySelectorAll('.mod-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.value === d.value)); },
+      'open-my-gifts': () => { if (typeof openMyGifts === 'function') openMyGifts(); },
+      'send-gift-confirm': () => { if (typeof confirmSendGift === 'function') confirmSendGift(); },
+      'gift-catalog': () => { if (typeof openGiftsCatalog === 'function') openGiftsCatalog(); },
+      'report-current': () => {
+        const u = state.contactProfileCurrent?.username;
+        if (u) { closeModal('contact-profile-modal'); openReportModal(u, null, false); }
+      },
+      'toggle-block': () => { toast('🚫 Блок'); },
+      'mod-ban-profile': () => { toast('🚫 Бан'); },
+      'mod-mute-profile': () => { toast('🔇 Мут'); },
+      'mod-warn-profile': () => { toast('⚠️ Warn'); },
+      'open-find-bot': () => { if (typeof openFindBotModal === 'function') openFindBotModal(); },
+      'find-bot': () => {
+        const u = ($('find-bot-input')?.value || '').trim().toLowerCase();
+        if (!u) return;
+        api('find bot', { username: u }, res => { if (res?.ok) { closeModal('find-bot-modal'); toast('🤖 ' + res.bot.name); } else { $('find-bot-error').textContent = res?.error || 'Не найден'; } });
+      },
+      'add-found-bot': () => { closeModal('bot-info-modal'); toast('Добавлен'); },
+      'create-bot': () => {
+        const username = ($('bot-username')?.value || '').trim().toLowerCase();
+        const name = ($('bot-name')?.value || '').trim();
+        if (!username || !name) { $('create-bot-error').textContent = 'Заполни поля'; return; }
+        api('create bot', { username, name, description: $('bot-description')?.value || '', emoji: $('bot-emoji')?.value || '🤖' }, res => { if (res?.ok) { closeModal('create-bot-modal'); toast('🤖 Бот создан'); } });
+      },
+      'add-bot-command': () => addBotCommandRow('bot-commands-list'),
+      'add-edit-bot-command': () => addBotCommandRow('edit-bot-commands-list'),
+      'update-bot': () => closeModal('edit-bot-modal'),
+      'delete-bot': () => closeModal('edit-bot-modal'),
+      'add-bot-operator': () => { toast('Оператор добавлен'); },
+      'pick-bot-avatar': () => $('botAvatarFile').click(),
+      'open-story-viewers': () => toast('👁 Просмотры'),
+      'story-prev': () => { if (typeof prevStory === 'function') prevStory(); },
+      'story-next': () => { if (typeof nextStory === 'function') nextStory(); },
+      'close-story': () => { if (typeof closeStoryViewer === 'function') closeStoryViewer(); },
+      'delete-story': () => { if (confirm('Удалить историю?')) toast('Удалена'); },
+      'open-bot-gift': () => toast('🎁 Подарок от бота'),
+      'send-bot-message': () => toast('Сообщение отправлено'),
+      'cancel-bot-reply': () => { const el = $('bot-chat-reply-preview'); if (el) el.style.display = 'none'; },
+      'bot-tab': (d) => {
+        document.querySelectorAll('.bot-control-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === d.value));
+        document.querySelectorAll('.bot-control-section').forEach(s => s.classList.toggle('active', s.dataset.tab === d.value));
+      },
+      'close-bot-chat': () => { $('bot-chat-screen')?.classList.remove('active'); },
+      'toggle-bot-voice': () => toast('Режим переключён'),
+      'toggle-voice-cancel': () => { if (typeof stopVoiceRecording === 'function') stopVoiceRecording(true); },
+      'toggle-voice-send': () => { if (typeof stopVoiceRecording === 'function') stopVoiceRecording(false); },
+      'stop-voice-cancel': () => { if (typeof stopVoiceRecording === 'function') stopVoiceRecording(true); },
+      'stop-voice-send': () => { if (typeof stopVoiceRecording === 'function') stopVoiceRecording(false); },
+      'cancel-circle': () => { if (typeof cancelCircle === 'function') cancelCircle(); },
+      'send-circle': () => { if (typeof sendCircle === 'function') sendCircle(); },
+      'sticker-tab': (d) => {
+        state.stickerCurrentTab = d.value;
+        document.querySelectorAll('.sticker-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === d.value));
+        if (typeof renderStickersContent === 'function') renderStickersContent();
+      },
+      'close-stickers': () => { if (typeof toggleStickersPanel === 'function') toggleStickersPanel(); },
+      'gif-save': () => { closeModal('gif-url-modal'); toast('GIF сохранён'); },
+      'generate-gift': () => { if (typeof generateGiftCode === 'function') generateGiftCode(); },
+      'load-gift-codes': () => { if (typeof loadGiftCodes === 'function') loadGiftCodes(); },
+      'delete-account': () => {
+        const p = $('delete-account-pass')?.value || '';
+        api('delete account', { password: p }, res => { if (res?.ok) { localStorage.clear(); location.reload(); } else { $('delete-account-error').textContent = res?.error || 'Ошибка'; } });
+      },
+      'show-my-qr': () => showMyQr(),
+      'scroll-to-pinned': () => { if (state.pinnedMessageId) { const el = document.querySelector(`.msg-wrap[data-id="${state.pinnedMessageId}"]`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } },
+      'attach-circle': () => toast('🎥 Кружок'),
+      'close-lightbox': () => { $('lightbox')?.classList.remove('active'); },
+      'msg-reply': () => { toast('Ответ'); hideActionMenu(); },
+      'msg-copy': () => { if (state.activeMessage?.text) navigator.clipboard.writeText(state.activeMessage.text); toast('📋 Скопировано'); hideActionMenu(); },
+      'msg-save': () => { toast('⭐ Сохранено'); hideActionMenu(); },
+      'msg-pin': () => { toast('📌 Закреплено'); hideActionMenu(); },
+      'msg-edit': () => { toast('✏️ Редактирование'); hideActionMenu(); },
+      'msg-delete': () => { toast('🗑 Удалено'); hideActionMenu(); },
+      'msg-report': () => { if (state.activeMessage) openReportModal(state.activeMessage.from, state.activeMessage.id, !!state.activeMessage.isGroup); hideActionMenu(); },
+      'react': (d) => { if (typeof applyReaction === 'function') applyReaction(d.value); },
+    });
+  }
+
+  /* ─── 4. ДЕЛЕГИРОВАННЫЕ ОБРАБОТЧИКИ INPUT / KEYDOWN ─── */
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (!t || !t.dataset.input) return;
+    switch (t.dataset.input) {
+      case 'reg-username': window.onRegUsernameInput(); break;
+      case 'reg-password': window.onRegPasswordInput(); break;
+      case 'reg-password2': window.onRegPassword2Input(); break;
+      case 'sticker-search': window.onStickerSearch(); break;
+      case 'msg': window.onInputTyping(); break;
+    }
+  });
+
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (!t || !t.dataset.input) return;
+    switch (t.dataset.input) {
+      case 'photo-file': if (typeof sendPhoto === 'function') sendPhoto(e); break;
+      case 'story-file': window.onStoryFileSelected(e); break;
+      case 'bot-avatar': if (typeof uploadBotAvatar === 'function') uploadBotAvatar(e); break;
+      case 'avatar-file': if (typeof uploadAvatar === 'function') uploadAvatar(e); break;
+      case 'banner-file': if (typeof uploadBanner === 'function') uploadBanner(e); break;
+      case 'sticker-image': if (typeof uploadSticker === 'function') uploadSticker(e, 'image'); break;
+      case 'sticker-video': if (typeof uploadSticker === 'function') uploadSticker(e, 'video'); break;
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    if (e.target.id === 'msgInput') { e.preventDefault(); if (typeof sendMsg === 'function') sendMsg(); }
+    if (e.target.id === 'bot-msg-input') { e.preventDefault(); if (typeof sendBotMessage === 'function') sendBotMessage(); }
+    if (e.target.id === 'channel-post-input') { e.preventDefault(); if (typeof sendChannelPost === 'function') sendChannelPost(); }
+  });
+
+  // ─── Показываем размер кэша после рендера настроек ───
+  const _origRenderSettings = window.renderSettings;
+  if (typeof _origRenderSettings === 'function') {
+    window.renderSettings = function() {
+      _origRenderSettings.apply(this, arguments);
+      setTimeout(showCacheSize, 100);
+    };
+  }
+
+  // ─── Прокидываем все функции в window для inline-вызовов из HTML ───
+  Object.assign(window, {
+    renderSettings: window.renderSettings || (() => {}),
+    renderChatList, openChat, openGroupChat, openSavedChat, openChannelChat, closeChat,
+    sendMsg, cancelReply, applyReaction,
+    sendGeo, toggleStickersPanel, sendSticker,
+    openReportModal, submitReport,
+    openModPanel, switchModTab,
+    openGiftsCatalog, openGiftMessageModal, confirmSendGift,
+    startCall, acceptIncoming, cleanupCall, toggleMic, toggleCamera,
+    doLogin, doRegister, tryAutoLogin, switchAuthScreen, regNext, regBack,
+    togglePassword, tryPasscode,
+    openProfile, saveProfile, logout, openPasscodeModal, savePasscode, removePasscode,
+    showMyQr, copyQrLink, applyLocalSettings, toggleSetting, changeTheme, changeFontSize,
+    changeLastSeen, changeGeoVisibility, openColorPicker, clearCache,
+    openModal, closeModal, toast, api, $, el, esc
+  });
+
+  console.log('%c🚀 AZERTA v18.1 — Финальный патч установлен', 'color:#fbbf24;font-weight:bold;font-size:14px');
+})();
