@@ -4341,146 +4341,15 @@ window.state = state;
 window.socket = socket;
 
 console.log('%c✅ Azerta v13.7 — Client загружен', 'color:#4ade80;font-weight:bold;font-size:14px');
-/* ═══════════════════════════════════════════════════════════
-   🚑 ФИКС ДЛЯ ЧЕРНОГО ЭКРАНА И АВТОВХОДА (Конец файла)
-   ═══════════════════════════════════════════════════════════ */
-
-// 1. Принудительно убираем заставку
-setTimeout(() => {
-  const sp = document.getElementById('splash-screen');
-  if (sp) { sp.style.opacity = '0'; setTimeout(() => sp.remove(), 300); }
+// 🚑 ФИКС ЧЕРНОГО ЭКРАНА (только это, ничего больше)
+setTimeout(function() {
+  var sp = document.getElementById('splash-screen');
+  if (sp) { sp.style.opacity = '0'; setTimeout(function() { sp.remove(); }, 300); }
 }, 1500);
 
-// 2. Фикс автовхода (если сессия есть, но сервер тупит)
-const originalAutoLogin = tryAutoLogin;
-tryAutoLogin = async function() {
-  const creds = jget(STORAGE.SESSION);
-  if (!creds?.sessionId) return false;
-  
-  return new Promise(resolve => {
-    let done = false;
-    const t = setTimeout(() => { if (!done) { done = true; resolve(false); } }, 5000);
-    
-    api('login with session', { sessionId: creds.sessionId }, res => {
-      if (done) return; done = true; clearTimeout(t);
-      
-      if (!res?.ok) {
-        localStorage.removeItem(STORAGE.SESSION); forceShowAuth('Сессия истекла'); resolve(false); return;
-      }
-      
-      jset(STORAGE.SESSION, { username: res.username, sessionId: res.sessionId });
-      applyMe(res);
-      
-      // Если сервер вернул данные (даже если что-то в них отсутствует), принудительно пускаем в приложение
-      playLoginTransition(res.username, res.firstName, true);
-      resolve(true);
-    });
-  });
-};
-
-// 3. Защита от битых картинок (чтобы скрипт не падал)
+// 🚑 Игнорируем битые картинки (чтобы скрипт не падал)
 window.addEventListener('error', function(e) {
   if (e.target && e.target.tagName === 'IMG') {
     e.target.style.display = 'none';
   }
 }, true);
-/* ═══════════════════════════════════════════════════════════
-   🚑 ФИКС КНОПОК (Тема и Создание)
-   ═══════════════════════════════════════════════════════════ */
-
-// 1. Кнопка "＋" в шапке (Открывает меню создания)
-window.openCreateMenu = function() {
-  const m = document.getElementById('create-menu-modal');
-  if (m) m.classList.add('active');
-};
-
-// 2. Кнопка смены темы (в настройках)
-window.changeTheme = function() {
-  const v = state.settings.theme === 'light' ? 'dark' : 'light';
-  api('update settings', { key: 'theme', value: v }, () => {
-    state.settings.theme = v;
-    applyLocalSettings();
-    // Если открыты настройки - перерисовываем их
-    if (typeof renderSettings === 'function') renderSettings(); 
-    // Если мы на вкладке настроек - обновляем и её
-    if (state.activeTab === 'settings' && typeof renderSettingsTab === 'function') renderSettingsTab();
-  });
-};
-
-// 3. Применение темы к body
-window.applyLocalSettings = function() {
-  const s = state.settings;
-  document.body.classList.toggle('light', s.theme === 'light');
-  document.body.classList.toggle('no-anim', s.animations == 0);
-  if (s.font_size) {
-    document.documentElement.style.setProperty('--font-size', {
-      small: '13px', medium: '15px', large: '17px'
-    }[s.font_size] || '15px');
-  }
-  if (s.accent_color) document.documentElement.style.setProperty('--accent', s.accent_color);
-};
-/* ═══════════════════════════════════════════════════════════
-   👑 ФИНАЛЬНЫЙ ФИКС (Без перехвата кликов, чтобы чаты работали)
-   ═══════════════════════════════════════════════════════════ */
-
-(function() {
-  // 1. Убираем заставку
-  setTimeout(() => {
-    const sp = document.getElementById('splash-screen');
-    if (sp) { sp.style.opacity = '0'; setTimeout(() => sp.remove(), 300); }
-  }, 1500);
-
-  // 2. Настройки
-  window.openSettings = function() {
-    const s = document.getElementById('settings-screen');
-    if (s) s.classList.add('active');
-    if (typeof renderSettings === 'function') renderSettings();
-  };
-  window.closeSettings = function() {
-    const s = document.getElementById('settings-screen');
-    if (s) s.classList.remove('active');
-  };
-
-  // 3. Смена темы
-  window.changeTheme = function() {
-    const v = state.settings.theme === 'light' ? 'dark' : 'light';
-    state.settings.theme = v;
-    document.body.classList.toggle('light', v === 'light');
-    if (typeof api === 'function') api('update settings', { key: 'theme', value: v });
-    if (typeof renderSettings === 'function') renderSettings();
-  };
-
-  // 4. Звёзды
-  window.openStarsHistory = function() {
-    const modal = document.getElementById('stars-history-modal');
-    if (modal) modal.classList.add('active');
-    const list = document.getElementById('stars-history-list');
-    if (!list) return;
-    list.innerHTML = '<div style="text-align:center;padding:20px;">Загрузка...</div>';
-    
-    if (typeof api === 'function') {
-      api('get stars', function(res) {
-        if (res && res.ok) {
-          list.innerHTML = `<div style="text-align:center;font-size:24px;font-weight:800;color:var(--gold);margin-bottom:20px;">${res.stars || 0} ⭐</div>`;
-          if (res.transactions && res.transactions.length > 0) {
-            res.transactions.forEach(function(t) {
-              let label = t.reason === 'welcome' ? '🎉 Бонус' : (t.reason === 'premium_activated' ? '⭐ Премиум' : t.reason);
-              let color = t.amount > 0 ? '#4ade80' : '#f87171';
-              list.innerHTML += `<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #333;"><span>${label}</span><span style="color:${color};font-weight:700;">${t.amount > 0 ? '+' : ''}${t.amount} ⭐</span></div>`;
-            });
-          } else {
-            list.innerHTML += '<div style="text-align:center;color:#888;margin-top:20px;">Нет операций</div>';
-          }
-        }
-      });
-    }
-  };
-
-  // 5. Профиль
-  window.openProfile = function() {
-    const u = document.getElementById('profile-username');
-    if (u) u.textContent = '@' + (state.me.username || '');
-    const modal = document.getElementById('profile-modal');
-    if (modal) modal.classList.add('active');
-  };
-})();
