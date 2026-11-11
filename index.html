@@ -7,6 +7,10 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a1628">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Azerta">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="animations.css">
 </head>
@@ -14,49 +18,171 @@
 
 <div id="snow-layer" aria-hidden="true"></div>
 
-<!-- ЗАСТАВКА -->
+<!-- SPLASH -->
 <div id="splash-screen">
-  <div id="splash-logo"><div style="font-size:60px;">🎄</div></div>
+  <div id="splash-logo">
+    <img id="splash-icon" src="icon-192.png" alt="" onerror="this.style.display='none'; this.parentNode.textContent='🎄';">
+  </div>
   <div id="splash-title">AZERTA</div>
   <div id="splash-subtitle">❄ семейный мессенджер ❄</div>
   <div id="splash-loader"></div>
 </div>
 
-<!-- ЭКРАН ВХОДА -->
+<!-- AUTH -->
 <div id="auth">
   <div class="auth-bg">
     <div class="auth-blob auth-blob-1"></div>
     <div class="auth-blob auth-blob-2"></div>
+    <div class="auth-blob auth-blob-3"></div>
   </div>
+
   <div id="auth-login-screen" class="auth-screen active">
     <div class="auth-card">
       <div class="auth-logo"><div class="auth-logo-inner">🎄</div></div>
       <h1 class="auth-title">Azerta</h1>
       <p class="auth-subtitle">❄ Твой семейный мессенджер ❄</p>
+
       <div class="auth-input-group">
-        <input id="login-username" class="auth-input" placeholder=" " autocapitalize="none">
+        <input id="login-username" class="auth-input" placeholder=" " autocapitalize="none" autocomplete="username" />
         <label class="auth-label" for="login-username">Ник</label>
         <span class="auth-input-icon">👤</span>
       </div>
+
       <div class="auth-input-group">
-        <input id="login-password" class="auth-input" type="password" placeholder=" ">
+        <input id="login-password" class="auth-input" type="password" placeholder=" " autocomplete="current-password" />
         <label class="auth-label" for="login-password">Пароль</label>
         <span class="auth-input-icon">🔒</span>
+        <button type="button" class="auth-toggle-password" onclick="togglePassword('login-password')">👁</button>
       </div>
+
       <div class="auth-err" id="login-error"></div>
+
       <button type="button" class="auth-btn-primary" id="login-btn" onclick="doLogin()">
         <span class="btn-text">🎅 Войти</span>
+        <span class="btn-spinner" style="display:none;">
+          <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.25"/><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </span>
       </button>
+
+      <button type="button" class="auth-btn-link" onclick="switchAuthScreen('register')">
+        Нет аккаунта? <span>Зарегистрироваться</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="auth-register-screen" class="auth-screen">
+    <div class="reg-top-bar">
+      <button type="button" class="reg-back-btn" id="reg-back-btn" onclick="regBack()"><span>‹</span></button>
+      <div class="reg-progress">
+        <div class="reg-progress-seg active" data-step="1"></div>
+        <div class="reg-progress-seg" data-step="2"></div>
+        <div class="reg-progress-seg" data-step="3"></div>
+      </div>
+    </div>
+
+    <div class="auth-card reg-step-card active" data-step="1">
+      <div class="auth-logo"><div class="auth-logo-inner">✨</div></div>
+      <h1 class="auth-title">Придумай ник</h1>
+      <p class="auth-subtitle">❄ Латиница, цифры и _ ❄</p>
+      <div class="auth-input-group reg-username-group" id="reg-username-wrap">
+        <span class="auth-input-prefix">@</span>
+        <input id="reg-username" class="auth-input" placeholder=" " autocapitalize="none" autocomplete="off" maxlength="20" oninput="onRegUsernameInput()" />
+        <label class="auth-label" for="reg-username">username</label>
+        <span class="reg-status" id="reg-username-status"></span>
+      </div>
+      <div class="auth-hint" id="reg-username-hint">Минимум 3 символа</div>
+      <div class="auth-err" id="reg-error-1"></div>
+      <button type="button" class="auth-btn-primary" id="reg-next-1" onclick="regNext(1)" disabled>
+        <span class="btn-text">Далее</span><span class="btn-arrow">→</span>
+      </button>
+      <button type="button" class="auth-btn-link" onclick="switchAuthScreen('login')">Уже есть аккаунт? <span>Войти</span></button>
+    </div>
+
+    <div class="auth-card reg-step-card" data-step="2">
+      <div class="auth-logo"><div class="auth-logo-inner">🎁</div></div>
+      <h1 class="auth-title">Как тебя зовут?</h1>
+      <p class="auth-subtitle">❄ Так тебя увидят другие ❄</p>
+      <div class="auth-input-group">
+        <input id="reg-displayname" class="auth-input" placeholder=" " maxlength="40" autocomplete="name" />
+        <label class="auth-label" for="reg-displayname">Имя</label>
+        <span class="auth-input-icon">💫</span>
+      </div>
+      <div class="auth-hint">Можно изменить позже в настройках</div>
+      <div class="auth-err" id="reg-error-2"></div>
+      <button type="button" class="auth-btn-primary" id="reg-next-2" onclick="regNext(2)">
+        <span class="btn-text">Далее</span><span class="btn-arrow">→</span>
+      </button>
+      <button type="button" class="auth-btn-link" onclick="regBack()">‹ Назад</button>
+    </div>
+
+    <div class="auth-card reg-step-card" data-step="3">
+      <div class="auth-logo"><div class="auth-logo-inner">🔐</div></div>
+      <h1 class="auth-title">Придумай пароль</h1>
+      <p class="auth-subtitle">❄ Минимум 8 символов ❄</p>
+      <div class="auth-input-group">
+        <input id="reg-password" class="auth-input" type="password" placeholder=" " autocomplete="new-password" oninput="onRegPasswordInput()" />
+        <label class="auth-label" for="reg-password">Пароль</label>
+        <button type="button" class="auth-toggle-password" onclick="togglePassword('reg-password')">👁</button>
+      </div>
+      <div class="reg-strength"><div class="reg-strength-bar" id="reg-strength-bar"></div></div>
+      <div class="auth-hint" id="reg-strength-label">Введи пароль</div>
+      <div class="auth-input-group">
+        <input id="reg-password2" class="auth-input" type="password" placeholder=" " autocomplete="new-password" oninput="onRegPassword2Input()" />
+        <label class="auth-label" for="reg-password2">Повтори пароль</label>
+        <button type="button" class="auth-toggle-password" onclick="togglePassword('reg-password2')">👁</button>
+      </div>
+      <div class="auth-hint" id="reg-password2-hint"></div>
+      <div class="auth-err" id="reg-error-3"></div>
+      <button type="button" class="auth-btn-primary auth-btn-success" id="reg-submit" onclick="doRegister()" disabled>
+        <span class="btn-text">Создать аккаунт</span>
+      </button>
+      <button type="button" class="auth-btn-link" onclick="regBack()">‹ Назад</button>
     </div>
   </div>
 </div>
 
-<!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
+<!-- CREATE MENU -->
+<div class="modal" id="create-menu-modal"><div class="modal-box">
+  <h3>🎄 Что создать?</h3>
+  <button type="button" class="create-menu-btn" onclick="closeModal('create-menu-modal'); openModal('add-modal');">
+    <span class="cm-icon">👤</span><span class="cm-text"><span class="cm-title">Добавить контакт</span></span>
+  </button>
+  <button type="button" class="create-menu-btn" onclick="closeModal('create-menu-modal'); openCreateChannelModal();">
+    <span class="cm-icon">📢</span><span class="cm-text"><span class="cm-title">Создать канал</span></span>
+  </button>
+  <button type="button" class="create-menu-btn" onclick="closeModal('create-menu-modal'); openCreateGroupModal();">
+    <span class="cm-icon">👥</span><span class="cm-text"><span class="cm-title">Создать группу</span></span>
+  </button>
+  <button type="button" class="create-menu-btn" onclick="closeModal('create-menu-modal'); openCreateBotModal();">
+    <span class="cm-icon">🤖</span><span class="cm-text"><span class="cm-title">Создать бота</span></span>
+  </button>
+  <button type="button" class="modal-secondary" onclick="closeModal('create-menu-modal')">Отмена</button>
+</div></div>
+
+<!-- PROFILE -->
+<div class="modal" id="profile-modal"><div class="modal-box">
+  <h3>🎅 Мой профиль</h3>
+  <div id="profile-banner-preview" class="profile-banner-preview" style="display:none;">
+    <img id="profile-banner-img" src="" alt="" />
+    <button type="button" class="banner-remove-btn" onclick="removeMyBanner(event)" title="Убрать баннер">×</button>
+  </div>
+  <div id="profile-username" style="text-align:center;color:var(--text-muted);margin-bottom:16px;font-size:14px"></div>
+  <label>Имя</label><input id="my-first-name" placeholder="Имя" maxlength="40" />
+  <label>Фамилия</label><input id="my-last-name" placeholder="Фамилия" maxlength="40" />
+  <label>О себе</label><textarea id="my-bio" placeholder="Пара слов" maxlength="200" rows="3"></textarea>
+  
+  <button type="button" class="modal-primary" onclick="saveProfile()">💾 Сохранить</button>
+  <button type="button" class="modal-primary" onclick="document.getElementById('avatarFile').click()">📷 Сменить фото</button>
+  <button type="button" class="modal-primary" onclick="document.getElementById('bannerFile').click()">🎨 Сменить баннер</button>
+  <button type="button" class="modal-secondary" onclick="closeModal('profile-modal')">Закрыть</button>
+</div></div>
+
+<!-- MAIN APP -->
 <div id="app" data-tab="chats">
   <div id="main-header">
     <button type="button" id="burger" onclick="openSettings()">☰</button>
     <h2>Azerta</h2>
-    <button type="button" class="icon-btn" onclick="openModal('create-menu-modal')">＋</button>
+    <button type="button" class="icon-btn" onclick="openModal('create-menu-modal')" title="Создать">＋</button>
     <button type="button" class="icon-btn" id="my-avatar-btn" onclick="openSettings()"></button>
   </div>
 
@@ -67,7 +193,6 @@
   <div id="tab-contacts" class="app-tab"><div class="tab-empty"><div class="big">👥</div><div>Контакты</div></div></div>
   <div id="tab-settings" class="app-tab"><div id="tab-settings-content"></div></div>
 
-  <!-- НИЖНЕЕ МЕНЮ -->
   <div id="bottom-nav">
     <button type="button" class="nav-btn active" data-tab="chats" onclick="switchTab('chats')">
       <span class="nav-icon">💬</span><span class="nav-label">Чаты</span>
@@ -78,13 +203,13 @@
     <button type="button" class="nav-btn" data-tab="contacts" onclick="switchTab('contacts')">
       <span class="nav-icon">👥</span><span class="nav-label">Контакты</span>
     </button>
-    <button type="button" class="nav-btn" data-tab="settings" onclick="openSettings()">
+    <button type="button" class="nav-btn" data-tab="settings" onclick="switchTab('settings')">
       <span class="nav-icon">🎄</span><span class="nav-label">Настройки</span>
     </button>
   </div>
 </div>
 
-<!-- НАСТРОЙКИ -->
+<!-- SETTINGS -->
 <div id="settings-screen">
   <div id="settings-header">
     <button type="button" class="back-btn" onclick="closeSettings()">‹</button>
@@ -93,7 +218,7 @@
   <div id="settings-content"></div>
 </div>
 
-<!-- ЧАТ -->
+<!-- CHAT -->
 <div id="chat-screen">
   <div id="chat-top">
     <button type="button" class="back-btn" onclick="closeChat()">‹</button>
@@ -105,36 +230,34 @@
   </div>
   <div id="messages"></div>
   <div id="input-area">
-    <input id="msgInput" placeholder="Сообщение...">
+    <input id="msgInput" placeholder="Сообщение..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMsg();}">
     <button type="button" id="send-btn" onclick="sendMsg()">➤</button>
   </div>
 </div>
 
-<!-- МОДАЛКИ -->
-<div class="modal" id="create-menu-modal"><div class="modal-box">
-  <h3>🎄 Что создать?</h3>
-  <button type="button" class="create-menu-btn" onclick="alert('Добавление контакта в разработке')"><span class="cm-icon">👤</span><span class="cm-text"><span class="cm-title">Добавить контакт</span></span></button>
-  <button type="button" class="create-menu-btn" onclick="alert('Создание канала в разработке')"><span class="cm-icon">📢</span><span class="cm-text"><span class="cm-title">Создать канал</span></span></button>
-  <button type="button" class="create-menu-btn" onclick="alert('Создание группы в разработке')"><span class="cm-icon">👥</span><span class="cm-text"><span class="cm-title">Создать группу</span></span></button>
-  <button type="button" class="modal-secondary" onclick="closeModal('create-menu-modal')">Отмена</button>
-</div></div>
+<!-- HIDDEN INPUTS (для смены фото и баннера) -->
+<input type="file" id="avatarFile" accept="image/*" style="display:none" onchange="uploadAvatar(event)" />
+<input type="file" id="bannerFile" accept="image/*" style="display:none" onchange="uploadBanner(event)" />
 
-<div class="modal" id="profile-modal"><div class="modal-box">
-  <h3>🎅 Мой профиль</h3>
-  <div id="profile-username" style="text-align:center;color:var(--text-muted);margin-bottom:16px;"></div>
-  <label>Имя</label><input id="my-first-name" placeholder="Имя">
-  <label>О себе</label><textarea id="my-bio" placeholder="Пара слов" rows="3"></textarea>
-  <button type="button" class="modal-primary" onclick="alert('Сохранение в разработке')">💾 Сохранить</button>
-  <button type="button" class="modal-secondary" onclick="closeModal('profile-modal')">Закрыть</button>
-</div></div>
-
-<div class="modal" id="stars-history-modal"><div class="modal-box">
-  <h3>⭐ Мои звёзды</h3>
-  <div id="stars-history-list" style="padding:20px;text-align:center;">Загрузка...</div>
-  <button type="button" class="modal-secondary" onclick="closeModal('stars-history-modal')">Закрыть</button>
-</div></div>
-
+<!-- СКРИПТЫ -->
 <script src="/socket.io/socket.io.js"></script>
 <script src="app.js"></script>
+
+<!-- 🚑 ЗАЩИТА ОТ ЧЕРНОГО ЭКРАНА И ОШИБОК -->
+<script>
+  // 1. Принудительно убираем заставку через 2 секунды, что бы ни случилось
+  setTimeout(() => {
+    const sp = document.getElementById('splash-screen');
+    if (sp) { sp.style.opacity = '0'; setTimeout(() => sp.remove(), 300); }
+  }, 2000);
+
+  // 2. Игнорируем битые картинки, чтобы скрипт не падал
+  window.addEventListener('error', function(e) {
+    if (e.target && e.target.tagName === 'IMG') {
+      e.target.style.display = 'none';
+    }
+  }, true);
+</script>
+
 </body>
 </html>
