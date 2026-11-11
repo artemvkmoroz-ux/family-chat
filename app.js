@@ -4384,3 +4384,38 @@ window.addEventListener('error', function(e) {
     e.target.style.display = 'none';
   }
 }, true);
+/* ═══════════════════════════════════════════════════════════
+   🚑 ФИКС КНОПОК (Тема и Создание)
+   ═══════════════════════════════════════════════════════════ */
+
+// 1. Кнопка "＋" в шапке (Открывает меню создания)
+window.openCreateMenu = function() {
+  const m = document.getElementById('create-menu-modal');
+  if (m) m.classList.add('active');
+};
+
+// 2. Кнопка смены темы (в настройках)
+window.changeTheme = function() {
+  const v = state.settings.theme === 'light' ? 'dark' : 'light';
+  api('update settings', { key: 'theme', value: v }, () => {
+    state.settings.theme = v;
+    applyLocalSettings();
+    // Если открыты настройки - перерисовываем их
+    if (typeof renderSettings === 'function') renderSettings(); 
+    // Если мы на вкладке настроек - обновляем и её
+    if (state.activeTab === 'settings' && typeof renderSettingsTab === 'function') renderSettingsTab();
+  });
+};
+
+// 3. Применение темы к body
+window.applyLocalSettings = function() {
+  const s = state.settings;
+  document.body.classList.toggle('light', s.theme === 'light');
+  document.body.classList.toggle('no-anim', s.animations == 0);
+  if (s.font_size) {
+    document.documentElement.style.setProperty('--font-size', {
+      small: '13px', medium: '15px', large: '17px'
+    }[s.font_size] || '15px');
+  }
+  if (s.accent_color) document.documentElement.style.setProperty('--accent', s.accent_color);
+};
