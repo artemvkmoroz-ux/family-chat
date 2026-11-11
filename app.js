@@ -724,3 +724,36 @@ window.addEventListener('load', () => {
     if (!creds?.sessionId) { hideSplash(); $('auth')?.classList.add('active'); }
   } catch (e) { console.error('Init error:', e); hideSplash(); $('auth')?.classList.add('active'); }
 });
+/* ─── ДОБАВЛЯЕМ НЕДОСТАЮЩИЕ ФУНКЦИИ ─── */
+window.openSettings = function() {
+  const s = document.getElementById('settings-screen');
+  if (s) s.classList.add('active');
+  if (typeof renderSettings === 'function') renderSettings();
+};
+
+window.openProfile = function() {
+  const usernameEl = document.getElementById('profile-username');
+  if (usernameEl) usernameEl.textContent = '@' + (state.me.username || '');
+  const fn = document.getElementById('my-first-name'); if (fn) fn.value = state.me.firstName || '';
+  const ln = document.getElementById('my-last-name'); if (ln) ln.value = state.me.lastName || '';
+  const bio = document.getElementById('my-bio'); if (bio) bio.value = state.me.bio || '';
+  openModal('profile-modal');
+};
+
+window.openBadgeModal = function() {
+  const u = document.getElementById('badge-username'); if (u) u.value = '';
+  const e = document.getElementById('badge-error'); if (e) e.textContent = '';
+  openModal('badge-modal');
+};
+
+window.renderStoriesBar = function() {
+  const row = document.getElementById('stories-row');
+  if (!row) return;
+  row.innerHTML = '';
+  const bubble = el('div', 'story-bubble');
+  bubble.innerHTML = `<div class="story-ring mine"><div class="story-ring-inner">${initials(state.me.username || '?')}</div><div class="story-add-badge">+</div></div><div class="story-name">Моя</div>`;
+  bubble.onclick = () => openModal('story-add-modal');
+  row.appendChild(bubble);
+};
+
+window.openStarsHistory = function() { alert('История звёзд'); };
