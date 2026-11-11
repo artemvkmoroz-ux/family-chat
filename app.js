@@ -4420,55 +4420,42 @@ window.applyLocalSettings = function() {
   if (s.accent_color) document.documentElement.style.setProperty('--accent', s.accent_color);
 };
 /* ═══════════════════════════════════════════════════════════
-   👑 ГЛАВНЫЙ БЛОК (Отменяет все предыдущие фиксы)
+   👑 ФИНАЛЬНЫЙ ФИКС (Без перехвата кликов, чтобы чаты работали)
    ═══════════════════════════════════════════════════════════ */
 
 (function() {
-  console.log("👑 Запуск главного блока. Игнорируем старые фиксы.");
-
-  // 1. ПРИНУДИТЕЛЬНО УБИРАЕМ ЗАСТАВКУ (защита от черного экрана)
+  // 1. Убираем заставку
   setTimeout(() => {
     const sp = document.getElementById('splash-screen');
     if (sp) { sp.style.opacity = '0'; setTimeout(() => sp.remove(), 300); }
   }, 1500);
 
-  // 2. ПЕРЕЗАПИСЫВАЕМ ОТКРЫТИЕ НАСТРОЕК
+  // 2. Настройки
   window.openSettings = function() {
     const s = document.getElementById('settings-screen');
     if (s) s.classList.add('active');
     if (typeof renderSettings === 'function') renderSettings();
   };
-
   window.closeSettings = function() {
     const s = document.getElementById('settings-screen');
     if (s) s.classList.remove('active');
   };
 
-  // 3. ПЕРЕЗАПИСЫВАЕМ СМЕНУ ТЕМЫ
+  // 3. Смена темы
   window.changeTheme = function() {
-    if (state.settings.theme === 'light') {
-      state.settings.theme = 'dark';
-    } else {
-      state.settings.theme = 'light';
-    }
-    // Применяем визуально
-    document.body.classList.toggle('light', state.settings.theme === 'light');
-    // Сохраняем на сервере (если api есть)
-    if (typeof api === 'function') {
-      api('update settings', { key: 'theme', value: state.settings.theme });
-    }
-    // Перерисовываем настройки
+    const v = state.settings.theme === 'light' ? 'dark' : 'light';
+    state.settings.theme = v;
+    document.body.classList.toggle('light', v === 'light');
+    if (typeof api === 'function') api('update settings', { key: 'theme', value: v });
     if (typeof renderSettings === 'function') renderSettings();
   };
 
-  // 4. ПЕРЕЗАПИСЫВАЕМ ЗВЁЗДЫ
+  // 4. Звёзды
   window.openStarsHistory = function() {
     const modal = document.getElementById('stars-history-modal');
     if (modal) modal.classList.add('active');
-    
     const list = document.getElementById('stars-history-list');
     if (!list) return;
-    
     list.innerHTML = '<div style="text-align:center;padding:20px;">Загрузка...</div>';
     
     if (typeof api === 'function') {
@@ -4484,44 +4471,16 @@ window.applyLocalSettings = function() {
           } else {
             list.innerHTML += '<div style="text-align:center;color:#888;margin-top:20px;">Нет операций</div>';
           }
-        } else {
-          list.innerHTML = '<div style="text-align:center;color:#f87171;padding:20px;">Ошибка загрузки</div>';
         }
       });
     }
   };
 
-  // 5. ОТКРЫТИЕ ПРОФИЛЯ
+  // 5. Профиль
   window.openProfile = function() {
     const u = document.getElementById('profile-username');
     if (u) u.textContent = '@' + (state.me.username || '');
     const modal = document.getElementById('profile-modal');
     if (modal) modal.classList.add('active');
   };
-
-  // 6. МОДАЛКИ (вдруг они были сломаны)
-  window.openModal = function(id) {
-    const m = document.getElementById(id);
-    if (m) m.classList.add('active');
-  };
-  window.closeModal = function(id) {
-    const m = document.getElementById(id);
-    if (m) m.classList.remove('active');
-  };
-
-  // 7. ПЕРЕХВАТ КЛИКОВ (Делаем кнопки железобетонными)
-  document.addEventListener('click', function(e) {
-    // Кнопка "Плюс" (Создать)
-    if (e.target.closest('button[onclick*="create-menu-modal"]')) {
-      e.preventDefault();
-      window.openModal('create-menu-modal');
-    }
-    // Звёзды (если кликнули по строке, где есть слово "звёзды")
-    if (e.target.closest('[onclick*="openStarsHistory"]') || (e.target.closest('.settings-stars-row'))) {
-      e.preventDefault();
-      window.openStarsHistory();
-    }
-  });
-
-  console.log("👑 Главный блок установлен. Все старые функции перезаписаны.");
 })();
