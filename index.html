@@ -1040,5 +1040,19 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="app.js"></script>
 <script src="calls-patch.js"></script>
+<script>
+  // 🚑 АВАРИЙНЫЙ ЗАПУСК
+  // Если через 2 секунды заставка всё ещё на экране - убираем её принудительно.
+  setTimeout(function() {
+    var sp = document.getElementById('splash-screen');
+    if (sp) sp.remove();
+    var auth = document.getElementById('auth');
+    var app = document.getElementById('app');
+    // Если приложение не загрузилось (не активно), показываем экран входа
+    if (auth && app && !app.classList.contains('active')) {
+      auth.classList.add('active');
+    }
+  }, 2000);
+</script>
 </body>
 </html>
