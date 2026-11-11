@@ -1,12 +1,10 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.8 — Часть 1 (Ядро, Авторизация)
+   AZERTA v13.9 — Client (Оригинал + Фиксы)
    ═══════════════════════════════════════════════════════════ */
 
 const $ = id => document.getElementById(id);
-const qs = (sel, root = document) => root.querySelector(sel);
-const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const now = () => Date.now();
@@ -16,32 +14,22 @@ const initials = n => { const p = String(n || '').trim().split(/\s+/); return p.
 const ago = ms => { const m = Math.floor((now() - ms) / 6e4); return m < 1 ? 'только что' : m < 60 ? m + ' мин назад' : m < 1440 ? Math.floor(m / 60) + ' ч назад' : Math.floor(m / 1440) + ' дн назад'; };
 const jset = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const jget = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } };
-const vib = ms => { if (state.settings?.vibration == 0) return; try { navigator.vibrate?.(ms || [10, 20, 10]); } catch {} };
+const vib = ms => { if (state.settings.vibration == 0) return; try { navigator.vibrate?.(ms || [10, 20, 10]); } catch {} };
 const api = (ev, payload, cb) => socket.emit(ev, payload, typeof cb === 'function' ? cb : () => {});
 
-let toastTimer = null;
-function toast(text) {
-  let t = $('aurora-toast');
-  if (!t) { t = el('div'); t.id = 'aurora-toast'; document.body.appendChild(t); }
-  t.textContent = text;
-  requestAnimationFrame(() => t.classList.add('show'));
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
-}
+const toast = (() => {
+  let t, timer;
+  return text => {
+    if (!t) { t = el('div'); t.id = 'aurora-toast'; document.body.appendChild(t); }
+    t.textContent = text;
+    requestAnimationFrame(() => t.classList.add('show'));
+    clearTimeout(timer);
+    timer = setTimeout(() => t.classList.remove('show'), 3000);
+  };
+})();
 
-const modalStack = [];
-function openModal(id) { const m = $(id); if (!m) return; m.classList.add('active'); if (!modalStack.includes(id)) modalStack.push(id); document.body.style.overflow = 'hidden'; }
-function closeModal(id) { $(id)?.classList.remove('active'); const i = modalStack.indexOf(id); if (i !== -1) modalStack.splice(i, 1); if (!modalStack.length) document.body.style.overflow = ''; }
-
-let splashHidden = false;
-function hideSplash() {
-  if (splashHidden) return;
-  splashHidden = true;
-  const sp = $('splash-screen');
-  if (sp) { sp.style.transition = 'opacity 0.3s'; sp.style.opacity = '0'; setTimeout(() => sp.remove(), 350); }
-}
-setTimeout(hideSplash, 2000);
-setTimeout(hideSplash, 4000);
+function openModal(id) { $(id)?.classList.add('active'); }
+function closeModal(id) { $(id)?.classList.remove('active'); }
 
 function renderBadges(u) {
   if (!u) return '';
@@ -89,8 +77,6 @@ const state = {
 const STORAGE = { SESSION: 'aurora-session', UNREAD: 'aurora-unread', CONTACTS: 'aurora-contacts-cache', GROUPS: 'aurora-groups-cache', STICKERS: 'aurora-recent-stickers', SETTINGS: 'aurora-settings-cache', WALLPAPERS: 'aurora-wallpapers' };
 const STORY_DURATION = 5000, SWIPE_THRESHOLD = 60, MAX_RECORDING_SEC = 60, MAX_CIRCLE_SEC = 30;
 
-const BUILTIN_GIFS = [['😀', 'https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif'], ['😍', 'https://media.giphy.com/media/3o6Zt6ML6BklcajjsA/giphy.gif'], ['😂', 'https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif']].map(([emoji, url]) => ({ emoji, url }));
-
 const REPORT_REASONS = { spam: '🚫 Спам', abuse: '🤬 Оскорбления', nsfw: '🔞 18+', scam: '💀 Мошенничество', ads: '📢 Реклама', other: '❓ Другое' };
 const PUNISH_LABELS = { ban: '🚫 Бан', mute: '🔇 Мут', warn: '⚠️ Предупреждение' };
 
@@ -133,6 +119,14 @@ function applyMuteLock() {
   let b = $('mute-banner'); if (!b) { b = el('div'); b.id = 'mute-banner'; $('input-area')?.parentNode?.insertBefore(b, $('input-area')); }
   b.innerHTML = '🔇 Ты в муте' + (mute.reason ? ' · ' + esc(mute.reason) : '') + (until ? ' · до ' + esc(until) : '');
 }
+
+function hideSplash() {
+  const sp = $('splash-screen');
+  if (sp && !sp.classList.contains('hide')) { sp.classList.add('hide'); setTimeout(() => sp.remove(), 500); }
+}
+// ФИКС ЧЕРНОГО ЭКРАНА
+setTimeout(hideSplash, 1500);
+setTimeout(hideSplash, 2500);
 
 function playLoginTransition(username, firstName, auto) {
   state.isLoggedIn = true; isLoggedInOnServer = true;
@@ -267,9 +261,71 @@ function regNext(step) {
   }
 }
 function regBack() { if (state.regStep > 1) regShowStep(state.regStep - 1); vib(10); }
-/* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.8 — Часть 2 (Настройки, Чаты, Сообщения)
-   ═══════════════════════════════════════════════════════════ */
+
+function onRegUsernameInput() {
+  const input = $('reg-username'), wrap = $('reg-username-wrap'), status = $('reg-username-status'), hint = $('reg-username-hint'), next = $('reg-next-1');
+  if (!input) return;
+  const v = input.value.trim().toLowerCase(); input.value = v;
+  wrap.classList.remove('error', 'success'); status.textContent = ''; hint.classList.remove('error', 'success');
+  next.disabled = true; state.regUsernameAvailable = false;
+  if (v.length < 3) { hint.textContent = 'Минимум 3 символа'; hint.classList.add('error'); return; }
+  if (v.length > 20) { hint.textContent = 'Максимум 20 символов'; hint.classList.add('error'); return; }
+  if (!/^[a-z0-9_]+$/.test(v)) { hint.textContent = 'Только латиница, цифры и _'; hint.classList.add('error'); wrap.classList.add('error'); return; }
+  hint.textContent = 'Проверяю...'; status.textContent = '⏳';
+  clearTimeout(state.regUsernameCheckTimer);
+  state.regUsernameCheckTimer = setTimeout(() => {
+    api('check username', { username: v }, res => {
+      if (!res?.ok) { hint.textContent = 'Ошибка проверки'; hint.classList.add('error'); return; }
+      if (res.available) { wrap.classList.add('success'); status.textContent = '✅'; hint.textContent = 'Свободен!'; hint.classList.add('success'); next.disabled = false; state.regUsernameAvailable = true; vib(15); }
+      else { wrap.classList.add('error'); status.textContent = '❌'; hint.textContent = { taken: 'Этот ник занят', short: 'Слишком короткий', long: 'Слишком длинный', chars: 'Только латиница, цифры и _', empty: 'Введи ник' }[res.reason] || 'Недоступен'; hint.classList.add('error'); next.disabled = true; vib([30, 20, 30]); }
+    });
+  }, 350);
+}
+function onRegPasswordInput() {
+  const p = $('reg-password')?.value || '';
+  const bar = $('reg-strength-bar'), label = $('reg-strength-label');
+  if (!bar || !label) return;
+  bar.classList.remove('weak', 'medium', 'strong');
+  if (!p) { label.textContent = 'Введи пароль'; label.style.color = ''; bar.style.width = '0'; onRegPassword2Input(); return; }
+  let score = 0;
+  if (p.length >= 8) score++;
+  if (/[a-z]/.test(p) && /[A-Z]/.test(p)) score++;
+  if (/[0-9]/.test(p)) score++;
+  if (/[^a-zA-Z0-9]/.test(p)) score++;
+  if (p.length < 8) { bar.classList.add('weak'); label.textContent = 'Слишком короткий (мин. 8)'; label.style.color = '#f87171'; }
+  else if (score <= 2) { bar.classList.add('weak'); label.textContent = 'Слабый'; label.style.color = '#f87171'; }
+  else if (score === 3) { bar.classList.add('medium'); label.textContent = 'Средний'; label.style.color = '#fbbf24'; }
+  else { bar.classList.add('strong'); label.textContent = 'Сильный 💪'; label.style.color = '#4ade80'; }
+  onRegPassword2Input();
+}
+function onRegPassword2Input() {
+  const p = $('reg-password')?.value || '', p2 = $('reg-password2')?.value || '';
+  const hint = $('reg-password2-hint'); if (!hint) return;
+  if (!p2) { hint.textContent = ''; hint.classList.remove('success', 'error'); }
+  else if (p === p2) { hint.textContent = '✓ Совпадают'; hint.classList.add('success'); hint.classList.remove('error'); }
+  else { hint.textContent = 'Пароли не совпадают'; hint.classList.add('error'); hint.classList.remove('success'); }
+  updateRegSubmit();
+}
+function updateRegSubmit() {
+  const btn = $('reg-submit'); if (!btn) return;
+  const p = $('reg-password')?.value || '', p2 = $('reg-password2')?.value || '', dn = ($('reg-displayname')?.value || '').trim();
+  btn.disabled = !(p.length >= 8 && /[a-zA-Z]/.test(p) && /[0-9]/.test(p) && p === p2 && dn && state.regUsernameAvailable);
+}
+function togglePassword(id) {
+  const input = $(id); if (!input) return;
+  const btn = input.parentElement.querySelector('.auth-toggle-password');
+  if (input.type === 'password') { input.type = 'text'; if (btn) btn.textContent = '🙈'; } else { input.type = 'password'; if (btn) btn.textContent = '👁'; }
+  vib(10);
+}
+function tryPasscode() {
+  const v = $('passcode-input')?.value || '', err = $('passcode-error'); if (err) err.textContent = '';
+  api('check passcode', { passcode: v }, res => {
+    if (!res?.ok) { if (err) err.textContent = 'Неверный код'; vib([30, 20, 30]); return; }
+    $('passcode-screen')?.classList.remove('active');
+    playLoginTransition(state.me.username, state.me.firstName, true);
+  });
+}
+/* === ПРОДОЛЖЕНИЕ (Настройки, Чаты, Сообщения, Звонки) === */
 
 function initNotifications() {
   if (!('Notification' in window)) return;
@@ -381,7 +437,7 @@ function renderSettings() {
     <div class="settings-tg-section"><div class="settings-tg-group">
       ${renderTgRow({ icon: '🚪', text: 'Выйти', type: 'danger', onClick: 'logout()' })}
     </div></div>
-    <div style="padding:30px 20px 10px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.8<br><br>Сделано с ❤️</div>`;
+    <div style="padding:30px 20px 10px;text-align:center;color:var(--text-muted);font-size:12px;">🌌 Azerta v13.9<br><br>Сделано с ❤️</div>`;
   box.innerHTML = html;
   setTimeout(showCacheSize, 100);
   bindRipples(box);
@@ -409,78 +465,6 @@ function updateMyAvatarBtn() {
 }
 function updateVerifyButton() { const b = $('verify-btn'); if (!b) return; b.style.display = state.me.username === 'moroz' ? 'block' : 'none'; if (state.me.username === 'moroz') b.onclick = openBadgeModal; }
 function updateVerifyChannelButton() { const b = $('verify-channel-btn'); if (!b) return; b.style.display = state.me.username === 'moroz' ? 'block' : 'none'; if (state.me.username === 'moroz') b.onclick = () => { $('verify-channel-slug').value = ''; $('verify-channel-error').textContent = ''; openModal('verify-channel-modal'); }; }
-/* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.8 — Часть 3 (Профиль, Чаты, Сообщения)
-   ═══════════════════════════════════════════════════════════ */
-
-/* ─── ПРОФИЛЬ ─── */
-function openProfile() {
-  $('profile-username').textContent = '@' + (state.me.username || '');
-  $('my-first-name').value = state.me.firstName || '';
-  $('my-last-name').value = state.me.lastName || '';
-  $('my-bio').value = state.me.bio || '';
-  $('my-birthday').value = state.me.birthday || '';
-  $('my-emoji').value = state.me.emoji || '';
-  const p = $('profile-banner-preview'), img = $('profile-banner-img');
-  if (state.me.banner && p && img) { img.src = state.me.banner; p.style.display = 'block'; p.classList.remove('removing'); }
-  else if (p) p.style.display = 'none';
-  updateVerifyButton(); updateVerifyChannelButton();
-  openModal('profile-modal');
-  setTimeout(patchProfileButtons, 50);
-}
-
-function patchProfileButtons() {
-  document.querySelectorAll('#profile-modal .modal-primary').forEach(btn => {
-    const t = btn.textContent || '';
-    if (t.includes('Сменить фото')) btn.onclick = pickAvatarMedia;
-    else if (t.includes('Сменить баннер')) btn.onclick = pickBannerMedia;
-  });
-}
-
-function saveProfile() {
-  const payload = { firstName: ($('my-first-name')?.value || '').trim(), lastName: ($('my-last-name')?.value || '').trim(), bio: ($('my-bio')?.value || '').trim(), birthday: $('my-birthday')?.value || '', emojiStatus: ($('my-emoji')?.value || '').trim() };
-  api('update profile', payload, res => {
-    if (!res?.ok) return;
-    Object.assign(state.me, payload);
-    closeModal('profile-modal'); renderChatList(); toast('✓ Профиль сохранён');
-  });
-}
-
-function pickMedia(kind) {
-  const input = el('input'); input.type = 'file'; input.accept = 'image/*,video/*'; input.style.display = 'none';
-  input.onchange = e => {
-    const f = e.target.files[0]; if (!f) return;
-    if (f.type.startsWith('video/')) uploadVideo(kind, f);
-    else if (f.type.startsWith('image/')) uploadPhoto(kind, f);
-  };
-  document.body.appendChild(input); input.click();
-  setTimeout(() => input.remove(), 1000);
-}
-function pickAvatarMedia() { pickMedia('avatar'); }
-function pickBannerMedia() { pickMedia('banner'); }
-
-function uploadPhoto(kind, file) {
-  const r = new FileReader();
-  r.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      const isAvatar = kind === 'avatar';
-      const W = isAvatar ? 200 : 1200, H = isAvatar ? 200 : 400;
-      const c = document.createElement('canvas'); c.width = W; c.height = H;
-      const ctx = c.getContext('2d');
-      if (isAvatar) { const m = Math.min(img.width, img.height); ctx.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, W, H); }
-      else { const sc = Math.max(W / img.width, H / img.height); const w = img.width * sc, h = img.height * sc; ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h); }
-      const dataUrl = c.toDataURL('image/jpeg', isAvatar ? 0.8 : 0.75);
-      if (isAvatar) {
-        api('remove avatar video', () => { state.me.avatarVideo = null; state.me.avatar = dataUrl; api('set avatar', { avatar: dataUrl }); updateMyAvatarBtn(); closeModal('profile-modal'); });
-      } else {
-        api('remove banner video', () => { state.me.bannerVideo = null; state.me.banner = dataUrl; api('set banner', { banner: dataUrl }, res => { if (res?.ok) { const p = $('profile-banner-preview'), im = $('profile-banner-img'); if (im) im.src = dataUrl; if (p) p.style.display = 'block'; } }); });
-      }
-    };
-    img.src = e.target.result;
-  };
-  r.readAsDataURL(file);
-}
 
 /* ─── СПИСОК ЧАТОВ ─── */
 function renderChatList() {
@@ -542,7 +526,6 @@ function renderContactItem(u) {
   return div;
 }
 
-/* ─── ОТКРЫТИЕ ЧАТОВ ─── */
 function openChat(name) {
   state.currentChat = name; state.currentGroup = null; state.currentChannel = null; state.isSavedChat = false;
   const contact = state.contacts.find(c => c.name === name);
@@ -592,7 +575,6 @@ function closeChat() {
 
 function clearUnread(key) { if (state.unread[key]) { delete state.unread[key]; jset(STORAGE.UNREAD, state.unread); updateTitle(); renderChatList(); } }
 
-/* ─── СООБЩЕНИЯ ─── */
 function renderMessage(msg) {
   const box = $('messages'); if (!box) return;
   if (msg.time) {
@@ -622,17 +604,9 @@ function sendMsg() {
   else if (state.currentGroup) api('group message', { groupId: state.currentGroup.id, text });
   input.value = ''; cancelReply();
 }
-/* ═══════════════════════════════════════════════════════════
-   🌌 AZERTA v13.8 — Часть 4 (Звонки, Сокеты, Запуск)
-   ═══════════════════════════════════════════════════════════ */
 
 /* ─── ЗВОНКИ ─── */
-const RTC_CONFIG = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
-  ]
-};
+const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }] };
 let iceCandidatesQueue = [], isRemoteDescSet = false;
 
 async function startCall(video) {
@@ -643,14 +617,11 @@ async function startCall(video) {
   $('call-status').textContent = 'Вызов...';
   $('call-screen').classList.add('active');
   if (video) { $('local-video-wrap').classList.add('active'); $('localVideo').srcObject = state.localStream; }
-  
   state.peerConnection = new RTCPeerConnection(RTC_CONFIG);
   iceCandidatesQueue = []; isRemoteDescSet = false;
   state.localStream.getTracks().forEach(t => state.peerConnection.addTrack(t, state.localStream));
-  
   state.peerConnection.onicecandidate = e => { if (e.candidate) socket.emit('ice-candidate', { to: state.currentChat, candidate: e.candidate }); };
   state.peerConnection.ontrack = e => { $('remoteVideo').srcObject = e.streams[0]; $('remote-video-wrap').classList.remove('audio-only'); $('call-status').textContent = 'В разговоре'; startCallTimer(); };
-  
   const offer = await state.peerConnection.createOffer();
   await state.peerConnection.setLocalDescription(offer);
   socket.emit('call-user', { to: state.currentChat, offer, video });
@@ -662,25 +633,20 @@ async function acceptIncoming() {
   const from = state.incomingFrom, offer = state.pendingOffer;
   state.currentChat = from; state.pendingOffer = null; state.incomingFrom = null;
   try { state.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: state.incomingVideo }); } catch (err) { socket.emit('end-call', { to: from }); return alert('Нет доступа'); }
-  
   state.callActive = true;
   $('call-peer-name').textContent = displayName(from);
   $('call-status').textContent = 'Соединение...';
   $('call-screen').classList.add('active');
   if (state.incomingVideo) { $('local-video-wrap').classList.add('active'); $('localVideo').srcObject = state.localStream; }
-  
   state.peerConnection = new RTCPeerConnection(RTC_CONFIG);
   iceCandidatesQueue = []; isRemoteDescSet = false;
   state.localStream.getTracks().forEach(t => state.peerConnection.addTrack(t, state.localStream));
-  
   state.peerConnection.onicecandidate = e => { if (e.candidate) socket.emit('ice-candidate', { to: from, candidate: e.candidate }); };
   state.peerConnection.ontrack = e => { $('remoteVideo').srcObject = e.streams[0]; $('remote-video-wrap').classList.remove('audio-only'); $('call-status').textContent = 'В разговоре'; startCallTimer(); };
-  
   await state.peerConnection.setRemoteDescription(offer);
   isRemoteDescSet = true;
   iceCandidatesQueue.forEach(c => state.peerConnection.addIceCandidate(c).catch(()=>{}));
   iceCandidatesQueue = [];
-  
   const answer = await state.peerConnection.createAnswer();
   await state.peerConnection.setLocalDescription(answer);
   socket.emit('answer-call', { to: from, answer });
@@ -693,38 +659,15 @@ function cleanupCall() {
   $('call-screen').classList.remove('active'); $('incoming-screen').classList.remove('active');
   $('localVideo').srcObject = null; $('remoteVideo').srcObject = null;
 }
-
 function startCallTimer() {
   state.callStartTime = Date.now(); clearInterval(state.callTimerInterval);
   state.callTimerInterval = setInterval(() => { const s = Math.floor((Date.now() - state.callStartTime) / 1000); $('call-timer').textContent = `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`; }, 1000);
 }
 
-function declineIncoming() {
-  $('incoming-screen').classList.remove('active');
-  if (state.incomingFrom) socket.emit('end-call', { to: state.incomingFrom });
-}
-
-function hangup() {
-  if (state.currentChat) socket.emit('end-call', { to: state.currentChat });
-  cleanupCall();
-}
-
-function toggleMic() {
-  if (state.localStream) { const t = state.localStream.getAudioTracks()[0]; t.enabled = !t.enabled; $('micBtn').classList.toggle('off', !t.enabled); }
-}
-
-function toggleCamera() {
-  if (state.localStream) { const t = state.localStream.getVideoTracks()[0]; t.enabled = !t.enabled; $('camBtn').classList.toggle('off', !t.enabled); }
-}
-
 /* ─── СОКЕТЫ ─── */
 socket.on('connect', async () => {
   const ok = await tryAutoLogin();
-  if (!ok) {
-    $('app').classList.remove('active');
-    $('auth').classList.add('active');
-    state.isLoggedIn = false; isLoggedInOnServer = false;
-  }
+  if (!ok) { $('app').classList.remove('active'); $('auth').classList.add('active'); state.isLoggedIn = false; }
   autoLoginDone = true;
 });
 
@@ -740,8 +683,7 @@ socket.on('private message', data => {
     renderMessage({ id: data.id, from: data.from, text: data.text, time: data.time, self: data.self });
   } else {
     state.unread[data.from] = (state.unread[data.from] || 0) + 1;
-    jset(STORAGE.UNREAD, state.unread); updateTitle(); renderChatList();
-    playPing();
+    jset(STORAGE.UNREAD, state.unread); updateTitle(); renderChatList(); playPing();
   }
 });
 
@@ -769,22 +711,16 @@ socket.on('ice-candidate', async data => {
 });
 
 socket.on('call-ended', () => cleanupCall());
-socket.on('message blocked', d => toast(d.reason));
 
 /* ─── ИНИЦИАЛИЗАЦИЯ ─── */
 window.addEventListener('load', () => {
   try {
     state.unread = jget(STORAGE.UNREAD, {}) || {};
     initNotifications();
-    
     const cc = jget(STORAGE.CONTACTS); if (cc) state.contacts = cc;
     const sc = jget(STORAGE.SETTINGS); if (sc) { state.settings = sc; applyLocalSettings(); }
-    
     bindRipples();
-
     const creds = jget(STORAGE.SESSION);
     if (!creds?.sessionId) { hideSplash(); $('auth')?.classList.add('active'); }
-  } catch (e) {
-    console.error('Init error:', e); hideSplash(); $('auth')?.classList.add('active');
-  }
+  } catch (e) { console.error('Init error:', e); hideSplash(); $('auth')?.classList.add('active'); }
 });
