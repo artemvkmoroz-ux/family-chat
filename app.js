@@ -1012,3 +1012,45 @@ window.addEventListener('load', () => {
 
 // Дополнительные функции
 function cancelReply() { state.replyToMessage = null; $('reply-preview')?.classList.remove('active'); }
+window.openSettings = function() { document.getElementById('settings-screen').classList.add('active'); };
+window.closeSettings = function() { document.getElementById('settings-screen').classList.remove('active'); };
+window.switchTab = function(tab) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.textContent.includes(tab === 'chats' ? 'Чаты' : tab === 'calls' ? 'Звонки' : tab === 'contacts' ? 'Контакты' : 'Настройки')));
+  if (tab !== 'chats') alert('Вкладка в разработке');
+};
+window.openChat = function(name) {
+  document.getElementById('chat-screen').classList.add('active');
+  document.getElementById('chat-top-name').textContent = name;
+  document.getElementById('messages').innerHTML = '';
+  socket.emit('load history', { withUser: name }, (data) => {
+    const box = document.getElementById('messages');
+    if (data && data.messages) {
+      data.messages.forEach(m => {
+        const isSelf = m.from_user !== name;
+        const d = document.createElement('div');
+        d.className = `msg-wrap ${isSelf ? 'self' : 'other'}`;
+        d.innerHTML = `<div class="msg ${isSelf ? 'self' : 'other'}">${m.text}</div>`;
+        box.appendChild(d);
+      });
+    }
+  });
+};
+window.closeChat = function() { document.getElementById('chat-screen').classList.remove('active'); };
+window.sendMsg = function() {
+  const text = document.getElementById('msgInput').value.trim();
+  const to = document.getElementById('chat-top-name').textContent;
+  if (!text || !to) return;
+  socket.emit('private message', { to, text });
+  document.getElementById('msgInput').value = '';
+};
+window.doLogin = function() {
+  const u = document.getElementById('login-username').value.trim();
+  const p = document.getElementById('login-password').value;
+  if (!u || !p) return alert('Заполни поля');
+  socket.emit('login', { username: u, password: p }, (res) => {
+    if (res && res.ok) {
+      localStorage.setItem('aurora-session', JSON.stringify({ username: res.username, sessionId: res.sessionId }));
+      location.reload();
+    } else alert(res?.error || 'Ошибка');
+  });
+};
