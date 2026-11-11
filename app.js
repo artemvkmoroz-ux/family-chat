@@ -1002,3 +1002,43 @@ window.openCreateMenu = function() {
   `;
   document.getElementById('modal-container').style.display = 'flex';
 };
+/* ─── ОБРАБОТЧИКИ КНОПОК (чтобы всё нажималось) ─── */
+
+window.openCreateMenu = function() {
+  alert('Меню создания (контакт, группа, канал)');
+};
+
+window.openSettings = function() {
+  document.getElementById('settings-screen').style.display = 'flex';
+};
+
+window.closeSettings = function() {
+  document.getElementById('settings-screen').style.display = 'none';
+};
+
+window.switchTab = function(tab) {
+  // Переключаем активный класс у кнопок
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+
+  // Показываем/скрываем список чатов
+  const list = document.getElementById('chat-list');
+  if (tab === 'chats') {
+    list.style.display = 'block';
+    list.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Загрузка чатов...</div>';
+    // Имитируем загрузку (на самом деле они уже есть в памяти)
+    if (window.renderChatListFull) window.renderChatListFull();
+  } else if (tab === 'calls') {
+    list.style.display = 'block';
+    list.innerHTML = '<div style="text-align:center; padding:40px; color:#888;">📞<br><br>История звонков пуста</div>';
+  } else if (tab === 'contacts') {
+    list.style.display = 'block';
+    list.innerHTML = '<div style="text-align:center; padding:40px; color:#888;">👥<br><br>Список контактов</div>';
+  }
+};
+
+window.changeTheme = function() {
+  document.body.classList.toggle('light');
+  document.body.style.background = document.body.classList.contains('light') ? '#fff' : '#0a1628';
+};
