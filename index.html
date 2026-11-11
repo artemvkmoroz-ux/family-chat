@@ -4,70 +4,139 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Azerta</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a1628">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="animations.css">
 </head>
 <body>
 
-<div id="splash-screen" style="position:fixed;inset:0;background:#0a1628;display:flex;align-items:center;justify-content:center;z-index:9999;">
-  <div style="text-align:center;">
-    <div style="font-size:60px;margin-bottom:20px;">🎄</div>
-    <div style="font-size:24px;font-weight:800;color:#fff;letter-spacing:4px;">AZERTA</div>
-  </div>
+<div id="snow-layer" aria-hidden="true"></div>
+
+<!-- ЗАСТАВКА -->
+<div id="splash-screen">
+  <div id="splash-logo"><div class="auth-logo-inner" style="font-size:60px;">🎄</div></div>
+  <div id="splash-title">AZERTA</div>
+  <div id="splash-subtitle">❄ семейный мессенджер ❄</div>
+  <div id="splash-loader"></div>
 </div>
 
 <!-- ЭКРАН ВХОДА -->
-<div id="auth" style="display:none;position:fixed;inset:0;background:#0a1628;z-index:1000;padding:20px;">
-  <div class="auth-card" style="max-width:400px;margin:100px auto;background:#142642;padding:30px;border-radius:20px;">
-    <h1 style="text-align:center;margin-bottom:30px;color:#fff;">Вход</h1>
-    
-    <input id="login-username" placeholder="Ник" style="width:100%;padding:15px;margin-bottom:15px;background:rgba(255,255,255,0.1);border:none;border-radius:10px;color:#fff;font-size:16px;">
-    
-    <input id="login-password" type="password" placeholder="Пароль" style="width:100%;padding:15px;margin-bottom:15px;background:rgba(255,255,255,0.1);border:none;border-radius:10px;color:#fff;font-size:16px;">
-    
-    <button onclick="doLogin()" style="width:100%;padding:15px;background:#e63946;border:none;border-radius:10px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;">Войти</button>
+<div id="auth">
+  <div class="auth-bg">
+    <div class="auth-blob auth-blob-1"></div>
+    <div class="auth-blob auth-blob-2"></div>
+  </div>
+  <div id="auth-login-screen" class="auth-screen active">
+    <div class="auth-card">
+      <div class="auth-logo"><div class="auth-logo-inner">🎄</div></div>
+      <h1 class="auth-title">Azerta</h1>
+      <p class="auth-subtitle">❄ Твой семейный мессенджер ❄</p>
+      <div class="auth-input-group">
+        <input id="login-username" class="auth-input" placeholder=" " autocapitalize="none">
+        <label class="auth-label" for="login-username">Ник</label>
+        <span class="auth-input-icon">👤</span>
+      </div>
+      <div class="auth-input-group">
+        <input id="login-password" class="auth-input" type="password" placeholder=" ">
+        <label class="auth-label" for="login-password">Пароль</label>
+        <span class="auth-input-icon">🔒</span>
+      </div>
+      <div class="auth-err" id="login-error"></div>
+      <button type="button" class="auth-btn-primary" id="login-btn" onclick="doLogin()">
+        <span class="btn-text">🎅 Войти</span>
+      </button>
+    </div>
   </div>
 </div>
 
-<!-- ПРИЛОЖЕНИЕ -->
-<div id="app" style="display:none;position:fixed;inset:0;background:#0a1628;flex-direction:column;">
-  <div style="padding:20px;background:#0f1e35;border-bottom:1px solid rgba(255,255,255,0.1);">
-    <h2 style="color:#fff;margin:0;">Azerta</h2>
+<!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
+<div id="app" data-tab="chats" style="display:none;">
+  <div id="main-header">
+    <button type="button" id="burger" onclick="openSettings()">☰</button>
+    <h2>Azerta</h2>
+    <button type="button" class="icon-btn" onclick="alert('Добавление контактов в разработке')" title="Создать">＋</button>
+    <button type="button" class="icon-btn" id="my-avatar-btn" onclick="openSettings()"></button>
   </div>
-  <div id="chat-list" style="flex:1;overflow-y:auto;padding:10px;"></div>
+
+  <div id="search-wrap"><input id="search" placeholder="🔍 Поиск"></div>
+  
+  <div id="chat-list"></div>
+
+  <div id="tab-calls" class="app-tab"><div class="tab-empty"><div class="big">📞</div><div>Звонки</div></div></div>
+  <div id="tab-contacts" class="app-tab"><div class="tab-empty"><div class="big">👥</div><div>Контакты</div></div></div>
+  <div id="tab-settings" class="app-tab"><div id="tab-settings-content"></div></div>
+
+  <!-- НИЖНЕЕ МЕНЮ -->
+  <div id="bottom-nav">
+    <button type="button" class="nav-btn active" data-tab="chats" onclick="switchTab('chats')">
+      <span class="nav-icon">💬</span><span class="nav-label">Чаты</span>
+    </button>
+    <button type="button" class="nav-btn" data-tab="calls" onclick="switchTab('calls')">
+      <span class="nav-icon">📞</span><span class="nav-label">Звонки</span>
+    </button>
+    <button type="button" class="nav-btn" data-tab="contacts" onclick="switchTab('contacts')">
+      <span class="nav-icon">👥</span><span class="nav-label">Контакты</span>
+    </button>
+    <button type="button" class="nav-btn" data-tab="settings" onclick="switchTab('settings')">
+      <span class="nav-icon">🎄</span><span class="nav-label">Настройки</span>
+    </button>
+  </div>
+</div>
+
+<!-- ЭКРАН НАСТРОЕК -->
+<div id="settings-screen">
+  <div id="settings-header">
+    <button type="button" class="back-btn" onclick="closeSettings()">‹</button>
+    <h2>🎄 Настройки</h2>
+  </div>
+  <div id="settings-content"></div>
 </div>
 
 <!-- ЭКРАН ЧАТА -->
-<div id="chat-screen" style="display:none;position:fixed;inset:0;background:#0a1628;z-index:500;flex-direction:column;">
-  <div style="padding:15px;background:#0f1e35;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.1);">
-    <button onclick="closeChat()" style="background:none;border:none;color:#e63946;font-size:28px;cursor:pointer;">‹</button>
-    <div id="chat-top-name" style="color:#fff;font-weight:700;font-size:18px;">—</div>
+<div id="chat-screen">
+  <div id="chat-top">
+    <button type="button" class="back-btn" onclick="closeChat()">‹</button>
+    <div class="avatar" id="chat-avatar"></div>
+    <div id="chat-top-info">
+      <div id="chat-top-name">—</div>
+      <div id="chat-top-status">—</div>
+    </div>
+    <div id="chat-actions">
+      <button type="button" onclick="startCall(false)">📞</button>
+      <button type="button" onclick="startCall(true)">📹</button>
+    </div>
   </div>
-  <div id="messages" style="flex:1;overflow-y:auto;padding:15px;"></div>
-  <div style="padding:10px;background:#0f1e35;display:flex;gap:10px;">
-    <input id="msgInput" placeholder="Сообщение..." style="flex:1;padding:12px;background:rgba(255,255,255,0.1);border:none;border-radius:20px;color:#fff;font-size:15px;">
-    <button onclick="sendMsg()" style="width:50px;height:50px;background:#e63946;border:none;border-radius:50%;color:#fff;font-size:18px;cursor:pointer;">➤</button>
+  <div id="messages"></div>
+  <div id="input-area">
+    <input id="msgInput" placeholder="Сообщение...">
+    <button type="button" id="send-btn" onclick="sendMsg()">➤</button>
   </div>
 </div>
 
-<style>
-  /* Базовые стили, чтобы сообщения выглядели нормально */
-  .msg-wrap { display: flex; margin: 5px 0; }
-  .msg-wrap.self { justify-content: flex-end; }
-  .msg-wrap.other { justify-content: flex-start; }
-  .msg { max-width: 70%; padding: 10px 15px; border-radius: 15px; color: #fff; }
-  .msg.self { background: #e63946; }
-  .msg.other { background: #1a3355; }
-  .chat-item { display: flex; gap: 12px; padding: 12px; border-radius: 12px; cursor: pointer; }
-  .chat-item:hover { background: rgba(255,255,255,0.05); }
-  .avatar { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: #fff; flex-shrink: 0; }
-  .chat-name { color: #fff; font-weight: 600; font-size: 16px; }
-  .chat-preview { color: #888; font-size: 14px; margin-top: 4px; }
-  .chat-info { flex: 1; }
-  #auth.active { display: block !important; }
-  #app.active { display: flex !important; }
-  #chat-screen.active { display: flex !important; }
-</style>
+<!-- ЭКРАН ЗВОНКА -->
+<div id="call-screen">
+  <div id="remote-video-wrap"><video id="remoteVideo" autoplay playsinline></video></div>
+  <div id="call-info"><div id="call-peer-name">—</div><div id="call-status">Соединение...</div><div id="call-timer"></div></div>
+  <div id="local-video-wrap"><video id="localVideo" autoplay muted playsinline></video></div>
+  <div id="call-controls-bar">
+    <button type="button" class="call-btn" id="micBtn" onclick="toggleMic()">🎤</button>
+    <button type="button" class="call-btn" id="camBtn" onclick="toggleCamera()">📷</button>
+    <button type="button" class="call-btn hangup" onclick="hangup()">📵</button>
+  </div>
+</div>
+
+<!-- ВХОДЯЩИЙ ЗВОНОК -->
+<div id="incoming-screen">
+  <div><div class="from-label">🎅 Входящий звонок</div><div class="from-name" id="incoming-name">—</div><div class="type" id="incoming-type">Видеозвонок</div></div>
+  <div class="buttons">
+    <button type="button" class="incoming-btn decline" onclick="declineIncoming()">📵</button>
+    <button type="button" class="incoming-btn accept" onclick="acceptIncoming()">📞</button>
+  </div>
+</div>
+
+<input type="file" id="photoFile" accept="image/*" style="display:none" onchange="sendPhoto(event)">
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="app.js"></script>
